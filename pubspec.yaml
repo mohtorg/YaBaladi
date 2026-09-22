@@ -1,0 +1,33 @@
+name: ya_baladi
+description: "تطبيق يا بلدي - دليل الأماكن والفعاليات في المدن المصرية"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.4
+  firebase_auth: ^5.3.1
+  google_sign_in: ^6.2.1
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
+  geolocator: ^13.0.1
+  http: ^1.6.0
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/ya_baladi_icon.png

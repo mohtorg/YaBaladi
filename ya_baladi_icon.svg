@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#087ACF"/>
+      <stop offset="1" stop-color="#064A86"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#159CEB"/>
+      <stop offset="1" stop-color="#0868B5"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="190" fill="url(#bg)"/>
+  <!-- Story/place frame -->
+  <path d="M224 796V370C224 300 282 244 352 244h320c70 0 128 56 128 126v426H224Z" fill="#FFF4DE"/>
+  <!-- sun -->
+  <circle cx="655" cy="392" r="112" fill="#FFC55B"/>
+  <!-- palm -->
+  <path d="M337 655c5-102 15-190 31-258 8-34 20-64 37-88-38 3-73-10-101-35 42-2 79 9 108 34-4-34 1-69 17-103 13 40 12 77 0 109 29-22 62-34 101-36-25 28-58 45-94 52 26 22 44 51 53 88-30-26-58-42-86-48-19 79-30 165-33 285l-33 0Z" fill="#0A4F8E"/>
+  <!-- landmark silhouette -->
+  <path d="M482 626V468h35v-50h39v50h58v-72h44v72h42v-96h36v254H482Z" fill="#0A4F8E"/>
+  <path d="M548 418h32v-58h12v58h-44Z" fill="#0A4F8E"/>
+  <!-- waves / story path -->
+  <path d="M170 682c132-44 231-43 327 5 83 41 165 45 357-9v86c-164 51-270 44-372-6-82-40-173-45-312 1v-77Z" fill="url(#wave)"/>
+  <path d="M170 747c142-45 234-37 327 9 92 45 186 45 357-8v48c-159 52-269 50-374 0-89-42-176-46-310-2v-47Z" fill="#F9F1DF"/>
+  <path d="M170 798c142-44 236-34 326 11 91 45 187 45 358-9v54H170v-56Z" fill="#0A78C7"/>
+</svg>

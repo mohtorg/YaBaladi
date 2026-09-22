@@ -1,0 +1,31 @@
+# Flutter
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Logs
+*.log
+
+# IDE
+.idea/
+*.iml
+
+# Local / generated files
+local.properties
+
+# Firebase / local credentials
+serviceAccountKey.json
+firebase-adminsdk-*.json
+*.pem
+*.key
+
+# Temporary project copies
+YaBaladi_Merged_Governorate_Control_Test/
+
+# Local backups
+*.bak
+.firebase/
+.vscode/

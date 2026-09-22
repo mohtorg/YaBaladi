@@ -1,0 +1,307 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    // صلاحية المشرف المخصص: لا تُقرأ من واجهة التطبيق، بل من مستند لا يستطيع
+    // المستخدم العادي إنشاءه أو تعديله. ويظل الأدمن الأعلى (Custom Claim) قادرًا دائمًا.
+    function hasPermission(permission) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admin_profiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.active == true
+        && (get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.permissions.hasAny([permission, '*']));
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function placeOwner(placeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/places/$(placeId))
+        && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == request.auth.uid;
+    }
+
+    // الأماكن عامة القراءة. الكتابة للأدمن فقط.
+    match /places/{placeId} {
+      allow read: if true;
+      allow create, delete: if isAdmin() || hasPermission('places.write');
+
+      // تحديث متوسط التقييم لا يتم إلا ضمن عملية تقييم موثّق.
+      allow update: if isAdmin() || hasPermission('places.write')
+        || (signedIn()
+          && placeOwner(placeId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['featuredRequestPending'])
+          && request.resource.data.featuredRequestPending == true)
+        || (signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'ratingCount', 'lastRatingId'])
+          && request.resource.data.ratingCount == resource.data.ratingCount + 1
+          && request.resource.data.rating >= 0
+          && request.resource.data.rating <= 5
+          && request.resource.data.lastRatingId is string
+          && exists(/databases/$(database)/documents/ratings/$(request.resource.data.lastRatingId))
+          && getAfter(/databases/$(database)/documents/ratings/$(request.resource.data.lastRatingId)).data.userId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/ratings/$(request.resource.data.lastRatingId)).data.placeId == placeId);
+    }
+
+    // المستخدم يقرأ/ينشئ مستنده فقط. لا يستطيع رفع نفسه إلى admin.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || hasPermission('users.read');
+
+      allow create: if isOwner(userId)
+        && request.resource.data.role in ['', 'user', 'merchant'];
+
+      allow update: if isAdmin() || hasPermission('users.write')
+        || (isOwner(userId)
+          && request.resource.data.role != 'admin'
+          && (request.resource.data.role == resource.data.role
+            || (resource.data.role == '' && request.resource.data.role in ['user', 'merchant'])));
+
+      allow delete: if isAdmin() || hasPermission('users.write');
+    }
+
+    // بيانات التجار: التاجر يدير بياناته الأساسية، والمشرف يحتاج صلاحية صريحة.
+    match /merchants/{merchantId} {
+      allow read: if isOwner(merchantId) || isAdmin() || hasPermission('merchants.read');
+      allow create: if isAdmin() || hasPermission('merchants.write')
+        || (isOwner(merchantId)
+          && request.resource.data.verified == false
+          && request.resource.data.ownedPlaceIds.size() == 0);
+      allow update: if isAdmin() || hasPermission('merchants.write')
+        || (isOwner(merchantId)
+          && request.resource.data.verified == resource.data.verified
+          && request.resource.data.ownedPlaceIds == resource.data.ownedPlaceIds);
+      allow delete: if isAdmin() || hasPermission('merchants.write');
+    }
+
+    // طلبات الزيارة: المستخدم ينشئ طلبه ويقرأه، والتاجر المالك للمكان يستطيع تأكيده.
+    match /visit_requests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(10, 'm');
+
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid
+          || placeOwner(resource.data.placeId));
+
+      allow update: if signedIn()
+        && placeOwner(resource.data.placeId)
+        && resource.data.status == 'pending'
+        && resource.data.expiresAt > request.time
+        && request.resource.data.status == 'confirmed'
+        && request.resource.data.confirmedBy == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.placeId == resource.data.placeId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.expiresAt == resource.data.expiresAt;
+
+      allow delete: if isAdmin();
+    }
+
+    // الزيارات الموثقة: المستخدم يقرأ زياراته، والتاجر يقرأ زيارات أماكنه.
+    match /visits/{visitId} {
+      // ملاحظة أمنية: إنشاء الزيارة يجب أن ينتقل إلى Cloud Functions بعد النشر.
+      // لا نسمح للعميل بإنشاء زيارة مباشرة حتى لا يستطيع التاجر/المستخدم اصطناع زيارة ونقاط.
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid
+          || resource.data.merchantId == request.auth.uid
+          || isAdmin());
+
+      // الإنشاء يتم داخل نفس Transaction التي تحول visit_request من pending إلى confirmed.
+      // getAfter() يربط المستندين ويمنع اختلاق Visit مستقلة.
+      allow create: if signedIn()
+        && request.resource.data.merchantId == request.auth.uid
+        && placeOwner(request.resource.data.placeId)
+        && request.resource.data.visitRequestId is string
+        && exists(/databases/$(database)/documents/visit_requests/$(request.resource.data.visitRequestId))
+        && getAfter(/databases/$(database)/documents/visit_requests/$(request.resource.data.visitRequestId)).data.status == 'confirmed'
+        && getAfter(/databases/$(database)/documents/visit_requests/$(request.resource.data.visitRequestId)).data.userId == request.resource.data.userId
+        && getAfter(/databases/$(database)/documents/visit_requests/$(request.resource.data.visitRequestId)).data.placeId == request.resource.data.placeId
+        && getAfter(/databases/$(database)/documents/visit_requests/$(request.resource.data.visitRequestId)).data.confirmedBy == request.auth.uid
+        && request.resource.data.ratingSubmitted == false;
+
+      // المستخدم لا يستطيع إلا تحويل ratingSubmitted من false إلى true.
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && resource.data.ratingSubmitted == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingSubmitted'])
+        && request.resource.data.ratingSubmitted == true;
+
+      allow delete: if isAdmin();
+    }
+
+    // التقييمات: القراءة عامة. إنشاء التقييم مرتبط بزيارة المستخدم.
+    match /ratings/{ratingId} {
+      allow read: if true;
+
+      allow create: if signedIn()
+        && ratingId == request.resource.data.visitId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.stars >= 1
+        && request.resource.data.stars <= 5
+        && exists(/databases/$(database)/documents/visits/$(request.resource.data.visitId))
+        && get(/databases/$(database)/documents/visits/$(request.resource.data.visitId)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/visits/$(request.resource.data.visitId)).data.placeId == request.resource.data.placeId
+        && get(/databases/$(database)/documents/visits/$(request.resource.data.visitId)).data.ratingSubmitted == false;
+
+      // رد التاجر على التقييم فقط، ومن تاجر يملك المكان.
+      allow update: if signedIn()
+        && placeOwner(resource.data.placeId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['merchantReply']);
+
+      allow delete: if isAdmin();
+    }
+
+    // سجل حجز مكافأة التقييم: مستند داخلي يمنع إصدار أكثر من كوبون لنفس التقييم.
+    match /coupon_claims/{ratingId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.ratingId == ratingId
+        && request.resource.data.userId == request.auth.uid
+        && exists(/databases/$(database)/documents/ratings/$(ratingId))
+        && get(/databases/$(database)/documents/ratings/$(ratingId)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/ratings/$(ratingId)).data.placeId == request.resource.data.placeId
+        && request.resource.data.code is string;
+      allow update, delete: if false;
+    }
+
+    // الكوبونات: المستخدم ينشئ كوبونه، والتاجر المالك للمكان يستردّه.
+    match /coupons/{couponId} {
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid
+          || placeOwner(resource.data.placeId)
+          || isAdmin());
+
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.isUsed == false
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(7, 'd')
+        && request.resource.data.ratingId is string
+        && exists(/databases/$(database)/documents/ratings/$(request.resource.data.ratingId))
+        && get(/databases/$(database)/documents/ratings/$(request.resource.data.ratingId)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/ratings/$(request.resource.data.ratingId)).data.placeId == request.resource.data.placeId
+        && getAfter(/databases/$(database)/documents/coupon_claims/$(request.resource.data.ratingId)).data.code == request.resource.data.code
+        && getAfter(/databases/$(database)/documents/coupon_claims/$(request.resource.data.ratingId)).data.userId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/coupon_claims/$(request.resource.data.ratingId)).data.placeId == request.resource.data.placeId;
+
+      allow update: if signedIn()
+        && placeOwner(resource.data.placeId)
+        && resource.data.isUsed == false
+        && request.resource.data.isUsed == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isUsed', 'usedAt', 'usedBy'])
+        && request.resource.data.usedBy == request.auth.uid;
+
+      allow delete: if isAdmin();
+    }
+
+    // المدن: قراءة عامة، إدارة للأدمن فقط.
+    match /cities/{cityId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+
+    match /subscription_plans/{planId} { allow read: if true; allow create, update, delete: if isAdmin() || hasPermission('subscriptions.write'); }
+    match /subscriptions/{userId} { allow read: if isOwner(userId) || isAdmin(); allow create, update, delete: if isAdmin(); }
+    match /events/{eventId} { allow read: if resource.data.isPublished == true || isAdmin() || hasPermission('events.write'); allow create, update, delete: if isAdmin() || hasPermission('events.write'); }
+    match /offers/{offerId} { allow read: if resource.data.active == true || isAdmin() || hasPermission('offers.write'); allow create, update, delete: if isAdmin() || hasPermission('offers.write'); }
+    match /points_wallets/{userId} { allow read: if isOwner(userId) || isAdmin(); allow write: if isAdmin(); }
+    match /rewards/{rewardId} { allow read: if resource.data.active == true || isAdmin() || hasPermission('rewards.write'); allow create, update, delete: if isAdmin() || hasPermission('rewards.write'); }
+    match /reward_redemption_requests/{requestId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.rewardId is string
+        && exists(/databases/$(database)/documents/rewards/$(request.resource.data.rewardId))
+        && get(/databases/$(database)/documents/rewards/$(request.resource.data.rewardId)).data.active == true
+        && request.resource.data.pointsCost == get(/databases/$(database)/documents/rewards/$(request.resource.data.rewardId)).data.pointsCost;
+      allow update, delete: if isAdmin();
+    }
+    match /tasks/{taskId} {
+      // القراءة تعتمد على المورد الموجود؛ الإنشاء يعتمد على البيانات الجديدة.
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.completed == false;
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+    match /notification_preferences/{userId} { allow read, write: if isOwner(userId); }
+    match /notifications/{notificationId} { allow read: if isAdmin() || hasPermission('notifications.write') || (signedIn() && resource.data.userId == request.auth.uid); allow update: if isAdmin() || hasPermission('notifications.write') || (signedIn() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead','readAt'])); allow create, delete: if isAdmin() || hasPermission('notifications.write'); }
+
+    // مركز التحكم بالمحافظات: بيانات تشغيلية وإعدادات وظائف محلية.
+    match /governorates/{governorateId} {
+      allow read: if isAdmin() || hasPermission('governorates.read')
+        || (resource.data.enabled == true && resource.data.visible == true);
+      allow create, update, delete: if isAdmin() || hasPermission('governorates.write');
+
+      match /feature_overrides/{featureId} {
+        allow read: if isAdmin() || hasPermission('governorates.read')
+          || (get(/databases/$(database)/documents/governorates/$(governorateId)).data.enabled == true
+            && get(/databases/$(database)/documents/governorates/$(governorateId)).data.visible == true);
+        allow create, update, delete: if isAdmin() || hasPermission('governorates.write');
+      }
+    }
+
+    match /governorate_groups/{groupId} {
+      allow read: if isAdmin() || hasPermission('governorates.read');
+      allow create, update, delete: if isAdmin() || hasPermission('governorates.write');
+    }
+
+    // الهوية البصرية للمحافظات: القراءة العامة للصور المنشورة والمصرح بها فقط.
+    // الكتابة للأدمن الأعلى فقط لأن بيانات المصدر والترخيص حساسة تجاريًا.
+    match /governorate_visuals/{governorateId} {
+      allow read: if resource.data.published == true && resource.data.usageApproved == true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // مكتبة يا بلدي: المحتوى الوطني المشترك والمحتوى المحلي لكل محافظة.
+    // القراءة العامة لا تتم إلا للمحتوى المنشور والمصرح باستخدامه.
+    // بيانات المصدر/الترخيص حساسة، لذلك الإدارة فقط تملك الكتابة.
+    match /content_library/{contentId} {
+      allow read: if resource.data.published == true && resource.data.usageApproved == true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ملفات المشرفين وسجل العمليات: للأدمن الأعلى فقط، حتى لا يستطيع مشرف تعديل صلاحياته.
+    match /admin_profiles/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // سجل تدقيق إداري غير قابل للحذف من التطبيق.
+    match /audit_logs/{logId} {
+      allow read: if isAdmin() || hasPermission('reports.read');
+      // سجل التدقيق Backend-only: لا يكتب فيه تطبيق الهاتف مباشرة.
+      allow create, update, delete: if false;
+    }
+
+    // تذاكر الدعم: المستخدم ينشئ ويقرأ تذاكره فقط، والمشرف المصرح له يديرها.
+    match /support_tickets/{ticketId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin() || hasPermission('support.read'));
+      allow update: if isAdmin() || hasPermission('support.write');
+      allow delete: if isAdmin() || hasPermission('support.write');
+    }
+
+    // أي Collection غير معرفة أعلاه مغلقة افتراضيًا.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
