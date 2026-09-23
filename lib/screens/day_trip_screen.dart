@@ -1,14 +1,17 @@
-// screens/day_trip_screen.dart
+﻿// screens/day_trip_screen.dart
 //
-// المرحلة الأولى من "رحلة اليوم": واجهة فعلية مرتبطة ببيانات Firestore الحالية.
-// لا ندّعي هنا وجود محرك ذكي للرحلات قبل بناء بيانات الساعات والمسافات والأحداث.
-// المستخدم يختار اهتمامًا، ثم يرى الأماكن المنشورة المتاحة في المحافظة.
-// هذه الشاشة هي الأساس الذي سيُطوّر لاحقًا إلى مخطط رحلة زمني كامل.
+// ط§ظ„ظ…ط±ط­ظ„ط© ط§ظ„ط£ظˆظ„ظ‰ ظ…ظ† "ط±ط­ظ„ط© ط§ظ„ظٹظˆظ…": ظˆط§ط¬ظ‡ط© ظپط¹ظ„ظٹط© ظ…ط±طھط¨ط·ط© ط¨ط¨ظٹط§ظ†ط§طھ Firestore ط§ظ„ط­ط§ظ„ظٹط©.
+// ظ„ط§ ظ†ط¯ظ‘ط¹ظٹ ظ‡ظ†ط§ ظˆط¬ظˆط¯ ظ…ط­ط±ظƒ ط°ظƒظٹ ظ„ظ„ط±ط­ظ„ط§طھ ظ‚ط¨ظ„ ط¨ظ†ط§ط، ط¨ظٹط§ظ†ط§طھ ط§ظ„ط³ط§ط¹ط§طھ ظˆط§ظ„ظ…ط³ط§ظپط§طھ ظˆط§ظ„ط£ط­ط¯ط§ط«.
+// ط§ظ„ظ…ط³طھط®ط¯ظ… ظٹط®طھط§ط± ط§ظ‡طھظ…ط§ظ…ظ‹ط§طŒ ط«ظ… ظٹط±ظ‰ ط§ظ„ط£ظ…ط§ظƒظ† ط§ظ„ظ…ظ†ط´ظˆط±ط© ط§ظ„ظ…طھط§ط­ط© ظپظٹ ط§ظ„ظ…ط­ط§ظپط¸ط©.
+// ظ‡ط°ظ‡ ط§ظ„ط´ط§ط´ط© ظ‡ظٹ ط§ظ„ط£ط³ط§ط³ ط§ظ„ط°ظٹ ط³ظٹظڈط·ظˆظ‘ط± ظ„ط§ط­ظ‚ظ‹ط§ ط¥ظ„ظ‰ ظ…ط®ط·ط· ط±ط­ظ„ط© ط²ظ…ظ†ظٹ ظƒط§ظ…ظ„.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/place.dart';
 import '../models/place_categories.dart';
 import '../services/place_service.dart';
+import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import 'place_details_screen.dart';
 
@@ -27,17 +30,29 @@ class _DayTripScreenState extends State<DayTripScreen> {
   bool _loading = true;
   String? _error;
   List<Place> _places = [];
+  StreamSubscription<Position>? _locationSubscription;
+  final LocationService _locationService = LocationService();
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _loadPlaces();
+    _startLiveLocation();
   }
 
   @override
   void didUpdateWidget(covariant DayTripScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cityId != widget.cityId) _loadPlaces();
+  }
+
+  void _startLiveLocation() {
+    _locationSubscription?.cancel();
+    _locationSubscription = _locationService.watchPosition(distanceFilterMeters: 25).listen((position) {
+      if (!mounted) return;
+      setState(() => _currentPosition = position);
+    });
   }
 
   Future<void> _loadPlaces() async {
@@ -55,16 +70,36 @@ class _DayTripScreenState extends State<DayTripScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'تعذر تحميل الأماكن حاليًا.';
+        _error = 'طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ط£ظ…ط§ظƒظ† ط­ط§ظ„ظٹظ‹ط§.';
         _loading = false;
       });
     }
   }
 
   List<Place> get _filteredPlaces {
-    if (_selectedCategory == null) return _places;
-    return _places.where((place) => place.category == _selectedCategory).toList();
+    final filtered = _selectedCategory == null
+        ? List<Place>.from(_places)
+        : _places.where((place) => place.category == _selectedCategory).toList();
+    final position = _currentPosition;
+    if (position == null) return filtered;
+    filtered.sort((a, b) {
+      final da = _locationService.distanceInKm(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        placeLat: a.latitude,
+        placeLng: a.longitude,
+      );
+      final db = _locationService.distanceInKm(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        placeLat: b.latitude,
+        placeLng: b.longitude,
+      );
+      return da.compareTo(db);
+    });
+    return filtered;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +107,7 @@ class _DayTripScreenState extends State<DayTripScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('رحلة اليوم'),
+        title: const Text('ط±ط­ظ„ط© ط§ظ„ظٹظˆظ…'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -82,12 +117,12 @@ class _DayTripScreenState extends State<DayTripScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const Text(
-              'ابدأ يومك من هنا',
+              'ط§ط¨ط¯ط£ ظٹظˆظ…ظƒ ظ…ظ† ظ‡ظ†ط§',
               style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             const Text(
-              'اختر اهتمامك الآن. سنبني لاحقًا رحلة زمنية كاملة حسب الوقت والمسافة والميزانية وساعات العمل.',
+              'ط§ط®طھط± ط§ظ‡طھظ…ط§ظ…ظƒ ط§ظ„ط¢ظ†. ط³ظ†ط¨ظ†ظٹ ظ„ط§ط­ظ‚ظ‹ط§ ط±ط­ظ„ط© ط²ظ…ظ†ظٹط© ظƒط§ظ…ظ„ط© ط­ط³ط¨ ط§ظ„ظˆظ‚طھ ظˆط§ظ„ظ…ط³ط§ظپط© ظˆط§ظ„ظ…ظٹط²ط§ظ†ظٹط© ظˆط³ط§ط¹ط§طھ ط§ظ„ط¹ظ…ظ„.',
               style: TextStyle(color: Colors.grey, height: 1.5),
             ),
             const SizedBox(height: 16),
@@ -97,7 +132,7 @@ class _DayTripScreenState extends State<DayTripScreen> {
                 scrollDirection: Axis.horizontal,
                 children: [
                   _CategoryChip(
-                    label: 'الكل',
+                    label: 'ط§ظ„ظƒظ„',
                     selected: _selectedCategory == null,
                     onTap: () => setState(() => _selectedCategory = null),
                   ),
@@ -121,7 +156,7 @@ class _DayTripScreenState extends State<DayTripScreen> {
               _MessageCard(message: _error!, onRetry: _loadPlaces)
             else if (visiblePlaces.isEmpty)
               const _MessageCard(
-                message: 'لا توجد أماكن منشورة متاحة لهذا الاختيار حاليًا.',
+                message: 'ظ„ط§ طھظˆط¬ط¯ ط£ظ…ط§ظƒظ† ظ…ظ†ط´ظˆط±ط© ظ…طھط§ط­ط© ظ„ظ‡ط°ط§ ط§ظ„ط§ط®طھظٹط§ط± ط­ط§ظ„ظٹظ‹ط§.',
               )
             else
               ...visiblePlaces.map(
@@ -145,7 +180,9 @@ class _DayTripScreenState extends State<DayTripScreen> {
                     title: Text(place.nameAr, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 5),
-                      child: Text('${place.category} • ${place.rating.toStringAsFixed(1)} ⭐'),
+                      child: Text(_currentPosition == null
+                          ? '${place.category} â€¢ ${place.rating.toStringAsFixed(1)} â­گ'
+                          : '${place.category} â€¢ ${place.rating.toStringAsFixed(1)} â­گ â€¢ ${_locationService.distanceInKm(userLat: _currentPosition!.latitude, userLng: _currentPosition!.longitude, placeLat: place.latitude, placeLng: place.longitude).toStringAsFixed(1)} ظƒظ…'),
                     ),
                     trailing: const Icon(Icons.chevron_left),
                     onTap: () => Navigator.push(
@@ -169,6 +206,7 @@ class _CategoryChip extends StatelessWidget {
 
   const _CategoryChip({required this.label, required this.selected, required this.onTap});
 
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -188,6 +226,7 @@ class _MessageCard extends StatelessWidget {
 
   const _MessageCard({required this.message, this.onRetry});
 
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -200,7 +239,7 @@ class _MessageCard extends StatelessWidget {
             Text(message, textAlign: TextAlign.center),
             if (onRetry != null) ...[
               const SizedBox(height: 12),
-              OutlinedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+              OutlinedButton(onPressed: onRetry, child: const Text('ط¥ط¹ط§ط¯ط© ط§ظ„ظ…ط­ط§ظˆظ„ط©')),
             ],
           ],
         ),
@@ -208,3 +247,4 @@ class _MessageCard extends StatelessWidget {
     );
   }
 }
+

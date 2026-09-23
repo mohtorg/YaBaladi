@@ -1,6 +1,6 @@
-// شاشة "حسابي" هي مركز النشاط الشخصي، وليست مكانًا لتسجيل الخروج.
-// الخروج موجود في الإعدادات فقط كما تم الاتفاق.
-// صورة Google/Firebase تستخدم أولًا، ثم صورة الحرف كبديل آمن إذا لم توجد صورة.
+// مركز النشاط الشخصي.
+// الوظائف الشخصية تظهر هنا، بينما إعدادات التطبيق موجودة في شاشة إعدادات واحدة فقط.
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
@@ -40,32 +40,34 @@ class AccountTabScreen extends StatelessWidget {
           final firstLetter = name.isNotEmpty ? name.substring(0, 1) : '؟';
 
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
             children: [
               Center(
                 child: CircleAvatar(
                   radius: 46,
                   backgroundColor: AppColors.primary,
                   backgroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
-                  child: photoUrl == null
-                      ? Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 30))
-                      : null,
+                  child: photoUrl == null ? Text(firstLetter, style: const TextStyle(color: Colors.white, fontSize: 30)) : null,
                 ),
               ),
               const SizedBox(height: 12),
               Center(child: Text(name.isEmpty ? AppStrings.of('welcome', lang) : name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
               if ((user?.email ?? firebaseUser?.email ?? '').isNotEmpty)
                 Center(child: Text(user?.email ?? firebaseUser!.email!, style: const TextStyle(color: Colors.grey))),
-              const SizedBox(height: 18),
-              _AccountTile(icon: Icons.card_giftcard, title: AppStrings.of('rewards', lang), onTap: () => _push(context, const RewardsScreen())),
-              _AccountTile(icon: Icons.notifications, title: AppStrings.of('notification_history', lang), onTap: () => _push(context, const NotificationsScreen())),
-              _AccountTile(icon: Icons.event_note, title: AppStrings.of('tasks', lang), onTap: () => _push(context, const TasksScreen())),
+              const SizedBox(height: 22),
+              _SectionTitle(AppStrings.of('activity', lang)),
+              _AccountTile(icon: Icons.location_history, title: AppStrings.of('visit_history', lang), onTap: () => _push(context, const MyVisitsScreen())),
               _AccountTile(icon: Icons.star, title: AppStrings.of('rating_history', lang), onTap: () => _push(context, const MyRatingsScreen())),
               _AccountTile(icon: Icons.rate_review_outlined, title: AppStrings.of('pending_ratings', lang), onTap: () => _push(context, const PendingRatingsScreen())),
-              _AccountTile(icon: Icons.location_history, title: AppStrings.of('visit_history', lang), onTap: () => _push(context, const MyVisitsScreen())),
+              _AccountTile(icon: Icons.notifications, title: AppStrings.of('notification_history', lang), onTap: () => _push(context, const NotificationsScreen())),
+              _AccountTile(icon: Icons.event_note, title: AppStrings.of('tasks', lang), onTap: () => _push(context, const TasksScreen())),
+              const SizedBox(height: 12),
+              _SectionTitle(AppStrings.of('rewards', lang)),
+              _AccountTile(icon: Icons.card_giftcard, title: AppStrings.of('rewards', lang), onTap: () => _push(context, const RewardsScreen())),
               _AccountTile(icon: Icons.card_membership, title: AppStrings.of('subscriptions', lang), onTap: () => _push(context, const SubscriptionsScreen())),
-              const SizedBox(height: 8),
-              _AccountTile(icon: Icons.settings_outlined, title: 'الإعدادات', onTap: () => _push(context, const SettingsTabScreen())),
+              const SizedBox(height: 12),
+              _SectionTitle(AppStrings.of('settings', lang)),
+              _AccountTile(icon: Icons.settings_outlined, title: AppStrings.of('settings', lang), onTap: () => _push(context, const SettingsTabScreen())),
             ],
           );
         },
@@ -76,11 +78,31 @@ class AccountTabScreen extends StatelessWidget {
   void _push(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 }
 
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+      );
+}
+
 class _AccountTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback onTap;
   const _AccountTile({required this.icon, required this.title, required this.onTap});
+
   @override
-  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: Icon(icon, color: AppColors.primary), title: Text(title), trailing: const Icon(Icons.chevron_left), onTap: onTap));
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          leading: Icon(icon, color: AppColors.primary),
+          title: Text(title),
+          trailing: const Icon(Icons.chevron_left),
+          onTap: onTap,
+        ),
+      );
 }

@@ -16,13 +16,23 @@ class PlaceService {
       FirebaseFirestore.instance.collection('places');
 
   Future<List<Place>> getPlacesByCity(String cityId) async {
-    final snapshot = await _placesRef.where('cityId', isEqualTo: cityId).get();
-
-    return snapshot.docs
+    try {
+      final snapshot = await _placesRef.where('cityId', isEqualTo: cityId).get();
+      return snapshot.docs
         .map((doc) => Place.fromMap(doc.id, doc.data()))
         // المستندات القديمة لا تحتوي isPublished؛ Place.fromMap يعتبرها منشورة.
         .where((place) => place.isPublished)
         .toList();
+    } catch (_) {
+      // عند انقطاع الشبكة، نطلب النسخة المحلية التي سبق أن خزّنها Firestore.
+      final snapshot = await _placesRef
+          .where('cityId', isEqualTo: cityId)
+          .get(const GetOptions(source: Source.cache));
+      return snapshot.docs
+          .map((doc) => Place.fromMap(doc.id, doc.data()))
+          .where((place) => place.isPublished)
+          .toList();
+    }
   }
 
   Future<List<Place>> getPlacesByGovernorate(String governorateId) async {

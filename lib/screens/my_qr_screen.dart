@@ -10,8 +10,9 @@ import '../models/place.dart';
 
 class MyQrScreen extends StatefulWidget {
   final Place place;
+  final String? existingRequestId;
 
-  const MyQrScreen({super.key, required this.place});
+  const MyQrScreen({super.key, required this.place, this.existingRequestId});
 
   @override
   State<MyQrScreen> createState() => _MyQrScreenState();
@@ -24,7 +25,12 @@ class _MyQrScreenState extends State<MyQrScreen> {
   @override
   void initState() {
     super.initState();
-    _generateCode();
+    if (widget.existingRequestId != null && widget.existingRequestId!.trim().isNotEmpty) {
+      _requestId = widget.existingRequestId;
+      _isLoading = false;
+    } else {
+      _generateCode();
+    }
   }
 
   Future<void> _generateCode() async {

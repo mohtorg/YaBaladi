@@ -1,4 +1,4 @@
-﻿// screens/home_tab_screen.dart
+// screens/home_tab_screen.dart
 //
 // ============================================================
 // الفكرة العامة من الشاشة دي:
@@ -26,6 +26,7 @@ import 'nearby_places_screen.dart';
 import 'events_today_screen.dart';
 import 'day_trip_screen.dart';
 import 'app_map_screen.dart';
+import 'member_qr_scanner_screen.dart';
 import 'place_details_screen.dart';
 
 class HomeTabScreen extends StatefulWidget {
@@ -228,15 +229,27 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
             // ------------------------------------------------------------
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(child: _QuickAction(icon: Icons.location_on_outlined, label: 'أماكن قريبة', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NearbyPlacesScreen(cityId: _selectedCityId))))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _QuickAction(icon: Icons.event_available_outlined, label: 'فعاليات اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsTodayScreen(cityId: _selectedCityId))))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _QuickAction(icon: Icons.route_outlined, label: 'رحلة اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayTripScreen(cityId: _selectedCityId))))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _QuickAction(icon: Icons.explore_rounded, label: 'خريطة يا بلدي', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AppMapScreen(cityId: _selectedCityId))))),
+                  Row(
+                    children: [
+                      Expanded(child: _QuickAction(icon: Icons.location_on_outlined, label: 'أماكن قريبة', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NearbyPlacesScreen(cityId: _selectedCityId))))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _QuickAction(icon: Icons.event_available_outlined, label: 'فعاليات اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsTodayScreen(cityId: _selectedCityId))))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _QuickAction(icon: Icons.route_outlined, label: 'رحلة اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayTripScreen(cityId: _selectedCityId))))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: 'مسح QR', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberQrScannerScreen())))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _QuickAction(icon: Icons.explore_rounded, label: 'خريطة يا بلدي', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AppMapScreen(cityId: _selectedCityId))))),
+                      const SizedBox(width: 8),
+                      const Expanded(child: SizedBox(height: 76)),
+                    ],
+                  ),
                 ],
               ),
             ),

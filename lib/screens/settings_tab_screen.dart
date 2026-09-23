@@ -8,15 +8,7 @@ import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
-import 'account_tab_screen.dart';
 import 'notification_settings_screen.dart';
-import 'notifications_screen.dart';
-import 'rewards_screen.dart';
-import 'tasks_screen.dart';
-import 'subscriptions_screen.dart';
-import 'my_ratings_screen.dart';
-import 'my_visits_screen.dart';
-import 'pending_ratings_screen.dart';
 import 'experience_mode_screen.dart';
 import '../services/quick_auth_service.dart';
 import 'privacy_security_screen.dart';
@@ -76,8 +68,6 @@ class SettingsTabScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(AppStrings.of('settings', lang)), backgroundColor: const Color(0xFF1454A3), foregroundColor: Colors.white),
       body: ListView(children: [
-        _Section(AppStrings.of('profile', lang)),
-        ListTile(leading: const Icon(Icons.person_outline), title: Text(AppStrings.of('profile', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountTabScreen()))),
         FutureBuilder<AppUser?>(
           future: AuthService().getCurrentAppUser(),
           builder: (context, snapshot) {
@@ -96,15 +86,6 @@ class SettingsTabScreen extends StatelessWidget {
         ),
         ListTile(leading: const Icon(Icons.language), title: Text(AppStrings.of('language', lang)), subtitle: Text(ar ? 'العربية' : 'English'), trailing: Switch(value: ar, onChanged: (_) => ctl.toggleLocale())),
         const _QuickAuthTile(),
-        _Section(AppStrings.of('activity', lang)),
-        ListTile(leading: const Icon(Icons.notifications), title: Text(AppStrings.of('notification_history', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
-        ListTile(leading: const Icon(Icons.notifications_active), title: Text(AppStrings.of('notification_settings', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()))),
-        ListTile(leading: const Icon(Icons.star), title: Text(AppStrings.of('rating_history', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRatingsScreen()))),
-        ListTile(leading: const Icon(Icons.rate_review_outlined), title: Text(AppStrings.of('pending_ratings', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PendingRatingsScreen()))),
-        ListTile(leading: const Icon(Icons.card_giftcard), title: Text(AppStrings.of('rewards', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RewardsScreen()))),
-        ListTile(leading: const Icon(Icons.location_history), title: Text(AppStrings.of('visit_history', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyVisitsScreen()))),
-        ListTile(leading: const Icon(Icons.event_note), title: Text(AppStrings.of('tasks', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksScreen()))),
-        ListTile(leading: const Icon(Icons.card_membership), title: Text(AppStrings.of('subscriptions', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()))),
         _Section(AppStrings.of('help_contact', lang)),
         ListTile(leading: const Icon(Icons.support_agent), title: Text(AppStrings.of('support_center', lang)), subtitle: Text(AppStrings.of('support_center_subtitle', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen()))),
         ListTile(leading: const Icon(Icons.chat), title: Text(AppStrings.of('contact_whatsapp', lang)), onTap: _whatsapp),
@@ -179,8 +160,8 @@ class _QuickAuthTileState extends State<_QuickAuthTile> {
     if (_loading || !_supported) return const SizedBox.shrink();
     return ListTile(
       leading: const Icon(Icons.fingerprint),
-      title: const Text('الدخول السريع'),
-      subtitle: Text(_enabled ? 'بصمة أو نمط/PIN الهاتف مفعّل' : 'تفعيل الدخول ببصمة أو نمط/PIN الهاتف'),
+      title: Text(AppStrings.of('quick_auth', LocaleController.of(context).locale.languageCode)),
+      subtitle: Text(_enabled ? AppStrings.of('quick_auth_enabled', LocaleController.of(context).locale.languageCode) : AppStrings.of('quick_auth_enable', LocaleController.of(context).locale.languageCode)),
       trailing: Switch(value: _enabled, onChanged: _toggle),
     );
   }

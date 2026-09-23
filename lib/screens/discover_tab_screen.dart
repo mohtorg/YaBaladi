@@ -1,15 +1,10 @@
-// screens/discover_tab_screen.dart
-//
-// الغرض: جعل "اكتشف" مساحة الاستكشاف العامة بدل تكرارها كزر ثانٍ في الشاشة الرئيسية.
-// السبب: الشريط السفلي يحتاج وظيفة مستقلة للبحث والفلاتر، بينما الشاشة الرئيسية تعرض
-// اختصارات سريعة فقط. لا نضيف "أضف مكان" إلى التنقل الرئيسي في هذه المرحلة.
-// العلاقة: يفتح البحث الحالي، رحلة اليوم، الفعاليات، الأماكن القريبة، وخريطة التطبيق.
-// لا نغيّر هذه الأدوار إلى تبويبات جديدة عشوائيًا؛ أي إضافة مستقبلية يجب أن تحافظ على
-// قاعدة: الرئيسية = ملخص، اكتشف = استكشاف، رحلتي = تخطيط، المفضلة = حفظ، حسابي = شخصي.
+// مساحة الاستكشاف العامة.
+// الوظيفة الواحدة لها مكان أساسي واحد: رحلة اليوم تخص تبويب رحلتي، لذلك لا نكررها هنا.
 
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import '../theme/app_colors.dart';
-import 'day_trip_screen.dart';
 import 'events_today_screen.dart';
 import 'nearby_places_screen.dart';
 import 'search_screen.dart';
@@ -23,27 +18,27 @@ class DiscoverTabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = LocaleController.of(context).locale.languageCode;
     final actions = [
-      _DiscoverAction(Icons.search, 'البحث', 'ابحث وفلتر الأماكن والخدمات', () => _push(context, SearchScreen(cityId: cityId))),
-      _DiscoverAction(Icons.location_on_outlined, 'أماكن قريبة', 'ما حولك الآن', () => _push(context, NearbyPlacesScreen(cityId: cityId))),
-      _DiscoverAction(Icons.event_available_outlined, 'فعاليات اليوم', 'ما يحدث اليوم', () => _push(context, EventsTodayScreen(cityId: cityId))),
-      _DiscoverAction(Icons.route_outlined, 'رحلة اليوم', 'خطط ليومك', () => _push(context, DayTripScreen(cityId: cityId))),
-      _DiscoverAction(Icons.photo_library_outlined, 'مكتبة يا بلدي', 'صور وحكايات ومعالم وتراث وفعاليات', () => _push(context, LibraryScreen(governorateId: cityId))),
-      _DiscoverAction(Icons.explore_rounded, 'خريطة يا بلدي', 'تعرف على أقسام التطبيق واختصاراته', () => _push(context, AppMapScreen(cityId: cityId))),
+      _DiscoverAction(Icons.search, AppStrings.of('search_action', lang), AppStrings.of('search_action_desc', lang), () => _push(context, SearchScreen(cityId: cityId))),
+      _DiscoverAction(Icons.location_on_outlined, AppStrings.of('nearby_places', lang), AppStrings.of('nearby_places_desc', lang), () => _push(context, NearbyPlacesScreen(cityId: cityId))),
+      _DiscoverAction(Icons.event_available_outlined, AppStrings.of('events_today', lang), AppStrings.of('events_today_desc', lang), () => _push(context, EventsTodayScreen(cityId: cityId))),
+      _DiscoverAction(Icons.photo_library_outlined, AppStrings.of('library', lang), AppStrings.of('library_desc', lang), () => _push(context, LibraryScreen(governorateId: cityId))),
+      _DiscoverAction(Icons.explore_rounded, AppStrings.of('map', lang), AppStrings.of('map_desc', lang), () => _push(context, AppMapScreen(cityId: cityId))),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('اكتشف'),
+        title: Text(AppStrings.of('discover', lang)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('ماذا تريد أن تفعل؟', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(AppStrings.of('discover_prompt', lang), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
-          const Text('كل أدوات الاستكشاف في مكان واحد، بدون ازدحام الشاشة الرئيسية.', style: TextStyle(color: Colors.grey, height: 1.5)),
+          Text(AppStrings.of('discover_subtitle', lang), style: const TextStyle(color: Colors.grey, height: 1.5)),
           const SizedBox(height: 18),
           ...actions.map((action) => Card(
                 margin: const EdgeInsets.only(bottom: 10),

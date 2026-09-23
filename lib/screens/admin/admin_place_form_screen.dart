@@ -9,11 +9,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../models/place.dart';
 import '../../models/egypt_governorates.dart';
 import '../../models/audience_tags.dart';
 import '../../models/place_categories.dart';
 import '../../models/app_content_type.dart';
+import '../../services/location_service.dart';
+import '../../l10n/app_strings.dart';
+import '../../l10n/locale_controller.dart';
 
 class AdminPlaceFormScreen extends StatefulWidget {
   final Place? existingPlace; // null = إضافة جديدة، غير null = تعديل
@@ -42,6 +46,7 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   String _priceRange = '';
   bool _hasParking = false, _hasWifi = false, _acceptsElectronicPayment = false, _hasDelivery = false, _requiresReservation = false;
   bool _isSaving = false;
+  bool _isLocating = false;
 
   bool get _isEditing => widget.existingPlace != null;
 
@@ -85,6 +90,72 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   // ملاحظة التعديل:
   // أضفنا try/catch/finally حول الحفظ حتى تظهر أخطاء Permission Denied أو الشبكة
   // للمستخدم بدل خروج الشاشة إلى حالة غير معروفة. كما نحافظ على isSaving بصورة صحيحة.
+  Future<void> _useCurrentLocation() async {
+    setState(() => _isLocating = true);
+    final result = await LocationService().getCurrentLocation(allowCached: false);
+    if (!mounted) return;
+    setState(() => _isLocating = false);
+    if (!result.isSuccess || result.position == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_locationErrorText(result.error))),
+      );
+      return;
+    }
+    final position = result.position!;
+    _lat.text = position.latitude.toStringAsFixed(7);
+    _lng.text = position.longitude.toStringAsFixed(7);
+    final address = await LocationService().addressFromCoordinates(position.latitude, position.longitude);
+    if (!mounted) return;
+    if (address.isSuccess && address.address != null && _addressAr.text.trim().isEmpty) {
+      _addressAr.text = address.address!;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.of('location_selected_success', LocaleController.of(context).locale.languageCode))),
+    );
+    setState(() {});
+  }
+
+  Future<void> _searchAddress() async {
+    final address = _addressAr.text.trim().isNotEmpty ? _addressAr.text.trim() : _addressEn.text.trim();
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.of('merchant_location_address_required', LocaleController.of(context).locale.languageCode))),
+      );
+      return;
+    }
+    setState(() => _isLocating = true);
+    final result = await LocationService().coordinatesFromAddress(address);
+    if (!mounted) return;
+    setState(() => _isLocating = false);
+    if (!result.isSuccess || result.latitude == null || result.longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.of('merchant_location_search_failed', LocaleController.of(context).locale.languageCode))),
+      );
+      return;
+    }
+    _lat.text = result.latitude!.toStringAsFixed(7);
+    _lng.text = result.longitude!.toStringAsFixed(7);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppStrings.of('location_selected_success', LocaleController.of(context).locale.languageCode))),
+    );
+    setState(() {});
+  }
+
+  String _locationErrorText(LocationError? error) {
+    final lang = LocaleController.of(context).locale.languageCode;
+    switch (error) {
+      case LocationError.serviceDisabled:
+        return AppStrings.of('location_service_disabled', lang);
+      case LocationError.permissionDenied:
+        return AppStrings.of('location_permission_denied', lang);
+      case LocationError.permissionDeniedForever:
+        return AppStrings.of('location_permission_denied_forever', lang);
+      case LocationError.unavailable:
+      case null:
+        return AppStrings.of('location_unavailable', lang);
+    }
+  }
+
   Future<void> _save() async {
     if (_nameAr.text.trim().isEmpty || _nameEn.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,14 +281,59 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
           _field('رابط الصورة', _imageUrl),
           _field('ساعات العمل بالعربي', _hoursAr),
           _field('ساعات العمل بالإنجليزي', _hoursEn),
-          Row(
-            children: [
-              Expanded(child: _field('خط العرض (Lat)', _lat)),
-              const SizedBox(width: 12),
-              Expanded(child: _field('خط الطول (Lng)', _lng)),
-            ],
+          Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    AppStrings.of('merchant_location_title', LocaleController.of(context).locale.languageCode),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(AppStrings.of('merchant_location_hint', LocaleController.of(context).locale.languageCode)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isLocating ? null : _searchAddress,
+                          icon: const Icon(Icons.search),
+                          label: Text(AppStrings.of('merchant_location_search', LocaleController.of(context).locale.languageCode)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isLocating ? null : _useCurrentLocation,
+                          icon: const Icon(Icons.my_location),
+                          label: Text(AppStrings.of('merchant_location_current', LocaleController.of(context).locale.languageCode)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_isLocating) ...[
+                    const SizedBox(height: 10),
+                    const LinearProgressIndicator(),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _field('خط العرض (Lat)', _lat)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('خط الطول (Lng)', _lng)),
+                    ],
+                  ),
+                  Text(
+                    AppStrings.of('merchant_location_manual_fallback', LocaleController.of(context).locale.languageCode),
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
 
           // ------------------------------------------------------------
           // الفكرة: قائمة منسدلة للمحافظة - نفس القائمة الثابتة المستخدمة

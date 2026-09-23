@@ -1,12 +1,9 @@
-// screens/main_shell.dart
-//
-// الغرض: الشريط السفلي للمقيم بعد إعادة ترتيب تجربة "يا بلدي".
-// الترتيب النهائي: الرئيسية، اكتشف، رحلتي، المفضلة، حسابي.
-// السبب: "أضف مكان" ليست وظيفة أساسية الآن، والإعدادات مكانها داخل "حسابي" بدل حجز
-// تبويب دائم لها. لا نعيد إضافة أي تبويب جديد إلا إذا كان له سلوك يومي واضح للمستخدم.
-// العلاقة: الرئيسية = ملخص، اكتشف = البحث والأدوات، رحلتي = التخطيط، المفضلة = الحفظ، حسابي = النشاط والإعدادات.
+// غلاف المستخدم المقيم.
+// قاعدة التنقل: الرئيسية = ملخص، اكتشف = استكشاف، رحلتي = تخطيط، المفضلة = حفظ، حسابي = النشاط والإعدادات.
 
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import 'home_tab_screen.dart';
 import 'discover_tab_screen.dart';
 import 'day_trip_screen.dart';
@@ -34,6 +31,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = LocaleController.of(context).locale.languageCode;
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _tabs),
       bottomNavigationBar: BottomNavigationBar(
@@ -42,12 +40,12 @@ class _MainShellState extends State<MainShell> {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: 'اكتشف'),
-          BottomNavigationBarItem(icon: Icon(Icons.route_outlined), activeIcon: Icon(Icons.route), label: 'رحلتي'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite_border), activeIcon: Icon(Icons.favorite), label: 'المفضلة'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'حسابي'),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home_outlined), activeIcon: const Icon(Icons.home), label: AppStrings.of('home', lang)),
+          BottomNavigationBarItem(icon: const Icon(Icons.explore_outlined), activeIcon: const Icon(Icons.explore), label: AppStrings.of('discover', lang)),
+          BottomNavigationBarItem(icon: const Icon(Icons.route_outlined), activeIcon: const Icon(Icons.route), label: AppStrings.of('day_trip', lang)),
+          BottomNavigationBarItem(icon: const Icon(Icons.favorite_border), activeIcon: const Icon(Icons.favorite), label: AppStrings.of('favorites', lang)),
+          BottomNavigationBarItem(icon: const Icon(Icons.person_outline), activeIcon: const Icon(Icons.person), label: AppStrings.of('account', lang)),
         ],
       ),
     );

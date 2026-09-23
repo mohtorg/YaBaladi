@@ -3,6 +3,8 @@
     <!-- الموقع التقريبي فقط: يكفي لميزة «أماكن قريبة» ويقلل نطاق البيانات المطلوبة. -->
     <!-- لا نطلب ACCESS_FINE_LOCATION لأن التطبيق لا يحتاج تتبعًا دقيقًا أو في الخلفية. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- إذن الكاميرا - مطلوب لميزة التاجر (مسح كود QR الخاص بالزبون) -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- الدخول السريع: Android يعرض بصمة/قفل الجهاز ولا يكشف التطبيق بيانات القفل. -->

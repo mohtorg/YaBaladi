@@ -3,14 +3,14 @@
 // الأمان والخصوصية: الموقع لا يُحفظ في Firestore هنا؛ يستخدم محليًا للفرز فقط.
 // إذا رفض المستخدم صلاحية الموقع، لا نخترع مسافة ونطلب منه تفعيلها أو نعرض القائمة العامة.
 
-import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
-import '../widgets/permission_explanation.dart';
 import '../models/place.dart';
 import '../services/place_service.dart';
+import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import 'place_details_screen.dart';
 
@@ -26,55 +26,87 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
   bool _loading = true;
   String? _message;
   List<_NearbyPlace> _items = [];
+  StreamSubscription<Position>? _locationSubscription;
+  final LocationService _locationService = LocationService();
 
   @override
   void initState() {
     super.initState();
     _load();
+    _startLiveLocation();
+  }
+
+  void _startLiveLocation() {
+    _locationSubscription?.cancel();
+    _locationSubscription = _locationService.watchPosition(distanceFilterMeters: 20).listen((position) {
+      if (!mounted || _items.isEmpty) return;
+      final updated = _items
+          .map((item) => _NearbyPlace(
+                item.place,
+                _locationService.distanceInKm(
+                  userLat: position.latitude,
+                  userLng: position.longitude,
+                  placeLat: item.place.latitude,
+                  placeLng: item.place.longitude,
+                ),
+              ))
+          .toList()
+        ..sort((a, b) => (a.distanceKm ?? double.infinity).compareTo(b.distanceKm ?? double.infinity));
+      setState(() {
+        _items = updated;
+        _message = null;
+      });
+    });
   }
 
   Future<void> _load() async {
     setState(() { _loading = true; _message = null; });
     try {
       final lang = LocaleController.of(context).locale.languageCode;
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-      if (!mounted) return;
-        final wantsToContinue = await showPermissionExplanation(context: context, lang: lang, titleKey: 'permission_location_title', bodyKey: 'permission_location_body');
-        if (!wantsToContinue) {
-          final places = await PlaceService().getPlacesByCity(widget.cityId);
-          if (!mounted) return;
-          setState(() { _items = places.map((p) => _NearbyPlace(p, null)).toList(); _message = AppStrings.of('permission_denied_location', lang); _loading = false; });
-          return;
-        }
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        final places = await PlaceService().getPlacesByCity(widget.cityId);
+      final places = await PlaceService().getPlacesByCity(widget.cityId);
+      final result = await LocationService().getCurrentLocation(allowCached: true);
+      if (!result.isSuccess || result.position == null) {
         if (!mounted) return;
-        setState(() { _items = places.map((p) => _NearbyPlace(p, null)).toList(); _message = AppStrings.of('permission_denied_location', lang); _loading = false; });
+        setState(() {
+          _items = places.map((p) => _NearbyPlace(p, null)).toList();
+          _message = AppStrings.of('location_unavailable_nearby', lang);
+          _loading = false;
+        });
         return;
       }
-      final position = await Geolocator.getCurrentPosition();
-      final places = await PlaceService().getPlacesByCity(widget.cityId);
-      final items = places.map((p) => _NearbyPlace(p, _distanceKm(position.latitude, position.longitude, p.latitude, p.longitude))).toList()..sort((a, b) => (a.distanceKm ?? double.infinity).compareTo(b.distanceKm ?? double.infinity));
+      final position = result.position!;
+      final items = places
+          .map((p) => _NearbyPlace(
+                p,
+                LocationService().distanceInKm(
+                  userLat: position.latitude,
+                  userLng: position.longitude,
+                  placeLat: p.latitude,
+                  placeLng: p.longitude,
+                ),
+              ))
+          .toList()
+        ..sort((a, b) => (a.distanceKm ?? double.infinity).compareTo(b.distanceKm ?? double.infinity));
       if (!mounted) return;
-      setState(() { _items = items; _loading = false; });
+      setState(() {
+        _items = items;
+        _message = result.source == LocationSource.cached || result.source == LocationSource.lastKnown
+            ? AppStrings.of('location_offline_cached', lang)
+            : null;
+        _loading = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() { _message = 'تعذر تحديد موقعك حاليًا.'; _loading = false; });
+      setState(() { _message = AppStrings.of('location_unavailable_nearby', LocaleController.of(context).locale.languageCode); _loading = false; });
     }
   }
 
-  double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
-    const radius = 6371.0;
-    final dLat = _rad(lat2 - lat1);
-    final dLon = _rad(lon2 - lon1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(_rad(lat1)) * math.cos(_rad(lat2)) * math.sin(dLon / 2) * math.sin(dLon / 2);
-    return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-  }
 
-  double _rad(double value) => value * math.pi / 180;
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
