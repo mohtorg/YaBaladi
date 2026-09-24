@@ -1,6 +1,6 @@
-// screens/my_qr_screen.dart
-// شاشة تولّد وتعرض كود QR للمستخدم يوريه للتاجر
-// الكود صالح 10 دقائق بس، ولما يتمسح بينفتح تلقائيًا مسار التقييم
+﻿// screens/my_qr_screen.dart
+// ╪┤╪د╪┤╪ر ╪ز┘ê┘┘ّ╪» ┘ê╪ز╪╣╪▒╪╢ ┘â┘ê╪» QR ┘┘┘à╪│╪ز╪«╪»┘à ┘è┘ê╪▒┘è┘ç ┘┘╪ز╪د╪ش╪▒
+// ╪د┘┘â┘ê╪» ╪╡╪د┘╪ص 10 ╪»┘é╪د╪خ┘é ╪ذ╪│╪î ┘ê┘┘à╪د ┘è╪ز┘à╪│╪ص ╪ذ┘è┘┘╪ز╪ص ╪ز┘┘é╪د╪خ┘è┘ï╪د ┘à╪│╪د╪▒ ╪د┘╪ز┘é┘è┘è┘à
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -51,7 +51,7 @@ class _MyQrScreenState extends State<MyQrScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء كود الزيارة: $e')),
+        SnackBar(content: Text('╪ز╪╣╪░╪▒ ╪ح┘╪┤╪د╪ة ┘â┘ê╪» ╪د┘╪▓┘è╪د╪▒╪ر: $e')),
       );
     }
   }
@@ -60,7 +60,7 @@ class _MyQrScreenState extends State<MyQrScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('كود الزيارة'),
+        title: const Text('┘â┘ê╪» ╪د┘╪▓┘è╪د╪▒╪ر'),
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
       ),
@@ -94,7 +94,7 @@ class _MyQrScreenState extends State<MyQrScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'وريّ الكود ده للتاجر عشان يوثّق زيارتك\nصالح لمدة 10 دقائق',
+                      '┘ê╪▒┘è┘ّ ╪د┘┘â┘ê╪» ╪»┘ç ┘┘╪ز╪د╪ش╪▒ ╪╣╪┤╪د┘ ┘è┘ê╪س┘ّ┘é ╪▓┘è╪د╪▒╪ز┘â\n╪╡╪د┘╪ص ┘┘à╪»╪ر 10 ╪»┘é╪د╪خ┘é',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),
@@ -105,7 +105,7 @@ class _MyQrScreenState extends State<MyQrScreen> {
                         _generateCode();
                       },
                       icon: const Icon(Icons.refresh),
-                      label: const Text('توليد كود جديد'),
+                      label: const Text('╪ز┘ê┘┘è╪» ┘â┘ê╪» ╪ش╪»┘è╪»'),
                     ),
                   ],
                 ),

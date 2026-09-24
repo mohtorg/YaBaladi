@@ -1,6 +1,6 @@
-// مركز إعدادات موحّد للمستخدم ومقدم الخدمة.
-// مهم: لا نضع اختيار "أدمن/مشرف" هنا؛ الصلاحيات الإدارية تأتي من Firebase فقط.
-// تسجيل الخروج موجود هنا فقط لتجنب تكرار الإجراء في أكثر من شاشة.
+﻿// ┘à╪▒┘â╪▓ ╪ح╪╣╪»╪د╪»╪د╪ز ┘à┘ê╪ص┘ّ╪» ┘┘┘à╪│╪ز╪«╪»┘à ┘ê┘à┘é╪»┘à ╪د┘╪«╪»┘à╪ر.
+// ┘à┘ç┘à: ┘╪د ┘╪╢╪╣ ╪د╪«╪ز┘è╪د╪▒ "╪ث╪»┘à┘/┘à╪┤╪▒┘" ┘ç┘╪د╪ؤ ╪د┘╪╡┘╪د╪ص┘è╪د╪ز ╪د┘╪ح╪»╪د╪▒┘è╪ر ╪ز╪ث╪ز┘è ┘à┘ Firebase ┘┘é╪╖.
+// ╪ز╪│╪ش┘è┘ ╪د┘╪«╪▒┘ê╪ش ┘à┘ê╪ش┘ê╪» ┘ç┘╪د ┘┘é╪╖ ┘╪ز╪ش┘╪ذ ╪ز┘â╪▒╪د╪▒ ╪د┘╪ح╪ش╪▒╪د╪ة ┘┘è ╪ث┘â╪س╪▒ ┘à┘ ╪┤╪د╪┤╪ر.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -18,7 +18,7 @@ class SettingsTabScreen extends StatelessWidget {
   const SettingsTabScreen({super.key});
 
   Future<void> _whatsapp() async {
-    final u = Uri.parse('https://wa.me/?text=${Uri.encodeComponent('مرحبًا يا بلدي، أريد التواصل معكم')}');
+    final u = Uri.parse('https://wa.me/?text=${Uri.encodeComponent('┘à╪▒╪ص╪ذ┘ï╪د ┘è╪د ╪ذ┘╪»┘è╪î ╪ث╪▒┘è╪» ╪د┘╪ز┘ê╪د╪╡┘ ┘à╪╣┘â┘à')}');
     await launchUrl(u, mode: LaunchMode.externalApplication);
   }
 
@@ -26,7 +26,7 @@ class SettingsTabScreen extends StatelessWidget {
     final uid = AuthService().currentUser?.uid ?? '';
     final message = lang == 'en'
         ? 'Join me on Ya Baladi. My invitation code: $uid'
-        : 'انضم معي إلى تطبيق يا بلدي. كود الدعوة الخاص بي: $uid';
+        : '╪د┘╪╢┘à ┘à╪╣┘è ╪ح┘┘ë ╪ز╪╖╪ذ┘è┘é ┘è╪د ╪ذ┘╪»┘è. ┘â┘ê╪» ╪د┘╪»╪╣┘ê╪ر ╪د┘╪«╪د╪╡ ╪ذ┘è: $uid';
     final u = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}');
     await launchUrl(u, mode: LaunchMode.externalApplication);
   }
@@ -84,7 +84,7 @@ class SettingsTabScreen extends StatelessWidget {
             );
           },
         ),
-        ListTile(leading: const Icon(Icons.language), title: Text(AppStrings.of('language', lang)), subtitle: Text(ar ? 'العربية' : 'English'), trailing: Switch(value: ar, onChanged: (_) => ctl.toggleLocale())),
+        ListTile(leading: const Icon(Icons.language), title: Text(AppStrings.of('language', lang)), subtitle: Text(ar ? '╪د┘╪╣╪▒╪ذ┘è╪ر' : 'English'), trailing: Switch(value: ar, onChanged: (_) => ctl.toggleLocale())),
         const _QuickAuthTile(),
         _Section(AppStrings.of('help_contact', lang)),
         ListTile(leading: const Icon(Icons.support_agent), title: Text(AppStrings.of('support_center', lang)), subtitle: Text(AppStrings.of('support_center_subtitle', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen()))),
@@ -92,17 +92,17 @@ class SettingsTabScreen extends StatelessWidget {
         ListTile(leading: const Icon(Icons.feedback_outlined), title: Text(AppStrings.of('complaints', lang)), onTap: () => _complaint(context, lang)),
         ListTile(leading: const Icon(Icons.verified_user_outlined), title: Text(AppStrings.of('privacy_security', lang)), subtitle: Text(AppStrings.of('privacy_security_subtitle', lang)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacySecurityScreen()))),
         _Section(AppStrings.of('legal', lang)),
-        ListTile(leading: const Icon(Icons.description), title: Text(AppStrings.of('terms_user', lang)), onTap: () => _dialog(context, AppStrings.of('terms_user', lang), ar ? 'الشروط والأحكام الخاصة باستخدام تطبيق يا بلدي للمستخدمين. سيتم استبدال هذه الصيغة بالنص القانوني المعتمد قبل الإطلاق.' : 'Terms and conditions for Ya Baladi users. This placeholder will be replaced by the approved legal text before launch.', AppStrings.of('close', lang))),
-        ListTile(leading: const Icon(Icons.store), title: Text(AppStrings.of('terms_merchant', lang)), onTap: () => _dialog(context, AppStrings.of('terms_merchant', lang), ar ? 'الشروط والأحكام الخاصة بمقدمي الخدمات. سيتم استبدال هذه الصيغة بالنص القانوني المعتمد قبل الإطلاق.' : 'Terms and conditions for service providers. This placeholder will be replaced by the approved legal text before launch.', AppStrings.of('close', lang))),
+        ListTile(leading: const Icon(Icons.description), title: Text(AppStrings.of('terms_user', lang)), onTap: () => _dialog(context, AppStrings.of('terms_user', lang), ar ? '╪د┘╪┤╪▒┘ê╪╖ ┘ê╪د┘╪ث╪ص┘â╪د┘à ╪د┘╪«╪د╪╡╪ر ╪ذ╪د╪│╪ز╪«╪»╪د┘à ╪ز╪╖╪ذ┘è┘é ┘è╪د ╪ذ┘╪»┘è ┘┘┘à╪│╪ز╪«╪»┘à┘è┘. ╪│┘è╪ز┘à ╪د╪│╪ز╪ذ╪»╪د┘ ┘ç╪░┘ç ╪د┘╪╡┘è╪║╪ر ╪ذ╪د┘┘╪╡ ╪د┘┘é╪د┘┘ê┘┘è ╪د┘┘à╪╣╪ز┘à╪» ┘é╪ذ┘ ╪د┘╪ح╪╖┘╪د┘é.' : 'Terms and conditions for Ya Baladi users. This placeholder will be replaced by the approved legal text before launch.', AppStrings.of('close', lang))),
+        ListTile(leading: const Icon(Icons.store), title: Text(AppStrings.of('terms_merchant', lang)), onTap: () => _dialog(context, AppStrings.of('terms_merchant', lang), ar ? '╪د┘╪┤╪▒┘ê╪╖ ┘ê╪د┘╪ث╪ص┘â╪د┘à ╪د┘╪«╪د╪╡╪ر ╪ذ┘à┘é╪»┘à┘è ╪د┘╪«╪»┘à╪د╪ز. ╪│┘è╪ز┘à ╪د╪│╪ز╪ذ╪»╪د┘ ┘ç╪░┘ç ╪د┘╪╡┘è╪║╪ر ╪ذ╪د┘┘╪╡ ╪د┘┘é╪د┘┘ê┘┘è ╪د┘┘à╪╣╪ز┘à╪» ┘é╪ذ┘ ╪د┘╪ح╪╖┘╪د┘é.' : 'Terms and conditions for service providers. This placeholder will be replaced by the approved legal text before launch.', AppStrings.of('close', lang))),
         _Section(AppStrings.of('sharing', lang)),
-        ListTile(leading: const Icon(Icons.group_add), title: Text(AppStrings.of('invite_friends', lang)), subtitle: Text(ar ? 'مشاركة كود الدعوة عبر واتساب' : 'Share your invitation code via WhatsApp'), onTap: () => _invite(context, lang)),
+        ListTile(leading: const Icon(Icons.group_add), title: Text(AppStrings.of('invite_friends', lang)), subtitle: Text(ar ? '┘à╪┤╪د╪▒┘â╪ر ┘â┘ê╪» ╪د┘╪»╪╣┘ê╪ر ╪╣╪ذ╪▒ ┘ê╪د╪ز╪│╪د╪ذ' : 'Share your invitation code via WhatsApp'), onTap: () => _invite(context, lang)),
         const SizedBox(height: 20),
         Padding(padding: const EdgeInsets.all(16), child: OutlinedButton.icon(
           onPressed: () => showDialog(
             context: context,
             builder: (_) => AlertDialog(
               title: Text(AppStrings.of('logout', lang)),
-              content: Text('${ar ? 'هل تريد تسجيل الخروج من' : 'Do you want to sign out from'} ${user?.email ?? (ar ? 'حسابك' : 'your account')}؟'),
+              content: Text('${ar ? '┘ç┘ ╪ز╪▒┘è╪» ╪ز╪│╪ش┘è┘ ╪د┘╪«╪▒┘ê╪ش ┘à┘' : 'Do you want to sign out from'} ${user?.email ?? (ar ? '╪ص╪│╪د╪ذ┘â' : 'your account')}╪ا'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: Text(AppStrings.of('cancel', lang))),
                 FilledButton(onPressed: () async { Navigator.pop(context); await AuthService().signOut(); }, child: Text(AppStrings.of('logout', lang))),

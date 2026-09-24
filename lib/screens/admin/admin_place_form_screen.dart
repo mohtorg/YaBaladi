@@ -1,10 +1,10 @@
-// screens/admin/admin_place_form_screen.dart
+﻿// screens/admin/admin_place_form_screen.dart
 //
 // ============================================================
-// الفكرة العامة من الشاشة دي:
-// فورم واحد بيخدم حالتين: "إضافة مكان جديد" و"تعديل مكان موجود".
-// الفرق الوحيد: لو existingPlace اتبعتلنا، بنملأ الحقول بقيمه القديمة
-// وبنحدّث نفس المستند بدل ما ننشئ واحد جديد. كده منكررش نفس الفورم مرتين.
+// ╪د┘┘┘â╪▒╪ر ╪د┘╪╣╪د┘à╪ر ┘à┘ ╪د┘╪┤╪د╪┤╪ر ╪»┘è:
+// ┘┘ê╪▒┘à ┘ê╪د╪ص╪» ╪ذ┘è╪«╪»┘à ╪ص╪د┘╪ز┘è┘: "╪ح╪╢╪د┘╪ر ┘à┘â╪د┘ ╪ش╪»┘è╪»" ┘ê"╪ز╪╣╪»┘è┘ ┘à┘â╪د┘ ┘à┘ê╪ش┘ê╪»".
+// ╪د┘┘╪▒┘é ╪د┘┘ê╪ص┘è╪»: ┘┘ê existingPlace ╪د╪ز╪ذ╪╣╪ز┘┘╪د╪î ╪ذ┘┘à┘╪ث ╪د┘╪ص┘é┘ê┘ ╪ذ┘é┘è┘à┘ç ╪د┘┘é╪»┘è┘à╪ر
+// ┘ê╪ذ┘╪ص╪»┘ّ╪س ┘┘╪│ ╪د┘┘à╪│╪ز┘╪» ╪ذ╪»┘ ┘à╪د ┘┘╪┤╪خ ┘ê╪د╪ص╪» ╪ش╪»┘è╪». ┘â╪»┘ç ┘à┘┘â╪▒╪▒╪┤ ┘┘╪│ ╪د┘┘┘ê╪▒┘à ┘à╪▒╪ز┘è┘.
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -20,7 +20,7 @@ import '../../l10n/app_strings.dart';
 import '../../l10n/locale_controller.dart';
 
 class AdminPlaceFormScreen extends StatefulWidget {
-  final Place? existingPlace; // null = إضافة جديدة، غير null = تعديل
+  final Place? existingPlace; // null = ╪ح╪╢╪د┘╪ر ╪ش╪»┘è╪»╪ر╪î ╪║┘è╪▒ null = ╪ز╪╣╪»┘è┘
 
   const AdminPlaceFormScreen({super.key, this.existingPlace});
 
@@ -30,8 +30,8 @@ class AdminPlaceFormScreen extends StatefulWidget {
 
 class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   // ------------------------------------------------------------
-  // الفكرة: كل حقل نصي في الفورم ليه Controller منفصل، وبنملأهم
-  // بالقيم القديمة لو إحنا في وضع "تعديل" (initState)
+  // ╪د┘┘┘â╪▒╪ر: ┘â┘ ╪ص┘é┘ ┘╪╡┘è ┘┘è ╪د┘┘┘ê╪▒┘à ┘┘è┘ç Controller ┘à┘┘╪╡┘╪î ┘ê╪ذ┘┘à┘╪ث┘ç┘à
+  // ╪ذ╪د┘┘é┘è┘à ╪د┘┘é╪»┘è┘à╪ر ┘┘ê ╪ح╪ص┘╪د ┘┘è ┘ê╪╢╪╣ "╪ز╪╣╪»┘è┘" (initState)
   // ------------------------------------------------------------
   late TextEditingController _nameAr, _nameEn, _descAr, _descEn;
   late TextEditingController _addressAr, _addressEn, _category, _imageUrl;
@@ -83,13 +83,13 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   }
 
   // ------------------------------------------------------------
-  // الفكرة: دالة الحفظ - بتبني Map واحد من كل الحقول، وبتقرر
-  // (بناءً على _isEditing) هل تعمل update للمستند القديم
-  // ولا تعمل add لمستند جديد بالكامل
+  // ╪د┘┘┘â╪▒╪ر: ╪»╪د┘╪ر ╪د┘╪ص┘╪╕ - ╪ذ╪ز╪ذ┘┘è Map ┘ê╪د╪ص╪» ┘à┘ ┘â┘ ╪د┘╪ص┘é┘ê┘╪î ┘ê╪ذ╪ز┘é╪▒╪▒
+  // (╪ذ┘╪د╪ة┘ï ╪╣┘┘ë _isEditing) ┘ç┘ ╪ز╪╣┘à┘ update ┘┘┘à╪│╪ز┘╪» ╪د┘┘é╪»┘è┘à
+  // ┘ê┘╪د ╪ز╪╣┘à┘ add ┘┘à╪│╪ز┘╪» ╪ش╪»┘è╪» ╪ذ╪د┘┘â╪د┘à┘
   // ------------------------------------------------------------
-  // ملاحظة التعديل:
-  // أضفنا try/catch/finally حول الحفظ حتى تظهر أخطاء Permission Denied أو الشبكة
-  // للمستخدم بدل خروج الشاشة إلى حالة غير معروفة. كما نحافظ على isSaving بصورة صحيحة.
+  // ┘à┘╪د╪ص╪╕╪ر ╪د┘╪ز╪╣╪»┘è┘:
+  // ╪ث╪╢┘┘╪د try/catch/finally ╪ص┘ê┘ ╪د┘╪ص┘╪╕ ╪ص╪ز┘ë ╪ز╪╕┘ç╪▒ ╪ث╪«╪╖╪د╪ة Permission Denied ╪ث┘ê ╪د┘╪┤╪ذ┘â╪ر
+  // ┘┘┘à╪│╪ز╪«╪»┘à ╪ذ╪»┘ ╪«╪▒┘ê╪ش ╪د┘╪┤╪د╪┤╪ر ╪ح┘┘ë ╪ص╪د┘╪ر ╪║┘è╪▒ ┘à╪╣╪▒┘ê┘╪ر. ┘â┘à╪د ┘╪ص╪د┘╪╕ ╪╣┘┘ë isSaving ╪ذ╪╡┘ê╪▒╪ر ╪╡╪ص┘è╪ص╪ر.
   Future<void> _useCurrentLocation() async {
     setState(() => _isLocating = true);
     final result = await LocationService().getCurrentLocation(allowCached: false);
@@ -159,7 +159,7 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   Future<void> _save() async {
     if (_nameAr.text.trim().isEmpty || _nameEn.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اسم المكان بالعربي والإنجليزي مطلوبين')),
+        const SnackBar(content: Text('╪د╪│┘à ╪د┘┘à┘â╪د┘ ╪ذ╪د┘╪╣╪▒╪ذ┘è ┘ê╪د┘╪ح┘╪ش┘┘è╪▓┘è ┘à╪╖┘┘ê╪ذ┘è┘')),
       );
       return;
     }
@@ -213,21 +213,21 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ المكان: $e')),
+        SnackBar(content: Text('╪ز╪╣╪░╪▒ ╪ص┘╪╕ ╪د┘┘à┘â╪د┘: $e')),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  // ملاحظة التعديل:
-  // تحرير جميع TextEditingController عند إغلاق الشاشة لمنع تسرب الموارد.
+  // ┘à┘╪د╪ص╪╕╪ر ╪د┘╪ز╪╣╪»┘è┘:
+  // ╪ز╪ص╪▒┘è╪▒ ╪ش┘à┘è╪╣ TextEditingController ╪╣┘╪» ╪ح╪║┘╪د┘é ╪د┘╪┤╪د╪┤╪ر ┘┘à┘╪╣ ╪ز╪│╪▒╪ذ ╪د┘┘à┘ê╪د╪▒╪».
   List<Widget> _propertySwitches() => [
-    SwitchListTile(title: const Text('موقف سيارات'), value: _hasParking, onChanged: (v) => setState(() => _hasParking = v)),
+    SwitchListTile(title: const Text('┘à┘ê┘é┘ ╪│┘è╪د╪▒╪د╪ز'), value: _hasParking, onChanged: (v) => setState(() => _hasParking = v)),
     SwitchListTile(title: const Text('Wi-Fi'), value: _hasWifi, onChanged: (v) => setState(() => _hasWifi = v)),
-    SwitchListTile(title: const Text('دفع إلكتروني'), value: _acceptsElectronicPayment, onChanged: (v) => setState(() => _acceptsElectronicPayment = v)),
-    SwitchListTile(title: const Text('خدمة توصيل'), value: _hasDelivery, onChanged: (v) => setState(() => _hasDelivery = v)),
-    SwitchListTile(title: const Text('يتطلب حجزًا مسبقًا'), value: _requiresReservation, onChanged: (v) => setState(() => _requiresReservation = v)),
+    SwitchListTile(title: const Text('╪»┘╪╣ ╪ح┘┘â╪ز╪▒┘ê┘┘è'), value: _acceptsElectronicPayment, onChanged: (v) => setState(() => _acceptsElectronicPayment = v)),
+    SwitchListTile(title: const Text('╪«╪»┘à╪ر ╪ز┘ê╪╡┘è┘'), value: _hasDelivery, onChanged: (v) => setState(() => _hasDelivery = v)),
+    SwitchListTile(title: const Text('┘è╪ز╪╖┘╪ذ ╪ص╪ش╪▓┘ï╪د ┘à╪│╪ذ┘é┘ï╪د'), value: _requiresReservation, onChanged: (v) => setState(() => _requiresReservation = v)),
   ];
 
   @override
@@ -245,21 +245,21 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'تعديل المكان' : 'إضافة مكان جديد'),
+        title: Text(_isEditing ? '╪ز╪╣╪»┘è┘ ╪د┘┘à┘â╪د┘' : '╪ح╪╢╪د┘╪ر ┘à┘â╪د┘ ╪ش╪»┘è╪»'),
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _field('الاسم بالعربي', _nameAr),
-          _field('الاسم بالإنجليزي', _nameEn),
-          _field('الوصف بالعربي', _descAr, maxLines: 3),
-          _field('الوصف بالإنجليزي', _descEn, maxLines: 3),
-          _field('العنوان بالعربي', _addressAr),
-          _field('العنوان بالإنجليزي', _addressEn),
-          // نوع المحتوى منفصل عن التصنيف: يحدد دورة الإدارة والتوسع، بينما category تصف النشاط.
-          const Text('نوع المحتوى', style: TextStyle(fontWeight: FontWeight.bold)),
+          _field('╪د┘╪د╪│┘à ╪ذ╪د┘╪╣╪▒╪ذ┘è', _nameAr),
+          _field('╪د┘╪د╪│┘à ╪ذ╪د┘╪ح┘╪ش┘┘è╪▓┘è', _nameEn),
+          _field('╪د┘┘ê╪╡┘ ╪ذ╪د┘╪╣╪▒╪ذ┘è', _descAr, maxLines: 3),
+          _field('╪د┘┘ê╪╡┘ ╪ذ╪د┘╪ح┘╪ش┘┘è╪▓┘è', _descEn, maxLines: 3),
+          _field('╪د┘╪╣┘┘ê╪د┘ ╪ذ╪د┘╪╣╪▒╪ذ┘è', _addressAr),
+          _field('╪د┘╪╣┘┘ê╪د┘ ╪ذ╪د┘╪ح┘╪ش┘┘è╪▓┘è', _addressEn),
+          // ┘┘ê╪╣ ╪د┘┘à╪ص╪ز┘ê┘ë ┘à┘┘╪╡┘ ╪╣┘ ╪د┘╪ز╪╡┘┘è┘: ┘è╪ص╪»╪» ╪»┘ê╪▒╪ر ╪د┘╪ح╪»╪د╪▒╪ر ┘ê╪د┘╪ز┘ê╪│╪╣╪î ╪ذ┘è┘┘à╪د category ╪ز╪╡┘ ╪د┘┘╪┤╪د╪╖.
+          const Text('┘┘ê╪╣ ╪د┘┘à╪ص╪ز┘ê┘ë', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             value: AppContentType.byId(_contentType)?.id ?? AppContentType.publicPlace.id,
@@ -269,18 +269,18 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
           ),
           const SizedBox(height: 16),
 
-          // التصنيف يُختار من قائمة موحدة حتى لا تتكرر قيم category بصيغ مختلفة.
-          const Text('نوع المكان / النشاط', style: TextStyle(fontWeight: FontWeight.bold)),
+          // ╪د┘╪ز╪╡┘┘è┘ ┘è┘╪«╪ز╪د╪▒ ┘à┘ ┘é╪د╪خ┘à╪ر ┘à┘ê╪ص╪»╪ر ╪ص╪ز┘ë ┘╪د ╪ز╪ز┘â╪▒╪▒ ┘é┘è┘à category ╪ذ╪╡┘è╪║ ┘à╪«╪ز┘┘╪ر.
+          const Text('┘┘ê╪╣ ╪د┘┘à┘â╪د┘ / ╪د┘┘╪┤╪د╪╖', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: PlaceCategories.byId(_category.text.trim())?.id ?? 'أخرى',
+            value: PlaceCategories.byId(_category.text.trim())?.id ?? '╪ث╪«╪▒┘ë',
             decoration: const InputDecoration(border: OutlineInputBorder()),
             items: PlaceCategories.all.map((c) => DropdownMenuItem(value: c.id, child: Text(c.labelAr))).toList(),
             onChanged: (value) { if (value != null) _category.text = value; setState(() {}); },
           ),
-          _field('رابط الصورة', _imageUrl),
-          _field('ساعات العمل بالعربي', _hoursAr),
-          _field('ساعات العمل بالإنجليزي', _hoursEn),
+          _field('╪▒╪د╪ذ╪╖ ╪د┘╪╡┘ê╪▒╪ر', _imageUrl),
+          _field('╪│╪د╪╣╪د╪ز ╪د┘╪╣┘à┘ ╪ذ╪د┘╪╣╪▒╪ذ┘è', _hoursAr),
+          _field('╪│╪د╪╣╪د╪ز ╪د┘╪╣┘à┘ ╪ذ╪د┘╪ح┘╪ش┘┘è╪▓┘è', _hoursEn),
           Card(
             margin: const EdgeInsets.only(bottom: 16),
             child: Padding(
@@ -321,9 +321,9 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _field('خط العرض (Lat)', _lat)),
+                      Expanded(child: _field('╪«╪╖ ╪د┘╪╣╪▒╪╢ (Lat)', _lat)),
                       const SizedBox(width: 12),
-                      Expanded(child: _field('خط الطول (Lng)', _lng)),
+                      Expanded(child: _field('╪«╪╖ ╪د┘╪╖┘ê┘ (Lng)', _lng)),
                     ],
                   ),
                   Text(
@@ -336,10 +336,10 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
           ),
 
           // ------------------------------------------------------------
-          // الفكرة: قائمة منسدلة للمحافظة - نفس القائمة الثابتة المستخدمة
-          // في كل التطبيق، عشان القيمة المحفوظة تتطابق دايمًا
+          // ╪د┘┘┘â╪▒╪ر: ┘é╪د╪خ┘à╪ر ┘à┘╪│╪»┘╪ر ┘┘┘à╪ص╪د┘╪╕╪ر - ┘┘╪│ ╪د┘┘é╪د╪خ┘à╪ر ╪د┘╪س╪د╪ذ╪ز╪ر ╪د┘┘à╪│╪ز╪«╪»┘à╪ر
+          // ┘┘è ┘â┘ ╪د┘╪ز╪╖╪ذ┘è┘é╪î ╪╣╪┤╪د┘ ╪د┘┘é┘è┘à╪ر ╪د┘┘à╪ص┘┘ê╪╕╪ر ╪ز╪ز╪╖╪د╪ذ┘é ╪»╪د┘è┘à┘ï╪د
           // ------------------------------------------------------------
-          const Text('المحافظة', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('╪د┘┘à╪ص╪د┘╪╕╪ر', style: TextStyle(fontWeight: FontWeight.bold)),
           DropdownButton<String>(
             value: _selectedCity,
             isExpanded: true,
@@ -352,42 +352,42 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
 
           const SizedBox(height: 8),
           SwitchListTile(
-            title: const Text('منشور للمستخدمين'),
-            subtitle: const Text('إلغاء النشر يخفي المحتوى عن واجهة المستخدم دون حذفه.'),
+            title: const Text('┘à┘╪┤┘ê╪▒ ┘┘┘à╪│╪ز╪«╪»┘à┘è┘'),
+            subtitle: const Text('╪ح┘╪║╪د╪ة ╪د┘┘╪┤╪▒ ┘è╪«┘┘è ╪د┘┘à╪ص╪ز┘ê┘ë ╪╣┘ ┘ê╪د╪ش┘ç╪ر ╪د┘┘à╪│╪ز╪«╪»┘à ╪»┘ê┘ ╪ص╪░┘┘ç.'),
             value: _isPublished,
             onChanged: (value) => setState(() => _isPublished = value),
           ),
 
           // ------------------------------------------------------------
-          // الفكرة: نص عرض الخصم اللي هيظهر كمكافأة للمستخدم بعد ما يقيّم
-          // زيارته الموثّقة لهذا المكان. لو سايبه فاضي، هيتستخدم نص افتراضي عام
+          // ╪د┘┘┘â╪▒╪ر: ┘╪╡ ╪╣╪▒╪╢ ╪د┘╪«╪╡┘à ╪د┘┘┘è ┘ç┘è╪╕┘ç╪▒ ┘â┘à┘â╪د┘╪ث╪ر ┘┘┘à╪│╪ز╪«╪»┘à ╪ذ╪╣╪» ┘à╪د ┘è┘é┘è┘ّ┘à
+          // ╪▓┘è╪د╪▒╪ز┘ç ╪د┘┘à┘ê╪س┘ّ┘é╪ر ┘┘ç╪░╪د ╪د┘┘à┘â╪د┘. ┘┘ê ╪│╪د┘è╪ذ┘ç ┘╪د╪╢┘è╪î ┘ç┘è╪ز╪│╪ز╪«╪»┘à ┘╪╡ ╪د┘╪ز╪▒╪د╪╢┘è ╪╣╪د┘à
           // ------------------------------------------------------------
-          _field('عرض الخصم بعد التقييم (اختياري، مثال: خصم 15% على الفاتورة)', _discountOffer),
+          _field('╪╣╪▒╪╢ ╪د┘╪«╪╡┘à ╪ذ╪╣╪» ╪د┘╪ز┘é┘è┘è┘à (╪د╪«╪ز┘è╪د╪▒┘è╪î ┘à╪س╪د┘: ╪«╪╡┘à 15% ╪╣┘┘ë ╪د┘┘╪د╪ز┘ê╪▒╪ر)', _discountOffer),
 
           // ------------------------------------------------------------
-          // الفكرة: مفتاح "مجاني بالكامل" - لو مفعّل، بيتخفى اختيار
-          // نطاق السعر تلقائيًا لأنه مالوش معنى لمكان مجاني
+          // ╪د┘┘┘â╪▒╪ر: ┘à┘╪ز╪د╪ص "┘à╪ش╪د┘┘è ╪ذ╪د┘┘â╪د┘à┘" - ┘┘ê ┘à┘╪╣┘ّ┘╪î ╪ذ┘è╪ز╪«┘┘ë ╪د╪«╪ز┘è╪د╪▒
+          // ┘╪╖╪د┘é ╪د┘╪│╪╣╪▒ ╪ز┘┘é╪د╪خ┘è┘ï╪د ┘╪ث┘┘ç ┘à╪د┘┘ê╪┤ ┘à╪╣┘┘ë ┘┘à┘â╪د┘ ┘à╪ش╪د┘┘è
           // ------------------------------------------------------------
           SwitchListTile(
-            title: const Text('مسموح بدخول الأكل'),
-            subtitle: const Text('معلومة تظهر كفلتر للمستخدم'),
+            title: const Text('┘à╪│┘à┘ê╪ص ╪ذ╪»╪«┘ê┘ ╪د┘╪ث┘â┘'),
+            subtitle: const Text('┘à╪╣┘┘ê┘à╪ر ╪ز╪╕┘ç╪▒ ┘â┘┘╪ز╪▒ ┘┘┘à╪│╪ز╪«╪»┘à'),
             value: _allowFoodInside,
             onChanged: (value) => setState(() => _allowFoodInside = value),
           ),
 
           const SizedBox(height: 12),
-          const Text('خصائص المكان والخدمات', style: TextStyle(fontWeight: FontWeight.bold)),
-          // هذه الخصائص لا تحدد الجمهور؛ هي معلومات قابلة للفلترة للمستخدم.
+          const Text('╪«╪╡╪د╪خ╪╡ ╪د┘┘à┘â╪د┘ ┘ê╪د┘╪«╪»┘à╪د╪ز', style: TextStyle(fontWeight: FontWeight.bold)),
+          // ┘ç╪░┘ç ╪د┘╪«╪╡╪د╪خ╪╡ ┘╪د ╪ز╪ص╪»╪» ╪د┘╪ش┘à┘ç┘ê╪▒╪ؤ ┘ç┘è ┘à╪╣┘┘ê┘à╪د╪ز ┘é╪د╪ذ┘╪ر ┘┘┘┘╪ز╪▒╪ر ┘┘┘à╪│╪ز╪«╪»┘à.
           ..._propertySwitches(),
 
           SwitchListTile(
-            title: const Text('مكان مجاني بالكامل'),
+            title: const Text('┘à┘â╪د┘ ┘à╪ش╪د┘┘è ╪ذ╪د┘┘â╪د┘à┘'),
             value: _isFree,
             onChanged: (value) => setState(() => _isFree = value),
           ),
           if (!_isFree) ...[
             const SizedBox(height: 8),
-            const Text('نطاق السعر التقريبي', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('┘╪╖╪د┘é ╪د┘╪│╪╣╪▒ ╪د┘╪ز┘é╪▒┘è╪ذ┘è', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -402,10 +402,10 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
           ],
 
           // ------------------------------------------------------------
-          // الفكرة: فئات الجمهور - نفس الـ Chips المستخدمة في شاشة الفلترة،
-          // لكن هنا بتحدد الفئات الفعلية للمكان بدل ما تفلتر بيها
+          // ╪د┘┘┘â╪▒╪ر: ┘╪خ╪د╪ز ╪د┘╪ش┘à┘ç┘ê╪▒ - ┘┘╪│ ╪د┘┘ Chips ╪د┘┘à╪│╪ز╪«╪»┘à╪ر ┘┘è ╪┤╪د╪┤╪ر ╪د┘┘┘╪ز╪▒╪ر╪î
+          // ┘┘â┘ ┘ç┘╪د ╪ذ╪ز╪ص╪»╪» ╪د┘┘╪خ╪د╪ز ╪د┘┘╪╣┘┘è╪ر ┘┘┘à┘â╪د┘ ╪ذ╪»┘ ┘à╪د ╪ز┘┘╪ز╪▒ ╪ذ┘è┘ç╪د
           // ------------------------------------------------------------
-          const Text('مناسب لـ (فئات الجمهور)', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('┘à┘╪د╪│╪ذ ┘┘ (┘╪خ╪د╪ز ╪د┘╪ش┘à┘ç┘ê╪▒)', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -438,7 +438,7 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
             ),
             child: _isSaving
                 ? const CircularProgressIndicator(color: Colors.white)
-                : Text(_isEditing ? 'حفظ التعديلات' : 'إضافة المكان'),
+                : Text(_isEditing ? '╪ص┘╪╕ ╪د┘╪ز╪╣╪»┘è┘╪د╪ز' : '╪ح╪╢╪د┘╪ر ╪د┘┘à┘â╪د┘'),
           ),
         ],
       ),
@@ -446,8 +446,8 @@ class _AdminPlaceFormScreenState extends State<AdminPlaceFormScreen> {
   }
 
   // ------------------------------------------------------------
-  // الفكرة: دالة مساعدة بسيطة بترجع نفس تصميم TextField في كل مكان
-  // بدل ما نكرر نفس الـ decoration في كل حقل من الـ 10 حقول فوق
+  // ╪د┘┘┘â╪▒╪ر: ╪»╪د┘╪ر ┘à╪│╪د╪╣╪»╪ر ╪ذ╪│┘è╪╖╪ر ╪ذ╪ز╪▒╪ش╪╣ ┘┘╪│ ╪ز╪╡┘à┘è┘à TextField ┘┘è ┘â┘ ┘à┘â╪د┘
+  // ╪ذ╪»┘ ┘à╪د ┘┘â╪▒╪▒ ┘┘╪│ ╪د┘┘ decoration ┘┘è ┘â┘ ╪ص┘é┘ ┘à┘ ╪د┘┘ 10 ╪ص┘é┘ê┘ ┘┘ê┘é
   // ------------------------------------------------------------
   Widget _field(String label, TextEditingController controller, {int maxLines = 1}) {
     return Padding(

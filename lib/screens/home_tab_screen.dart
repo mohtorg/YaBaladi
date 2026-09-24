@@ -1,11 +1,11 @@
-// screens/home_tab_screen.dart
+﻿// screens/home_tab_screen.dart
 //
 // ============================================================
-// الفكرة العامة من الشاشة دي:
-// دي "التبويب الرئيسي" الجديد - هيدر ترحيبي + بحث + شبكة أيقونات
-// لأنواع الأماكن بس (مطاعم، كافيهات، فعاليات...).
-// عن قصد ملهاش فلاتر جمهور هنا - دي بقت متنقلة لشاشة الفئة نفسها
-// (category_screen.dart) عشان الشاشة الرئيسية تفضل بسيطة ونضيفة
+// ╪د┘┘┘â╪▒╪ر ╪د┘╪╣╪د┘à╪ر ┘à┘ ╪د┘╪┤╪د╪┤╪ر ╪»┘è:
+// ╪»┘è "╪د┘╪ز╪ذ┘ê┘è╪ذ ╪د┘╪▒╪خ┘è╪│┘è" ╪د┘╪ش╪»┘è╪» - ┘ç┘è╪»╪▒ ╪ز╪▒╪ص┘è╪ذ┘è + ╪ذ╪ص╪س + ╪┤╪ذ┘â╪ر ╪ث┘è┘é┘ê┘╪د╪ز
+// ┘╪ث┘┘ê╪د╪╣ ╪د┘╪ث┘à╪د┘â┘ ╪ذ╪│ (┘à╪╖╪د╪╣┘à╪î ┘â╪د┘┘è┘ç╪د╪ز╪î ┘╪╣╪د┘┘è╪د╪ز...).
+// ╪╣┘ ┘é╪╡╪» ┘à┘┘ç╪د╪┤ ┘┘╪د╪ز╪▒ ╪ش┘à┘ç┘ê╪▒ ┘ç┘╪د - ╪»┘è ╪ذ┘é╪ز ┘à╪ز┘┘é┘╪ر ┘╪┤╪د╪┤╪ر ╪د┘┘╪خ╪ر ┘┘╪│┘ç╪د
+// (category_screen.dart) ╪╣╪┤╪د┘ ╪د┘╪┤╪د╪┤╪ر ╪د┘╪▒╪خ┘è╪│┘è╪ر ╪ز┘╪╢┘ ╪ذ╪│┘è╪╖╪ر ┘ê┘╪╢┘è┘╪ر
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -38,7 +38,7 @@ class HomeTabScreen extends StatefulWidget {
 
 class _HomeTabScreenState extends State<HomeTabScreen> {
   String _selectedCityId = EgyptGovernorates.activeGovernorateId;
-  final String _locationLabel = 'الموقع';
+  final String _locationLabel = '╪د┘┘à┘ê┘é╪╣';
   String _userName = '';
   GovernorateVisualProfile? _visual;
   WeatherSnapshot? _weather;
@@ -62,21 +62,21 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
   }
 
   // ------------------------------------------------------------
-  // الفكرة: كل فئة عندها اسم عربي، أيقونة، ولون خلفية مميز -
-  // بنعرضهم كقائمة ثابتة هنا عشان الشبكة تتبني منها بحلقة for
-  // بدل ما نكرر نفس كود البطاقة 6 مرات يدويًا
+  // ╪د┘┘┘â╪▒╪ر: ┘â┘ ┘╪خ╪ر ╪╣┘╪»┘ç╪د ╪د╪│┘à ╪╣╪▒╪ذ┘è╪î ╪ث┘è┘é┘ê┘╪ر╪î ┘ê┘┘ê┘ ╪«┘┘┘è╪ر ┘à┘à┘è╪▓ -
+  // ╪ذ┘╪╣╪▒╪╢┘ç┘à ┘â┘é╪د╪خ┘à╪ر ╪س╪د╪ذ╪ز╪ر ┘ç┘╪د ╪╣╪┤╪د┘ ╪د┘╪┤╪ذ┘â╪ر ╪ز╪ز╪ذ┘┘è ┘à┘┘ç╪د ╪ذ╪ص┘┘é╪ر for
+  // ╪ذ╪»┘ ┘à╪د ┘┘â╪▒╪▒ ┘┘╪│ ┘â┘ê╪» ╪د┘╪ذ╪╖╪د┘é╪ر 6 ┘à╪▒╪د╪ز ┘è╪»┘ê┘è┘ï╪د
   // ------------------------------------------------------------
   // ------------------------------------------------------------
-  // التصنيفات الرئيسية موحدة في PlaceCategories حتى تستخدم نفس القيم
-  // لوحة الأدمن + البحث + الشاشة الرئيسية. لا نكتب category يدويًا.
+  // ╪د┘╪ز╪╡┘┘è┘╪د╪ز ╪د┘╪▒╪خ┘è╪│┘è╪ر ┘à┘ê╪ص╪»╪ر ┘┘è PlaceCategories ╪ص╪ز┘ë ╪ز╪│╪ز╪«╪»┘à ┘┘╪│ ╪د┘┘é┘è┘à
+  // ┘┘ê╪ص╪ر ╪د┘╪ث╪»┘à┘ + ╪د┘╪ذ╪ص╪س + ╪د┘╪┤╪د╪┤╪ر ╪د┘╪▒╪خ┘è╪│┘è╪ر. ┘╪د ┘┘â╪ز╪ذ category ┘è╪»┘ê┘è┘ï╪د.
   // ------------------------------------------------------------
   final List<_CategoryItem> _categories = PlaceCategories.all
       .map((c) => _CategoryItem(c.id, c.labelAr, c.icon, const Color(0xFFFFF4E8), const Color(0xFFD8720C)))
       .toList();
 
   // ------------------------------------------------------------
-  // الفكرة: نافذة بسيطة لاختيار المحافظة - بديل عن الـ Dropdown
-  // القديم، بنفتحها بالضغط على أيقونة الموقع في الهيدر
+  // ╪د┘┘┘â╪▒╪ر: ┘╪د┘╪░╪ر ╪ذ╪│┘è╪╖╪ر ┘╪د╪«╪ز┘è╪د╪▒ ╪د┘┘à╪ص╪د┘╪╕╪ر - ╪ذ╪»┘è┘ ╪╣┘ ╪د┘┘ Dropdown
+  // ╪د┘┘é╪»┘è┘à╪î ╪ذ┘┘╪ز╪ص┘ç╪د ╪ذ╪د┘╪╢╪║╪╖ ╪╣┘┘ë ╪ث┘è┘é┘ê┘╪ر ╪د┘┘à┘ê┘é╪╣ ┘┘è ╪د┘┘ç┘è╪»╪▒
   // ------------------------------------------------------------
   void _showCityPicker() {
     showModalBottomSheet(
@@ -87,7 +87,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
           final isActive = gov.id == EgyptGovernorates.activeGovernorateId;
           return ListTile(
             title: Text(gov.nameAr),
-            trailing: !isActive ? const Text('قريبًا', style: TextStyle(color: Colors.grey, fontSize: 12)) : null,
+            trailing: !isActive ? const Text('┘é╪▒┘è╪ذ┘ï╪د', style: TextStyle(color: Colors.grey, fontSize: 12)) : null,
             enabled: isActive,
             selected: gov.id == _selectedCityId,
             onTap: isActive
@@ -133,8 +133,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
           child: Column(
             children: [
             // ------------------------------------------------------------
-            // الفكرة: هيدر أزرق فيه (يمين ليسار): جرس إشعارات، اسم التطبيق
-            // ومحافظة المستخدم الحالية، ورسالة ترحيب بالاسم
+            // ╪د┘┘┘â╪▒╪ر: ┘ç┘è╪»╪▒ ╪ث╪▓╪▒┘é ┘┘è┘ç (┘è┘à┘è┘ ┘┘è╪│╪د╪▒): ╪ش╪▒╪│ ╪ح╪┤╪╣╪د╪▒╪د╪ز╪î ╪د╪│┘à ╪د┘╪ز╪╖╪ذ┘è┘é
+            // ┘ê┘à╪ص╪د┘╪╕╪ر ╪د┘┘à╪│╪ز╪«╪»┘à ╪د┘╪ص╪د┘┘è╪ر╪î ┘ê╪▒╪│╪د┘╪ر ╪ز╪▒╪ص┘è╪ذ ╪ذ╪د┘╪د╪│┘à
             // ------------------------------------------------------------
             Container(
               width: double.infinity,
@@ -154,7 +154,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                             child: Image.asset('assets/branding/ya_baladi_icon.png', width: 28, height: 28),
                           ),
                           const SizedBox(width: 8),
-                          const Text('يا بلدي', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Text('┘è╪د ╪ذ┘╪»┘è', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                           const SizedBox(width: 8),
                           GestureDetector(
                             onTap: _showCityPicker,
@@ -169,29 +169,29 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text('${_locationLabel == 'موقعي الحالي' ? '📍 $_locationLabel' : cityName} • ${_userName.isEmpty ? 'أهلًا بيك' : 'أهلًا بيك يا $_userName'} 👋', style: const TextStyle(color: Color(0xFFCFE0F5), fontSize: 13)),
+                  Text('${_locationLabel == '┘à┘ê┘é╪╣┘è ╪د┘╪ص╪د┘┘è' ? '≡اô $_locationLabel' : cityName} ظت ${_userName.isEmpty ? '╪ث┘ç┘┘ï╪د ╪ذ┘è┘â' : '╪ث┘ç┘┘ï╪د ╪ذ┘è┘â ┘è╪د $_userName'} ≡اّï', style: const TextStyle(color: Color(0xFFCFE0F5), fontSize: 13)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Container(width: 8, height: 8, decoration: BoxDecoration(color: localIdentity.accent, shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Text('اكتشف ${localIdentity.labelFor('ar')}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text('╪د┘â╪ز╪┤┘ ${localIdentity.labelFor('ar')}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ],
               ),
             ),
 
-            // شريط البحث (بيوديك لشاشة فئة "الكل" بنص بحث مبدئي لاحقًا)
-            Padding(padding: const EdgeInsets.all(16), child: InkWell(onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>SearchScreen(cityId:_selectedCityId))), child: Container(height:42,padding:const EdgeInsets.symmetric(horizontal:12),decoration:BoxDecoration(color:Colors.grey[100],borderRadius:BorderRadius.circular(10)),child:const Row(children:[Icon(Icons.search,color:Colors.grey,size:20),SizedBox(width:8),Text('ابحث عن أي مكان أو خدمة بسهولة!',style:TextStyle(color:Colors.grey,fontSize:13))])))),
+            // ╪┤╪▒┘è╪╖ ╪د┘╪ذ╪ص╪س (╪ذ┘è┘ê╪»┘è┘â ┘╪┤╪د╪┤╪ر ┘╪خ╪ر "╪د┘┘â┘" ╪ذ┘╪╡ ╪ذ╪ص╪س ┘à╪ذ╪»╪خ┘è ┘╪د╪ص┘é┘ï╪د)
+            Padding(padding: const EdgeInsets.all(16), child: InkWell(onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>SearchScreen(cityId:_selectedCityId))), child: Container(height:42,padding:const EdgeInsets.symmetric(horizontal:12),decoration:BoxDecoration(color:Colors.grey[100],borderRadius:BorderRadius.circular(10)),child:const Row(children:[Icon(Icons.search,color:Colors.grey,size:20),SizedBox(width:8),Text('╪د╪ذ╪ص╪س ╪╣┘ ╪ث┘è ┘à┘â╪د┘ ╪ث┘ê ╪«╪»┘à╪ر ╪ذ╪│┘ç┘ê┘╪ر!',style:TextStyle(color:Colors.grey,fontSize:13))])))),
 
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: GovernorateHero(
                 governorateName: cityName,
                 subtitle: _userName.isEmpty
-                    ? 'اكتشف ما حولك في ${localIdentity.labelFor('ar')}'
-                    : 'أهلًا بك يا $_userName 👋 • اكتشف ${localIdentity.labelFor('ar')}',
+                    ? '╪د┘â╪ز╪┤┘ ┘à╪د ╪ص┘ê┘┘â ┘┘è ${localIdentity.labelFor('ar')}'
+                    : '╪ث┘ç┘┘ï╪د ╪ذ┘â ┘è╪د $_userName ≡اّï ظت ╪د┘â╪ز╪┤┘ ${localIdentity.labelFor('ar')}',
                 visual: _visual,
               ),
             ),
@@ -210,10 +210,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     Expanded(
                       child: Text(
                         _weatherLoading
-                            ? 'الطقس الآن • جارٍ التحديث...'
+                            ? '╪د┘╪╖┘é╪│ ╪د┘╪ت┘ ظت ╪ش╪د╪▒┘ ╪د┘╪ز╪ص╪»┘è╪س...'
                             : _weather == null
-                                ? 'الطقس الآن • غير متاح حاليًا'
-                                : 'الطقس الآن في $cityName • ${_weather!.temperatureC.round()}° • ${_weather!.conditionAr}',
+                                ? '╪د┘╪╖┘é╪│ ╪د┘╪ت┘ ظت ╪║┘è╪▒ ┘à╪ز╪د╪ص ╪ص╪د┘┘è┘ï╪د'
+                                : '╪د┘╪╖┘é╪│ ╪د┘╪ت┘ ┘┘è $cityName ظت ${_weather!.temperatureC.round()}┬░ ظت ${_weather!.conditionAr}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -223,9 +223,9 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
             ),
 
             // ------------------------------------------------------------
-            // اختصارات الشاشة الأولى: أربع وظائف يومية واضحة.
-            // الخريطة الجغرافية أزيلت من هذه المنطقة؛ الزر الرابع يفتح خريطة التطبيق
-            // نفسها لمساعدة المستخدم على فهم الأقسام، بينما الخريطة الجغرافية تظل سياقية.
+            // ╪د╪«╪ز╪╡╪د╪▒╪د╪ز ╪د┘╪┤╪د╪┤╪ر ╪د┘╪ث┘ê┘┘ë: ╪ث╪▒╪ذ╪╣ ┘ê╪╕╪د╪خ┘ ┘è┘ê┘à┘è╪ر ┘ê╪د╪╢╪ص╪ر.
+            // ╪د┘╪«╪▒┘è╪╖╪ر ╪د┘╪ش╪║╪▒╪د┘┘è╪ر ╪ث╪▓┘è┘╪ز ┘à┘ ┘ç╪░┘ç ╪د┘┘à┘╪╖┘é╪ر╪ؤ ╪د┘╪▓╪▒ ╪د┘╪▒╪د╪ذ╪╣ ┘è┘╪ز╪ص ╪«╪▒┘è╪╖╪ر ╪د┘╪ز╪╖╪ذ┘è┘é
+            // ┘┘╪│┘ç╪د ┘┘à╪│╪د╪╣╪»╪ر ╪د┘┘à╪│╪ز╪«╪»┘à ╪╣┘┘ë ┘┘ç┘à ╪د┘╪ث┘é╪│╪د┘à╪î ╪ذ┘è┘┘à╪د ╪د┘╪«╪▒┘è╪╖╪ر ╪د┘╪ش╪║╪▒╪د┘┘è╪ر ╪ز╪╕┘ ╪│┘è╪د┘é┘è╪ر.
             // ------------------------------------------------------------
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -233,19 +233,19 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _QuickAction(icon: Icons.location_on_outlined, label: 'أماكن قريبة', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NearbyPlacesScreen(cityId: _selectedCityId))))),
+                      Expanded(child: _QuickAction(icon: Icons.location_on_outlined, label: '╪ث┘à╪د┘â┘ ┘é╪▒┘è╪ذ╪ر', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NearbyPlacesScreen(cityId: _selectedCityId))))),
                       const SizedBox(width: 8),
-                      Expanded(child: _QuickAction(icon: Icons.event_available_outlined, label: 'فعاليات اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsTodayScreen(cityId: _selectedCityId))))),
+                      Expanded(child: _QuickAction(icon: Icons.event_available_outlined, label: '┘╪╣╪د┘┘è╪د╪ز ╪د┘┘è┘ê┘à', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsTodayScreen(cityId: _selectedCityId))))),
                       const SizedBox(width: 8),
-                      Expanded(child: _QuickAction(icon: Icons.route_outlined, label: 'رحلة اليوم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayTripScreen(cityId: _selectedCityId))))),
+                      Expanded(child: _QuickAction(icon: Icons.route_outlined, label: '╪▒╪ص┘╪ر ╪د┘┘è┘ê┘à', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DayTripScreen(cityId: _selectedCityId))))),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: 'مسح QR', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberQrScannerScreen())))),
+                      Expanded(child: _QuickAction(icon: Icons.qr_code_scanner, label: '┘à╪│╪ص QR', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberQrScannerScreen())))),
                       const SizedBox(width: 8),
-                      Expanded(child: _QuickAction(icon: Icons.explore_rounded, label: 'خريطة يا بلدي', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AppMapScreen(cityId: _selectedCityId))))),
+                      Expanded(child: _QuickAction(icon: Icons.explore_rounded, label: '╪«╪▒┘è╪╖╪ر ┘è╪د ╪ذ┘╪»┘è', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AppMapScreen(cityId: _selectedCityId))))),
                       const SizedBox(width: 8),
                       const Expanded(child: SizedBox(height: 76)),
                     ],
@@ -258,14 +258,14 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('التصنيفات الرئيسية', textAlign: TextAlign.right, style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                  const Text('╪د┘╪ز╪╡┘┘è┘╪د╪ز ╪د┘╪▒╪خ┘è╪│┘è╪ر', textAlign: TextAlign.right, style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       ..._categories.take(6).map((cat) => _CategoryPill(item: cat, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoryScreen(category: cat.categoryValue, categoryLabel: cat.label, cityId: _selectedCityId))))),
-                      _CategoryPill(item: _CategoryItem('all', 'المزيد', Icons.apps, const Color(0xFFF1F4F8), AppColors.primary), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoryScreen(category: '', categoryLabel: 'كل التصنيفات', cityId: _selectedCityId)))),
+                      _CategoryPill(item: _CategoryItem('all', '╪د┘┘à╪▓┘è╪»', Icons.apps, const Color(0xFFF1F4F8), AppColors.primary), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoryScreen(category: '', categoryLabel: '┘â┘ ╪د┘╪ز╪╡┘┘è┘╪د╪ز', cityId: _selectedCityId)))),
                     ],
                   ),
                 ],
@@ -276,7 +276,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: Text('الجديد في $cityName', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                  child: Text('╪د┘╪ش╪»┘è╪» ┘┘è $cityName', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
                 ),
               ),
               SizedBox(
@@ -296,7 +296,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PlaceDetailsScreen(place: place))),
                           child: Stack(children: [
                             Positioned.fill(child: place.imageUrl.isEmpty ? const ColoredBox(color: Color(0xFFEAF0F7), child: Icon(Icons.place, size: 40)) : Image.network(place.imageUrl, fit: BoxFit.cover)),
-                            Positioned(left: 8, top: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: const Text('جديد', style: TextStyle(fontWeight: FontWeight.bold)))),
+                            Positioned(left: 8, top: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: const Text('╪ش╪»┘è╪»', style: TextStyle(fontWeight: FontWeight.bold)))),
                             Positioned(left: 0, right: 0, bottom: 0, child: Container(padding: const EdgeInsets.all(10), color: Colors.black54, child: Text(place.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
                           ]),
                         ),
@@ -316,8 +316,8 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 }
 
 // ------------------------------------------------------------
-// الفكرة: كلاس بسيط لتجميع بيانات كل فئة مع بعض (اسم القيمة المخزّنة
-// في قاعدة البيانات، الاسم المعروض، الأيقونة، الألوان)
+// ╪د┘┘┘â╪▒╪ر: ┘â┘╪د╪│ ╪ذ╪│┘è╪╖ ┘╪ز╪ش┘à┘è╪╣ ╪ذ┘è╪د┘╪د╪ز ┘â┘ ┘╪خ╪ر ┘à╪╣ ╪ذ╪╣╪╢ (╪د╪│┘à ╪د┘┘é┘è┘à╪ر ╪د┘┘à╪«╪▓┘ّ┘╪ر
+// ┘┘è ┘é╪د╪╣╪»╪ر ╪د┘╪ذ┘è╪د┘╪د╪ز╪î ╪د┘╪د╪│┘à ╪د┘┘à╪╣╪▒┘ê╪╢╪î ╪د┘╪ث┘è┘é┘ê┘╪ر╪î ╪د┘╪ث┘┘ê╪د┘)
 // ------------------------------------------------------------
 class _QuickAction extends StatelessWidget {
   final IconData icon;
@@ -371,8 +371,8 @@ class _CategoryPill extends StatelessWidget {
 
 
 class _CategoryItem {
-  final String categoryValue; // القيمة المخزّنة في حقل "category" بالمكان
-  final String label; // الاسم المعروض للمستخدم
+  final String categoryValue; // ╪د┘┘é┘è┘à╪ر ╪د┘┘à╪«╪▓┘ّ┘╪ر ┘┘è ╪ص┘é┘ "category" ╪ذ╪د┘┘à┘â╪د┘
+  final String label; // ╪د┘╪د╪│┘à ╪د┘┘à╪╣╪▒┘ê╪╢ ┘┘┘à╪│╪ز╪«╪»┘à
   final IconData icon;
   final Color bgColor;
   final Color iconColor;

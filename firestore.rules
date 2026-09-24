@@ -19,16 +19,6 @@ service cloud.firestore {
         && (get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.permissions.hasAny([permission, '*']));
     }
 
-    function hasGovernorateScopedPermission(permission, governorateId) {
-      return isAdmin()
-        || (hasPermission(permission)
-          && (
-            get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.get('scope', {}).get('all', false) == true
-            || (get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.get('scope', {}).get('governorateIds', []).size() > 0
-              && get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.get('scope', {}).get('governorateIds', []).hasAny([governorateId]))
-          ));
-    }
-
     function isOwner(userId) {
       return signedIn() && request.auth.uid == userId;
     }
@@ -39,61 +29,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == request.auth.uid;
     }
 
-    // النطاق متعدد الأبعاد: كل بُعد مقيّد في ملف المشرف يجب أن يطابق المستند.
-    // scope.all هو الاستثناء الوحيد الذي يمنح النطاق الكامل للمشرف المصرح له.
-    // إذا كان all=false وكل قوائم النطاق فارغة، فالنتيجة رفض تلقائي (Deny by Default).
-    function scopeAllows(data) {
-      let scope = get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.get('scope', {});
-      let governorates = scope.get('governorateIds', []);
-      let cities = scope.get('cityIds', []);
-      let categories = scope.get('categoryIds', []);
-      let groups = scope.get('groupIds', []);
-      return scope.get('all', false) == true
-        || (
-          (governorates.size() > 0 || cities.size() > 0 || categories.size() > 0 || groups.size() > 0)
-          && (governorates.size() == 0 || (data.get('governorateId', '') is string && governorates.hasAny([data.get('governorateId', '')])))
-          && (cities.size() == 0 || (data.get('cityId', '') is string && cities.hasAny([data.get('cityId', '')])))
-          && (categories.size() == 0 || (data.get('category', '') is string && categories.hasAny([data.get('category', '')])))
-          && (groups.size() == 0 || (data.get('groupId', '') is string && groups.hasAny([data.get('groupId', '')])))
-        );
-    }
-
-    function scopedPermission(permission, data) {
-      return isAdmin() || (hasPermission(permission) && scopeAllows(data));
-    }
-
-    function scopedWrite(permission, oldData, newData) {
-      return isAdmin() || (hasPermission(permission) && scopeAllows(oldData) && scopeAllows(newData));
-    }
-
-    function scopedGroupPermission(permission, groupId, data) {
-      let scope = get(/databases/$(database)/documents/admin_profiles/$(request.auth.uid)).data.get('scope', {});
-      let governorates = scope.get('governorateIds', []);
-      let cities = scope.get('cityIds', []);
-      let categories = scope.get('categoryIds', []);
-      let groups = scope.get('groupIds', []);
-      return isAdmin()
-        || (hasPermission(permission)
-          && (
-            scope.get('all', false) == true
-            || (
-              (governorates.size() > 0 || cities.size() > 0 || categories.size() > 0 || groups.size() > 0)
-              && (governorates.size() == 0 || (data.get('governorateIds', []) is list && data.get('governorateIds', []).hasAny(governorates)))
-              && (cities.size() == 0 || (data.get('cityIds', []) is list && data.get('cityIds', []).hasAny(cities)))
-              && (categories.size() == 0 || (data.get('categoryIds', []) is list && data.get('categoryIds', []).hasAny(categories)))
-              && (groups.size() == 0 || groups.hasAny([groupId]))
-            )
-          ));
-    }
-
     // الأماكن عامة القراءة. الكتابة للأدمن فقط.
     match /places/{placeId} {
       allow read: if true;
-      allow create: if isAdmin() || scopedPermission('places.write', request.resource.data);
-      allow delete: if isAdmin() || scopedPermission('places.write', resource.data);
+      allow create, delete: if isAdmin() || hasPermission('places.write');
 
       // تحديث متوسط التقييم لا يتم إلا ضمن عملية تقييم موثّق.
-      allow update: if isAdmin() || scopedWrite('places.write', resource.data, request.resource.data)
+      allow update: if isAdmin() || hasPermission('places.write')
         || (signedIn()
           && placeOwner(placeId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['featuredRequestPending'])
@@ -273,16 +215,10 @@ service cloud.firestore {
 
     match /subscription_plans/{planId} { allow read: if true; allow create, update, delete: if isAdmin() || hasPermission('subscriptions.write'); }
     match /subscriptions/{userId} { allow read: if isOwner(userId) || isAdmin(); allow create, update, delete: if isAdmin(); }
-    match /events/{eventId} { allow read: if resource.data.isPublished == true || isAdmin() || scopedPermission('events.write', resource.data); allow create: if isAdmin() || scopedPermission('events.write', request.resource.data);
-      allow update: if scopedWrite('events.write', resource.data, request.resource.data);
-      allow delete: if scopedPermission('events.write', resource.data); }
-    match /offers/{offerId} { allow read: if resource.data.active == true || isAdmin() || scopedPermission('offers.write', resource.data); allow create: if isAdmin() || scopedPermission('offers.write', request.resource.data);
-      allow update: if scopedWrite('offers.write', resource.data, request.resource.data);
-      allow delete: if scopedPermission('offers.write', resource.data); }
+    match /events/{eventId} { allow read: if resource.data.isPublished == true || isAdmin() || hasPermission('events.write'); allow create, update, delete: if isAdmin() || hasPermission('events.write'); }
+    match /offers/{offerId} { allow read: if resource.data.active == true || isAdmin() || hasPermission('offers.write'); allow create, update, delete: if isAdmin() || hasPermission('offers.write'); }
     match /points_wallets/{userId} { allow read: if isOwner(userId) || isAdmin(); allow write: if isAdmin(); }
-    match /rewards/{rewardId} { allow read: if resource.data.active == true || isAdmin() || scopedPermission('rewards.write', resource.data); allow create: if isAdmin() || scopedPermission('rewards.write', request.resource.data);
-      allow update: if scopedWrite('rewards.write', resource.data, request.resource.data);
-      allow delete: if scopedPermission('rewards.write', resource.data); }
+    match /rewards/{rewardId} { allow read: if resource.data.active == true || isAdmin() || hasPermission('rewards.write'); allow create, update, delete: if isAdmin() || hasPermission('rewards.write'); }
     match /reward_redemption_requests/{requestId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if signedIn()
@@ -308,28 +244,6 @@ service cloud.firestore {
     match /notification_preferences/{userId} { allow read, write: if isOwner(userId); }
     match /notifications/{notificationId} { allow read: if isAdmin() || hasPermission('notifications.write') || (signedIn() && resource.data.userId == request.auth.uid); allow update: if isAdmin() || hasPermission('notifications.write') || (signedIn() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead','readAt'])); allow create, delete: if isAdmin() || hasPermission('notifications.write'); }
 
-    // مركز التحكم بالمحافظات: بيانات تشغيلية وإعدادات وظائف محلية.
-    match /governorates/{governorateId} {
-      allow read: if hasGovernorateScopedPermission('governorates.read', governorateId)
-        || (resource.data.enabled == true && resource.data.visible == true);
-      allow create, update, delete: if hasGovernorateScopedPermission('governorates.write', governorateId);
-
-      match /feature_overrides/{featureId} {
-        allow read: if hasGovernorateScopedPermission('governorates.read', governorateId)
-          || (get(/databases/$(database)/documents/governorates/$(governorateId)).data.enabled == true
-            && get(/databases/$(database)/documents/governorates/$(governorateId)).data.visible == true);
-        allow create, update, delete: if hasGovernorateScopedPermission('governorates.write', governorateId);
-      }
-    }
-
-    match /governorate_groups/{groupId} {
-      allow read: if scopedGroupPermission('governorates.read', groupId, resource.data);
-      allow create: if scopedGroupPermission('governorates.write', groupId, request.resource.data);
-      allow update: if scopedGroupPermission('governorates.write', groupId, resource.data)
-        && scopedGroupPermission('governorates.write', groupId, request.resource.data);
-      allow delete: if scopedGroupPermission('governorates.write', groupId, resource.data);
-    }
-
     // الهوية البصرية للمحافظات: القراءة العامة للصور المنشورة والمصرح بها فقط.
     // الكتابة للأدمن الأعلى فقط لأن بيانات المصدر والترخيص حساسة تجاريًا.
     match /governorate_visuals/{governorateId} {
@@ -347,15 +261,13 @@ service cloud.firestore {
 
     // ملفات المشرفين وسجل العمليات: للأدمن الأعلى فقط، حتى لا يستطيع مشرف تعديل صلاحياته.
     match /admin_profiles/{userId} {
-      allow read: if isAdmin() || isOwner(userId) || hasPermission('team.read');
-      // منح/تغيير الصلاحيات يظل بيد الأدمن الأعلى فقط؛ team.write لا يتيح تصعيد الصلاحيات.
+      allow read: if isAdmin() || isOwner(userId);
       allow create, update, delete: if isAdmin();
     }
 
     // سجل تدقيق إداري غير قابل للحذف من التطبيق.
     match /audit_logs/{logId} {
-      allow read: if isAdmin()
-        || (hasPermission('audit.read') && resource.data.actorUid == request.auth.uid);
+      allow read: if isAdmin() || hasPermission('reports.read');
       // سجل التدقيق Backend-only: لا يكتب فيه تطبيق الهاتف مباشرة.
       allow create, update, delete: if false;
     }

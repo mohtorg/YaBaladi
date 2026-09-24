@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 class QuickAuthService {
  static const MethodChannel _channel=MethodChannel('ya_baladi/quick_auth');

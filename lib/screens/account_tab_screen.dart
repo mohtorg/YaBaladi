@@ -1,5 +1,5 @@
-// مركز النشاط الشخصي.
-// الوظائف الشخصية تظهر هنا، بينما إعدادات التطبيق موجودة في شاشة إعدادات واحدة فقط.
+﻿// ┘à╪▒┘â╪▓ ╪د┘┘╪┤╪د╪╖ ╪د┘╪┤╪«╪╡┘è.
+// ╪د┘┘ê╪╕╪د╪خ┘ ╪د┘╪┤╪«╪╡┘è╪ر ╪ز╪╕┘ç╪▒ ┘ç┘╪د╪î ╪ذ┘è┘┘à╪د ╪ح╪╣╪»╪د╪»╪د╪ز ╪د┘╪ز╪╖╪ذ┘è┘é ┘à┘ê╪ش┘ê╪»╪ر ┘┘è ╪┤╪د╪┤╪ر ╪ح╪╣╪»╪د╪»╪د╪ز ┘ê╪د╪ص╪»╪ر ┘┘é╪╖.
 
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
@@ -37,7 +37,7 @@ class AccountTabScreen extends StatelessWidget {
               ? user!.fullName.trim()
               : (firebaseUser?.displayName ?? '');
           final photoUrl = firebaseUser?.photoURL;
-          final firstLetter = name.isNotEmpty ? name.substring(0, 1) : '؟';
+          final firstLetter = name.isNotEmpty ? name.substring(0, 1) : '╪ا';
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),

@@ -1,4 +1,4 @@
-﻿name: ya_baladi
+name: ya_baladi
 description: "طھط·ط¨ظٹظ‚ ظٹط§ ط¨ظ„ط¯ظٹ - ط¯ظ„ظٹظ„ ط§ظ„ط£ظ…ط§ظƒظ† ظˆط§ظ„ظپط¹ط§ظ„ظٹط§طھ ظپظٹ ط§ظ„ظ…ط¯ظ† ط§ظ„ظ…طµط±ظٹط©"
 publish_to: 'none'
 version: 1.0.0+1
@@ -34,3 +34,6 @@ flutter:
   assets:
     - assets/branding/ya_baladi_icon.png
 
+dependency_overrides:
+  geocoding_android:
+    path: third_party/geocoding_android

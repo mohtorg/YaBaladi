@@ -14,8 +14,6 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../models/governorate_visual_profile.dart';
 import '../services/governorate_visual_service.dart';
-import '../models/governorate_control.dart';
-import '../services/governorate_control_service.dart';
 import '../widgets/governorate_hero.dart';
 import 'category_screen.dart';
 import 'day_trip_screen.dart';
@@ -32,7 +30,6 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
   String _selectedGovernorateId = EgyptGovernorates.activeGovernorateId;
   String _userName = '';
   GovernorateVisualProfile? _visual;
-  final _governorateControlService = GovernorateControlService();
 
   @override
   void initState() {
@@ -53,46 +50,32 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
   void _showGovernoratePicker() {
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) => StreamBuilder<List<GovernorateControl>>(
-        stream: _governorateControlService.watchPublic(),
-        builder: (context, snapshot) {
-          final publicGovernorates = snapshot.data ?? const <GovernorateControl>[];
-          final entries = publicGovernorates.isEmpty
-              ? EgyptGovernorates.all.map((gov) => (gov.id, gov.nameAr)).toList()
-              : publicGovernorates.map((gov) => (gov.id, gov.nameAr)).toList();
-          return ListView(
-            shrinkWrap: true,
-            children: entries.map((entry) {
-              final id = entry.$1;
-              final name = entry.$2;
-              final selected = id == _selectedGovernorateId;
-              return ListTile(
-                title: Text(name),
-                trailing: selected ? const Icon(Icons.check) : null,
-                onTap: () {
-                  setState(() {
-                    _selectedGovernorateId = id;
-                    _visual = null;
-                  });
-                  Navigator.pop(context);
-                  GovernorateVisualService().getPublished(id).then((visual) {
-                    if (mounted && _selectedGovernorateId == id) {
-                      setState(() => _visual = visual);
-                    }
-                  });
-                },
-              );
-            }).toList(),
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        children: EgyptGovernorates.all.map((gov) {
+          final active = gov.id == EgyptGovernorates.activeGovernorateId;
+          return ListTile(
+            title: Text(gov.nameAr),
+            trailing: !active
+                ? const Text('قريبًا', style: TextStyle(color: Colors.grey))
+                : const Icon(Icons.check),
+            enabled: active,
+            onTap: active
+                ? () {
+                    setState(() {
+                      _selectedGovernorateId = gov.id;
+                      _visual = null;
+                    });
+                    Navigator.pop(context);
+                    GovernorateVisualService().getPublished(gov.id).then((visual) {
+                      if (mounted && _selectedGovernorateId == gov.id) setState(() => _visual = visual);
+                    });
+                  }
+                : null,
           );
-        },
+        }).toList(),
       ),
     );
-  }
-
-  bool _featureAvailable(FeatureState? state) {
-    return state != FeatureState.disabled &&
-        state != FeatureState.hidden &&
-        state != FeatureState.maintenance;
   }
 
   @override
@@ -100,19 +83,9 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
     final governorate = EgyptGovernorates.getById(_selectedGovernorateId);
     final localIdentity = LocalIdentity.forGovernorate(_selectedGovernorateId);
 
-    return StreamBuilder<List<GovernorateControl>>(
-      stream: _governorateControlService.watchPublic(),
-      builder: (context, governorateSnapshot) {
-        return StreamBuilder<Map<String, FeatureState>>(
-          stream: _governorateControlService.watchEffectiveFeatureStates(_selectedGovernorateId),
-          builder: (context, featureSnapshot) {
-            final features = featureSnapshot.data ?? const <String, FeatureState>{};
-            final placesAvailable = _featureAvailable(features['places']);
-            final dayTripAvailable = _featureAvailable(features['day_trip']);
-
-            return Scaffold(
-              body: SafeArea(
-                child: Column(
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
           children: [
             Container(
               width: double.infinity,
@@ -230,10 +203,9 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
                 ),
               ),
             ),
-            if (dayTripAvailable)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: InkWell(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: InkWell(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -295,8 +267,7 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
               ),
             ),
             Expanded(
-              child: placesAvailable
-                  ? GridView.count(
+              child: GridView.count(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
@@ -328,16 +299,11 @@ class _VisitorHomeScreenState extends State<VisitorHomeScreen> {
                     ),
                   );
                 }).toList(),
-              )
-                  : const Center(child: Text('الأماكن غير متاحة حاليًا في هذه المحافظة.')),
+              ),
             ),
           ],
         ),
       ),
-    );
-          },
-        );
-      },
     );
   }
 }

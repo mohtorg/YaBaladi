@@ -1,6 +1,6 @@
-// لوحة التاجر.
-// الوظائف الأساسية موزعة على: الرئيسية، أماكني، النشاط، المزيد.
-// لا نضع إعدادات أو إجراءات شخصية في أكثر من مكان.
+﻿// ┘┘ê╪ص╪ر ╪د┘╪ز╪د╪ش╪▒.
+// ╪د┘┘ê╪╕╪د╪خ┘ ╪د┘╪ث╪│╪د╪│┘è╪ر ┘à┘ê╪▓╪╣╪ر ╪╣┘┘ë: ╪د┘╪▒╪خ┘è╪│┘è╪ر╪î ╪ث┘à╪د┘â┘┘è╪î ╪د┘┘╪┤╪د╪╖╪î ╪د┘┘à╪▓┘è╪».
+// ┘╪د ┘╪╢╪╣ ╪ح╪╣╪»╪د╪»╪د╪ز ╪ث┘ê ╪ح╪ش╪▒╪د╪ة╪د╪ز ╪┤╪«╪╡┘è╪ر ┘┘è ╪ث┘â╪س╪▒ ┘à┘ ┘à┘â╪د┘.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -159,7 +159,7 @@ class _MerchantActivity extends StatelessWidget {
         ...places.map((place) => ListTile(
               leading: const Icon(Icons.star_outline),
               title: Text(place.nameAr),
-              subtitle: Text('⭐ ${place.rating.toStringAsFixed(1)} (${place.ratingCount})'),
+              subtitle: Text('ظص ${place.rating.toStringAsFixed(1)} (${place.ratingCount})'),
               trailing: const Icon(Icons.chevron_left),
               onTap: () => onOpenReviews(place),
             )),
@@ -198,7 +198,7 @@ class _PlaceCard extends StatelessWidget {
         children: [
           ListTile(
             title: Text(place.nameAr, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('⭐ ${place.rating.toStringAsFixed(1)} (${place.ratingCount} ${AppStrings.of('merchant_review_count', lang)})'),
+            subtitle: Text('ظص ${place.rating.toStringAsFixed(1)} (${place.ratingCount} ${AppStrings.of('merchant_review_count', lang)})'),
             trailing: place.isFeatured ? const Icon(Icons.star, color: Color(0xFFD4AF37)) : null,
             onTap: () => onOpenReviews(place),
           ),

@@ -1,17 +1,17 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- إذن الوصول للموقع الجغرافي - مطلوب لميزة "الأقرب مني" -->
-    <!-- الموقع التقريبي فقط: يكفي لميزة «أماكن قريبة» ويقلل نطاق البيانات المطلوبة. -->
-    <!-- لا نطلب ACCESS_FINE_LOCATION لأن التطبيق لا يحتاج تتبعًا دقيقًا أو في الخلفية. -->
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ╪ح╪░┘ ╪د┘┘ê╪╡┘ê┘ ┘┘┘à┘ê┘é╪╣ ╪د┘╪ش╪║╪▒╪د┘┘è - ┘à╪╖┘┘ê╪ذ ┘┘à┘è╪▓╪ر "╪د┘╪ث┘é╪▒╪ذ ┘à┘┘è" -->
+    <!-- ╪د┘┘à┘ê┘é╪╣ ╪د┘╪ز┘é╪▒┘è╪ذ┘è ┘┘é╪╖: ┘è┘â┘┘è ┘┘à┘è╪▓╪ر ┬س╪ث┘à╪د┘â┘ ┘é╪▒┘è╪ذ╪ر┬╗ ┘ê┘è┘é┘┘ ┘╪╖╪د┘é ╪د┘╪ذ┘è╪د┘╪د╪ز ╪د┘┘à╪╖┘┘ê╪ذ╪ر. -->
+    <!-- ┘╪د ┘╪╖┘╪ذ ACCESS_FINE_LOCATION ┘╪ث┘ ╪د┘╪ز╪╖╪ذ┘è┘é ┘╪د ┘è╪ص╪ز╪د╪ش ╪ز╪ز╪ذ╪╣┘ï╪د ╪»┘é┘è┘é┘ï╪د ╪ث┘ê ┘┘è ╪د┘╪«┘┘┘è╪ر. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- إذن الكاميرا - مطلوب لميزة التاجر (مسح كود QR الخاص بالزبون) -->
+    <!-- ╪ح╪░┘ ╪د┘┘â╪د┘à┘è╪▒╪د - ┘à╪╖┘┘ê╪ذ ┘┘à┘è╪▓╪ر ╪د┘╪ز╪د╪ش╪▒ (┘à╪│╪ص ┘â┘ê╪» QR ╪د┘╪«╪د╪╡ ╪ذ╪د┘╪▓╪ذ┘ê┘) -->
     <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- الدخول السريع: Android يعرض بصمة/قفل الجهاز ولا يكشف التطبيق بيانات القفل. -->
+    <!-- ╪د┘╪»╪«┘ê┘ ╪د┘╪│╪▒┘è╪╣: Android ┘è╪╣╪▒╪╢ ╪ذ╪╡┘à╪ر/┘é┘┘ ╪د┘╪ش┘ç╪د╪▓ ┘ê┘╪د ┘è┘â╪┤┘ ╪د┘╪ز╪╖╪ذ┘è┘é ╪ذ┘è╪د┘╪د╪ز ╪د┘┘é┘┘. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
 
     <application
-        android:label="يا بلدي"
+        android:label="┘è╪د ╪ذ┘╪»┘è"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
