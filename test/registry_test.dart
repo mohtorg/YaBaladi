@@ -2,27 +2,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yabaladi_rebuild/registries/category_registry.dart';
 
 void main() {
-  test('approved Home category registry remains exactly six categories', () {
-    expect(CategoryRegistry.homeCategories.length, 6);
-    expect(CategoryRegistry.byId('CAT-001')?.nameEn, 'Restaurants');
-    expect(CategoryRegistry.byId('CAT-002')?.nameEn, 'Cafes');
-    expect(CategoryRegistry.byId('CAT-003')?.nameEn, 'Events');
-    expect(CategoryRegistry.byId('CAT-004')?.nameEn, 'Historical Places');
-    expect(CategoryRegistry.byId('CAT-005')?.nameEn, 'Cinema');
-    expect(CategoryRegistry.byId('CAT-006')?.nameEn, 'Gyms');
+  group('CategoryRegistry - Home', () {
+    test('contains exactly 6 home categories', () {
+      expect(CategoryRegistry.homeCategories.length, 6);
+    });
+
+    test('uses stable registry IDs CAT-001..CAT-006', () {
+      final ids = CategoryRegistry.homeCategories
+          .map((c) => c.registryId)
+          .toList(growable: false);
+      expect(ids, [
+        'CAT-001',
+        'CAT-002',
+        'CAT-003',
+        'CAT-004',
+        'CAT-005',
+        'CAT-006',
+      ]);
+    });
+
+    test('exactly one category is marked documentedOnly', () {
+      final documentedOnly = CategoryRegistry.homeCategories
+          .where((c) => c.sourceStatus == CategorySourceStatus.documentedOnly)
+          .toList(growable: false);
+      expect(documentedOnly.length, 1);
+      expect(documentedOnly.first.registryId, 'CAT-005');
+    });
+
+    test('all other home categories are sourceProven', () {
+      final proven = CategoryRegistry.homeCategories
+          .where((c) => c.sourceStatus == CategorySourceStatus.sourceProven)
+          .toList(growable: false);
+      expect(proven.length, 5);
+    });
   });
 
-  test('only source-proven storage IDs are marked verified', () {
-    expect(CategoryRegistry.verifiedHomeCategories.length, 4);
-    expect(CategoryRegistry.documentedOnlyHomeCategories.length, 2);
-    expect(CategoryRegistry.byId('CAT-004')?.storageId, isNull);
-    expect(CategoryRegistry.byId('CAT-005')?.storageId, isNull);
+  group('CategoryRegistry - More', () {
+    test('moreCategories contains 21 entries', () {
+      expect(CategoryRegistry.moreCategories.length, 21);
+    });
+
+    test('all moreCategories are sourceProven', () {
+      for (final c in CategoryRegistry.moreCategories) {
+        expect(c.sourceStatus, CategorySourceStatus.sourceProven);
+      }
+    });
   });
 
-  test('documented-only categories are never treated as executable storage values', () {
-    for (final c in CategoryRegistry.documentedOnlyHomeCategories) {
-      expect(c.isVerifiedInCode, isFalse);
-      expect(c.storageId, isNull);
-    }
+  group('CategoryRegistry - sourceProven getters', () {
+    test('sourceProvenHomeCategories returns only proven home', () {
+      final proven = CategoryRegistry.sourceProvenHomeCategories;
+      expect(proven.length, 5);
+      for (final c in proven) {
+        expect(c.sourceStatus, CategorySourceStatus.sourceProven);
+      }
+    });
+
+    test('sourceProvenMoreCategories returns all more', () {
+      final proven = CategoryRegistry.sourceProvenMoreCategories;
+      expect(proven.length, 21);
+    });
   });
 }

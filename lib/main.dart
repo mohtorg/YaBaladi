@@ -13,7 +13,7 @@ Future<void> main() async {
 }
 
 class YaBaladiApp extends StatelessWidget {
-  const YaBaladiApp({key});
+  const YaBaladiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
