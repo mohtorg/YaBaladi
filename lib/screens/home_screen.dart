@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../registries/category_registry.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  static const _arabicLabels = <String, String>{
-    'Restaurants': 'المطاعم',
-    'Cafes': 'المقاهي',
-    'Events': 'الفعاليات',
-    'Historical Landmarks': 'الأماكن التاريخية',
-    'Cinema': 'السينما',
-    'Clubs & Gyms': 'الأندية والصالات الرياضية',
-  };
+  /// Get localized label for a category
+  String _categoryLabel(AppLocalizations l10n, String labelEn) {
+    switch (labelEn) {
+      case 'Restaurants':
+        return l10n.restaurants;
+      case 'Cafes':
+        return l10n.cafes;
+      case 'Events':
+        return l10n.events;
+      case 'Historical Landmarks':
+        return l10n.historicalPlaces;
+      case 'Cinema':
+        return l10n.cinema;
+      case 'Clubs & Gyms':
+        return l10n.gyms;
+      default:
+        return labelEn;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final categories = CategoryRegistry.homeCategories;
 
     return SafeArea(
@@ -25,15 +38,15 @@ class HomeScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
               child: Text(
-                'يا بلدي',
+                l10n.appName,
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
             ),
           ),
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('اكتشف الأماكن والخدمات من حولك بسهولة.'),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(l10n.welcome),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -43,8 +56,7 @@ class HomeScreen extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final category = categories[index];
-                  final label =
-                      _arabicLabels[category.labelEn] ?? category.labelEn;
+                  final label = _categoryLabel(l10n, category.labelEn);
 
                   return Card(
                     child: InkWell(
