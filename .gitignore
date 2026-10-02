@@ -71,3 +71,4 @@ _recovery/
 *.broken
 *.snapshot
 *.tmp
+*.hprof
