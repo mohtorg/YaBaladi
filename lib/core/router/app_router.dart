@@ -6,22 +6,9 @@ import '../../features/profile/profile_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../screens/search_screen.dart';
+import '../../screens/settings_screen.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
-
-/// Placeholder مؤقت — سنستبدله بـ SettingsScreen الحقيقي بعد
-/// ربط LocaleController و ThemeController عبر Provider أو InheritedWidget
-class _SettingsPlaceholder extends StatelessWidget {
-  const _SettingsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: const Center(child: Text('شاشة الإعدادات — قيد الربط')),
-    );
-  }
-}
 
 final GoRouter appRouter = GoRouter(
   initialLocation: RoutePaths.home,
@@ -49,7 +36,7 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: RoutePaths.settings,
           name: RouteNames.settings,
-          builder: (context, state) => const _SettingsPlaceholder(),
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
     ),

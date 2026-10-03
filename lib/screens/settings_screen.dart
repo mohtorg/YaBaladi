@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../l10n/locale_controller.dart';
@@ -14,19 +15,19 @@ import '../widgets/theme_picker_dialog.dart';
 /// - Account (Profile, Favorites, Logout)
 /// - Legal & Policies (Privacy, Terms, About, Version)
 /// - Advanced (Clear Cache, Delete Account)
+///
+/// Controllers (LocaleController, ThemeController) are provided
+/// via Provider at the app root (see lib/main.dart).
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({
-    super.key,
-    required this.localeController,
-    required this.themeController,
-  });
-
-  final LocaleController localeController;
-  final ThemeController themeController;
+  const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
+    // === Controllers from Provider ===
+    final localeController = context.watch<LocaleController>();
+    final themeController = context.watch<ThemeController>();
 
     return Scaffold(
       appBar: AppBar(
@@ -169,7 +170,7 @@ class SettingsScreen extends StatelessWidget {
       confirmLabel: l10n.confirm,
       cancelLabel: l10n.cancel,
     );
-    // TODO(G2.3): call authService.logout() when Auth is wired
+    // TODO(G2.4): call authService.logout() when Auth is wired
     if (confirmed == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.logoutConfirmTitle)),
