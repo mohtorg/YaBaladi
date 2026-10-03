@@ -1,8 +1,8 @@
 # Ya Baladi — Session State
 
 **آخر تحديث:** 2026-10-03
-**آخر commit:** `[hash]` (سيُملأ بعد commit G2.2)
-**آخر tag:** `v0.2.1-g2.1-localization`
+**آخر commit:** `403395a`
+**آخر tag:** `v0.2.2-g2.2-design`
 
 ---
 
@@ -13,8 +13,8 @@
 | **G0** Baseline | ✅ مكتمل |
 | **G1** Build Foundation | ✅ مكتمل |
 | **G2.1** Localization | ✅ مكتمل |
-| **G2.2** Design System | 🟡 95% مكتمل |
-| **G2.3** Navigation | ⏳ التالي |
+| **G2.2** Design System | ✅ مكتمل (`v0.2.2-g2.2-design`) |
+| **G2.3** Navigation | 🟡 التالي |
 | **G3** Discovery | ⏳ |
 | **G4** Security | ⏳ |
 | **G5** Admin | ⏳ |
@@ -27,86 +27,81 @@
 
 | البيئة | المسار | الدور |
 |---|---|---|
-| **Primary** | GitHub Codespaces (`glowing waffle`) | بناء + تطوير |
+| **Primary** | Codespaces (`glowing waffle`) | بناء + تطوير |
 | **Secondary** | WORK (`C:\ya_baladi_rebuild`) | احتياطي |
 | **Reference** | HOME (`D:\ya_baladi_rebuild`) | تصميم/توثيق |
 
 **GitHub:** `https://github.com/mohtorg/YaBaladi`
+**Releases:** `https://github.com/mohtorg/YaBaladi/releases`
 
 ---
 
-## ✅ ما تم في G2.2 (Design System)
+## ✅ ما تم في G2.2
 
-### الملفات المُنشأة/المُحدَّثة
-lib/theme/
-├── design_tokens.dart (Semantic + Dark mode)
-├── app_typography.dart (Body + Label + Display)
-└── app_theme.dart (Light + Dark + Cairo)
+### ملفات جديدة
+- `lib/theme/app_theme.dart`
+- `lib/l10n/theme_controller.dart`
+- `lib/widgets/language_picker_dialog.dart`
+- `lib/widgets/theme_picker_dialog.dart`
+- `lib/screens/settings_screen.dart`
+- `assets/fonts/Cairo-{Regular,Medium,SemiBold,Bold}.ttf`
 
-lib/l10n/
-├── locale_controller.dart (SharedPreferences)
-├── theme_controller.dart (SharedPreferences)
-├── app_ar.arb (~100 مفتاح)
-└── app_en.arb (~100 مفتاح)
+### ملفات محدَّثة
+- `pubspec.yaml` (shared_preferences + Cairo + go_router later)
+- `lib/theme/design_tokens.dart`
+- `lib/theme/app_typography.dart`
+- `lib/l10n/locale_controller.dart`
+- `lib/l10n/app_ar.arb` (~100 مفتاح)
+- `lib/l10n/app_en.arb`
+- `lib/screens/main_shell.dart` (4 tabs)
+- `lib/main.dart` (StatefulWidget + Controllers)
+- `android/gradle.properties` (Xmx=2048m, Metaspace=768m)
+- `test/bottom_navigation_test.dart`
 
-lib/widgets/
-├── language_picker_dialog.dart
-└── theme_picker_dialog.dart
+### ملفات حوكمة (في الجذر)
+- `SESSION_STATE.md`
+- `EXPERIENCE_LOG.md`
+- `PROJECT_STATE.md`
+- `COMPLIANCE_MATRIX.md`
 
-lib/screens/
-├── settings_screen.dart (4 أقسام)
-└── main_shell.dart (4 tabs)
+### APK
+- `app-debug.apk` (161 MB) على GitHub Release `v0.2.2-g2.2-design`
 
-lib/main.dart (StatefulWidget)
+---
 
-assets/fonts/
-├── Cairo-Regular.ttf
-├── Cairo-Medium.ttf
-├── Cairo-SemiBold.ttf
-└── Cairo-Bold.ttf
-
-### الميزات
-- ✅ Cairo font في كل التطبيق
-- ✅ Design Tokens مركزية (لا ألوان عشوائية)
-- ✅ Light + Dark themes
-- ✅ Language Picker Dialog (AR/EN)
-- ✅ Theme Picker Dialog (System/Light/Dark)
-- ✅ حفظ الاختيارات (SharedPreferences)
-- ✅ Settings Screen احترافي
-- ✅ RTL/LTR يعمل
-- ✅ `flutter analyze = 0 issues`
+## 📋 Tags الرسمية (6)
+backup-before-encoding-20260924
+v0.0.1-baseline
+v0.1.0-g1-pass
+v0.1.1-g1-complete
+v0.2.0-g2.1-localization
+v0.2.2-g2.2-design ← آخر tag
 
 ---
 
 ## 🚧 المشاكل المفتوحة
 
-- 🟡 `app_strings.dart` و `locale_controller.dart` القديمان (يجب حذفهما)
-- 🟡 اختبارات Unit مفقودة (مؤجلة لـG7)
-- 🟡 Accessibility لم يُختبر (مؤجل لـG7)
+- 🟡 `locale_controller.dart` القديم (تم استبداله — لا يزال موجودًا)
+- 🟡 اختبارات Unit (مؤجلة لـG7)
+- 🟡 Accessibility (مؤجل لـG7)
+- 🟠 Package name `_rebuild` (يُوحَّد بعد G2)
 
 ---
 
-## 🎯 الخطوة التالية الفورية
+## 🎯 الخطوة التالية — G2.3 Navigation
 
-1. `flutter build apk --debug`
-2. اختبار على الموبايل
-3. `git commit + push`
-4. `git tag v0.2.2-g2.2-design`
-5. بدء G2.3 Navigation
-
----
-
-## 📋 الخطوات التالية (G2.3)
-
-- إضافة `go_router`
-- `app_router.dart`
-- Bottom Nav → Routes
-- Back behavior
-- اختبار التنقل
+1. إضافة `go_router: ^14.6.2` إلى `pubspec.yaml`
+2. إنشاء `lib/navigation/app_routes.dart`
+3. إنشاء `lib/navigation/app_router.dart`
+4. تحديث `main.dart` (MaterialApp.router)
+5. تحديث `main_shell.dart` (ShellRoute + BottomNav)
+6. `flutter analyze`
+7. `flutter build apk --debug`
+8. Commit + Tag `v0.2.3-g2.3-navigation`
 
 ---
 
-## 🔑 مفاتيح التشغيل السريع
+## 🔑 أوامر البدء السريع
 
 ```bash
 # في Codespaces
@@ -114,128 +109,36 @@ cd /workspaces/YaBaladi
 git pull origin main
 flutter pub get
 flutter analyze
-flutter build apk --debug
+الوثائق المرجعية
+في المشروع (GitHub):
 
-5. **`Ctrl + S`**
+SESSION_STATE.md ← هذا الملف
 
----
+EXPERIENCE_LOG.md
 
-## 🚦 المهمة 2: تحديث سجل الخبرة (10 دقائق)
+PROJECT_STATE.md
 
-### 📍 المسار
-docs/experience_log.md (ملف جديد)
+COMPLIANCE_MATRIX.md
+
+MVP.md
+
+في HOME:
+
+D:\Ya_Baladi\ — كل الوثائق
+
+D:\YA_BALADI_BACKUPS\ — النسخ الاحتياطية
 
 
-**أو:**
-سجل_خبرة_يا_بلدي.md (إذا موجود في الجذر)
-
-
-### 📝 الكود الكامل
-
-**أنشئ الملف `docs/experience_log.md`:**
-
-```markdown
-# سجل خبرة يا بلدي — Experience Log
-
-> كل تجربة مهمة تُسجَّل هنا. القاعدة الذهبية: لا نبدأ من الصفر.
+**احفظ.**
 
 ---
 
-## EXP-2026-10-01-001 — مشكلة `C:\ya_baladi`
+### الخطوة 2: Commit + Push
 
-**المشكلة:** `flutter build apk` يفشل بـ `Directory 'C:\ya_baladi' does not contain a Gradle build` على HOME.
-
-**الأعراض:**
-- Gradle يبحث عن مشروع في مسار قديم.
-- لا يحل حتى بعد حذف Gradle cache.
-
-**الفحص:**
-- `flutter doctor` — كل شيء سليم.
-- `.gitignore` — سليم.
-- `android/local.properties` — سليم.
-
-**السبب المثبت:**
-- ملف `Microsoft.PowerShell_profile.ps1` على HOME يحتوي `Set-Location C:\ya_baladi`.
-- عند كل جلسة PowerShell، يبحث عن المشروع القديم.
-
-**الإجراء:**
-- تعطيل السطر في PowerShell Profile.
-- الملف: `C:\Users\<user>\OneDrive\...\WindowsPowerShell\Microsoft.PowerShell_profile.ps1`.
-
-**النتيجة:** ✅ حُلّت — `flutter build apk` يعمل.
-
-**ما يجب تجنبه:**
-- لا نضع `Set-Location` لمسار قديم في PowerShell Profile.
-- عند تغيير مسار المشروع، حدّث كل الإشارات إليه.
-
----
-
-## EXP-2026-10-02-002 — GitHub Codespaces = بيئة البناء المثالية
-
-**المشكلة:** HOME (1.8 GB RAM) بطيء جدًا في البناء (45+ دقيقة).
-
-**الحل المكتشف:**
-- **GitHub Codespaces** (8 GB RAM, 2-core).
-- وقت البناء: **120–370 ثانية**.
-- 5 tags رسمية على GitHub.
-
-**الإجراء:**
-- اعتماد Codespaces كبيئة البناء الرسمية.
-- HOME/WORK للتصميم/التوثيق فقط.
-
-**النتيجة:** ✅ توفير 40 دقيقة لكل بناء.
-
-**ما يجب تجنبه:**
-- لا نستخدم HOME للبناء (RAM منخفضة).
-- لا نستخدم WORK كبيئة أساسية.
-
----
-
-## EXP-2026-10-02-003 — `git reset --soft HEAD~N` خطير
-
-**المشكلة:** `git reset --soft HEAD~2` على HOME أزال 5 commits (بدل 2).
-
-**الأعراض:**
-- HEAD انتقل لـ`c1a9b42` بدل `30c3ad1`.
-- المخاطرة: فقدان commits مهمة.
-
-**السبب:**
-- HOME كان متأخرًا عن origin بـ3 commits.
-- `HEAD~2` يشير لـcommit مختلف عن المتوقع.
-
-**الإجراء:**
-- `git reset --hard HEAD` — العودة لآخر commit.
-- `git pull origin main` — fast-forward.
-- استعادة كل commits من GitHub.
-
-**النتيجة:** ✅ لم يُفقد شيء — كل شيء آمن على GitHub.
-
-**ما يجب تجنبه:**
-- قبل أي `reset`، تأكد: `git status` + `git log --oneline -5`.
-- لا تستخدم `reset --soft HEAD~N` بدون التأكد.
-- دائمًا `git pull` أولًا، ثم `reset`.
-
----
-
-## EXP-2026-10-02-004 — Flutter SDK في Codespaces
-
-**المشكلة:** `flutter: command not found` في Codespaces.
-
-**السبب:**
-- Codespace جديد لم يُهيَّأ Flutter.
-- PATH لا يحتوي `flutter/bin`.
-
-**الإجراء:**
 ```bash
-cd ~
-git clone https://github.com/flutter/flutter.git -b stable --depth 1
-echo 'export PATH="$PATH:$HOME/flutter/bin"' >> ~/.bashrc
-export PATH="$PATH:$HOME/flutter/bin"
-flutter config --android-sdk /home/codespace/android-sdk
-النتيجة: ✅ Flutter يعمل في 10 ثوان.
+cd /workspaces/YaBaladi
+git add SESSION_STATE.md
+git commit -m "docs: update session state at end of G2.2"
+git push origin main
+git log --oneline -3
 
-ما يجب تجنبه:
-
-لا نفتح Codespace جديد بدون تثبيت Flutter.
-
-احفظ ~/.bashrc دائمًا.
