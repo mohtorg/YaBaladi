@@ -1,9 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'core/router/app_router.dart';
+import 'features/auth/controllers/auth_controller.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/locale_controller.dart';
@@ -31,37 +33,63 @@ class YaBaladiApp extends StatelessWidget {
         ChangeNotifierProvider<ThemeController>(
           create: (_) => ThemeController()..load(),
         ),
+        ChangeNotifierProvider<AuthController>(
+          create: (_) => AuthController(),
+        ),
       ],
-      child: Consumer2<LocaleController, ThemeController>(
-        builder: (context, locale, theme, _) {
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            onGenerateTitle: (context) =>
-                AppLocalizations.of(context).appName,
+      child: const _AppRoot(),
+    );
+  }
+}
 
-            // === Localization ===
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('ar'),
-              Locale('en'),
-            ],
-            locale: locale.locale,
+class _AppRoot extends StatefulWidget {
+  const _AppRoot();
 
-            // === Theme ===
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: theme.themeMode,
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
 
-            // === Router ===
-            routerConfig: appRouter,
-          );
-        },
-      ),
+class _AppRootState extends State<_AppRoot> {
+  GoRouter? _router;
+  AuthController? _authController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final auth = context.read<AuthController>();
+
+    // نبني router مرة واحدة فقط (أو عند تغيّر auth)
+    if (_router == null || _authController != auth) {
+      _router = createAppRouter(auth);
+      _authController = auth;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = context.watch<LocaleController>();
+    final theme = context.watch<ThemeController>();
+
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context).appName,
+
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('ar'), Locale('en')],
+      locale: locale.locale,
+
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: theme.themeMode,
+
+      routerConfig: _router!,
     );
   }
 }

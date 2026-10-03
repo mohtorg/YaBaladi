@@ -121,5 +121,18 @@
   "errorPasswordShort": "كلمة المرور قصيرة جدًا (6 أحرف على الأقل)",
   "errorPasswordsMismatch": "كلمتا المرور غير متطابقتين",
   "errorNameRequired": "الاسم مطلوب",
-  "errorNameShort": "الاسم قصير جدًا"
+  "errorNameShort": "الاسم قصير جدًا",
+  "profileActivity": "نشاطي",
+  "profileStatsFavorites": "مفضلة",
+  "profileStatsRatings": "تقييمات",
+  "profileStatsPlaces": "أماكني",
+  "profileStatsPhotos": "صوري",
+  "profileGovernorateUnknown": "غير محدد",
+  "favoritesEmptyTitle": "لا توجد أماكن في المفضلة",
+  "favoritesEmptySubtitle": "ابدأ باستكشاف الأماكن واحفظ ما يعجبك",
+  "discoverPlaces": "اكتشف الأماكن",
+  "searchComingSoon": "البحث قادم قريبًا",
+  "settingsAppearance": "المظهر",
+  "settingsPrivacySection": "الخصوصية والأذونات",
+  "settingsDangerSection": "منطقة الخطر"
 }

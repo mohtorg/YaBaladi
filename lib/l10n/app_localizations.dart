@@ -733,6 +733,84 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'الاسم قصير جدًا'**
   String get errorNameShort;
+
+  /// No description provided for @profileActivity.
+  ///
+  /// In ar, this message translates to:
+  /// **'نشاطي'**
+  String get profileActivity;
+
+  /// No description provided for @profileStatsFavorites.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفضلة'**
+  String get profileStatsFavorites;
+
+  /// No description provided for @profileStatsRatings.
+  ///
+  /// In ar, this message translates to:
+  /// **'تقييمات'**
+  String get profileStatsRatings;
+
+  /// No description provided for @profileStatsPlaces.
+  ///
+  /// In ar, this message translates to:
+  /// **'أماكني'**
+  String get profileStatsPlaces;
+
+  /// No description provided for @profileStatsPhotos.
+  ///
+  /// In ar, this message translates to:
+  /// **'صوري'**
+  String get profileStatsPhotos;
+
+  /// No description provided for @profileGovernorateUnknown.
+  ///
+  /// In ar, this message translates to:
+  /// **'غير محدد'**
+  String get profileGovernorateUnknown;
+
+  /// No description provided for @favoritesEmptyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد أماكن في المفضلة'**
+  String get favoritesEmptyTitle;
+
+  /// No description provided for @favoritesEmptySubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'ابدأ باستكشاف الأماكن واحفظ ما يعجبك'**
+  String get favoritesEmptySubtitle;
+
+  /// No description provided for @discoverPlaces.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتشف الأماكن'**
+  String get discoverPlaces;
+
+  /// No description provided for @searchComingSoon.
+  ///
+  /// In ar, this message translates to:
+  /// **'البحث قادم قريبًا'**
+  String get searchComingSoon;
+
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In ar, this message translates to:
+  /// **'المظهر'**
+  String get settingsAppearance;
+
+  /// No description provided for @settingsPrivacySection.
+  ///
+  /// In ar, this message translates to:
+  /// **'الخصوصية والأذونات'**
+  String get settingsPrivacySection;
+
+  /// No description provided for @settingsDangerSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'منطقة الخطر'**
+  String get settingsDangerSection;
 }
 
 class _AppLocalizationsDelegate

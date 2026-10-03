@@ -328,4 +328,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorNameShort => 'Name is too short';
+
+  @override
+  String get profileActivity => 'My Activity';
+
+  @override
+  String get profileStatsFavorites => 'Favorites';
+
+  @override
+  String get profileStatsRatings => 'Ratings';
+
+  @override
+  String get profileStatsPlaces => 'My Places';
+
+  @override
+  String get profileStatsPhotos => 'My Photos';
+
+  @override
+  String get profileGovernorateUnknown => 'Not set';
+
+  @override
+  String get favoritesEmptyTitle => 'No favorites yet';
+
+  @override
+  String get favoritesEmptySubtitle =>
+      'Start exploring places and save what you like';
+
+  @override
+  String get discoverPlaces => 'Discover Places';
+
+  @override
+  String get searchComingSoon => 'Search coming soon';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsPrivacySection => 'Privacy & Permissions';
+
+  @override
+  String get settingsDangerSection => 'Danger Zone';
 }

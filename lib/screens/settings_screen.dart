@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/locale_controller.dart';
@@ -9,24 +12,19 @@ import '../theme/design_tokens.dart';
 import '../widgets/language_picker_dialog.dart';
 import '../widgets/theme_picker_dialog.dart';
 
-/// Professional Settings screen for Ya Baladi.
+/// شاشة الإعدادات — تخصيص التطبيق
 ///
-/// Sections:
-/// - General (Language, Theme, Location, Notifications)
-/// - Account (Profile, Favorites, Logout)
-/// - Legal & Policies (Privacy, Terms, About, Version)
-/// - Advanced (Clear Cache, Delete Account)
-///
-/// Controllers (LocaleController, ThemeController, AuthController)
-/// are provided via Provider at the app root (see lib/main.dart).
+/// الأقسام:
+/// - المظهر (اللغة + الثيم)
+/// - الخصوصية والأذونات (الموقع + مسح الذاكرة)
+/// - القانوني والسياسات (4 بنود)
+/// - منطقة الخطر (حذف الحساب)
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-
-    // === Controllers from Provider ===
     final localeController = context.watch<LocaleController>();
     final themeController = context.watch<ThemeController>();
     final auth = context.watch<AuthController>();
@@ -34,6 +32,18 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.settings),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: l10n.home,
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              // ignore: use_build_context_synchronously
+              context.go(RoutePaths.home);
+            }
+          },
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(
@@ -41,17 +51,19 @@ class SettingsScreen extends StatelessWidget {
         ),
         children: [
           // ============================================================
-          // GENERAL
+          // المظهر
           // ============================================================
-          _SectionHeader(title: l10n.settingsGeneral),
+          _SectionHeader(title: l10n.settingsAppearance),
 
-          _LanguageTile(
-            localeController: localeController,
-          ),
+          _LanguageTile(localeController: localeController),
+          _ThemeTile(themeController: themeController),
 
-          _ThemeTile(
-            themeController: themeController,
-          ),
+          const SizedBox(height: YaBaladiDesignTokens.space4),
+
+          // ============================================================
+          // الخصوصية والأذونات
+          // ============================================================
+          _SectionHeader(title: l10n.settingsPrivacySection),
 
           _SettingTile(
             icon: Icons.location_on_outlined,
@@ -61,47 +73,16 @@ class SettingsScreen extends StatelessWidget {
           ),
 
           _SettingTile(
-            icon: Icons.notifications_outlined,
-            title: l10n.notificationsLabel,
-            subtitle: l10n.notificationsSubtitle,
-            trailing: Switch(
-              value: true,
-              onChanged: (_) {},
-            ),
+            icon: Icons.cleaning_services_outlined,
+            title: l10n.clearCacheLabel,
+            subtitle: l10n.clearCacheSubtitle,
+            onTap: () => _confirmClearCache(context),
           ),
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
 
           // ============================================================
-          // ACCOUNT
-          // ============================================================
-          _SectionHeader(title: l10n.settingsAccount),
-
-          _SettingTile(
-            icon: Icons.person_outline,
-            title: l10n.profile,
-            onTap: () {},
-          ),
-
-          _SettingTile(
-            icon: Icons.favorite_border,
-            title: l10n.favorites,
-            onTap: () {},
-          ),
-
-          // Logout — يعمل فقط إذا كان المستخدم مسجل دخول
-          if (auth.isLoggedIn)
-            _SettingTile(
-              icon: Icons.logout,
-              title: l10n.logout,
-              isDestructive: true,
-              onTap: () => _confirmLogout(context, auth),
-            ),
-
-          const SizedBox(height: YaBaladiDesignTokens.space4),
-
-          // ============================================================
-          // LEGAL & POLICIES
+          // القانوني والسياسات
           // ============================================================
           _SectionHeader(title: l10n.settingsLegal),
 
@@ -133,28 +114,21 @@ class SettingsScreen extends StatelessWidget {
             onTap: null,
           ),
 
-          const SizedBox(height: YaBaladiDesignTokens.space4),
-
           // ============================================================
-          // ADVANCED
+          // منطقة الخطر
           // ============================================================
-          _SectionHeader(title: l10n.settingsAdvanced),
+          if (auth.isLoggedIn) ...[
+            const SizedBox(height: YaBaladiDesignTokens.space4),
+            _SectionHeader(title: l10n.settingsDangerSection),
 
-          _SettingTile(
-            icon: Icons.cleaning_services_outlined,
-            title: l10n.clearCacheLabel,
-            subtitle: l10n.clearCacheSubtitle,
-            onTap: () => _confirmClearCache(context),
-          ),
-
-          if (auth.isLoggedIn)
             _SettingTile(
-              icon: Icons.delete_outline,
+              icon: Icons.delete_forever,
               title: l10n.deleteAccountLabel,
               subtitle: l10n.deleteAccountSubtitle,
               isDestructive: true,
               onTap: () => _confirmDeleteAccount(context),
             ),
+          ],
 
           const SizedBox(height: YaBaladiDesignTokens.space6),
         ],
@@ -166,23 +140,6 @@ class SettingsScreen extends StatelessWidget {
   // CONFIRMATIONS
   // ============================================================
 
-  Future<void> _confirmLogout(
-    BuildContext context,
-    AuthController auth,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await _showConfirmDialog(
-      context: context,
-      title: l10n.logoutConfirmTitle,
-      message: l10n.logoutConfirmMessage,
-      confirmLabel: l10n.confirm,
-      cancelLabel: l10n.cancel,
-    );
-    if (confirmed == true) {
-      await auth.signOut();
-    }
-  }
-
   Future<void> _confirmClearCache(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await _showConfirmDialog(
@@ -192,15 +149,32 @@ class SettingsScreen extends StatelessWidget {
       confirmLabel: l10n.confirm,
       cancelLabel: l10n.cancel,
     );
-    if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.clearCacheSuccess)),
-      );
+
+    if (confirmed != true) return;
+
+    try {
+      await FirebaseFirestore.instance.clearPersistence();
+      await FirebaseFirestore.instance.terminate();
+      await FirebaseFirestore.instance.enableNetwork();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.clearCacheSuccess)),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('حدث خطأ أثناء المسح')),
+        );
+      }
     }
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
+
+    // الحوار الأول: تأكيد عام
     final confirmed = await _showConfirmDialog(
       context: context,
       title: l10n.deleteAccountLabel,
@@ -209,12 +183,20 @@ class SettingsScreen extends StatelessWidget {
       cancelLabel: l10n.cancel,
       isDestructive: true,
     );
-    // TODO(G4): call authService.deleteAccount() when Auth is wired
-    if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.deleteAccountWarning)),
-      );
-    }
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    // الحوار الثاني: تحذير إضافي
+    await _showConfirmDialog(
+      context: context,
+      title: l10n.deleteAccountLabel,
+      message: l10n.deleteAccountConfirm,
+      confirmLabel: l10n.confirm,
+      cancelLabel: l10n.cancel,
+      isDestructive: true,
+    );
+    // TODO(G4): call authService.deleteAccount() when wired
   }
 
   Future<bool?> _showConfirmDialog({
@@ -363,7 +345,6 @@ class _SettingTile extends StatelessWidget {
     required this.icon,
     required this.title,
     this.subtitle,
-    this.trailing,
     this.onTap,
     this.isDestructive = false,
   });
@@ -371,7 +352,6 @@ class _SettingTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  final Widget? trailing;
   final VoidCallback? onTap;
   final bool isDestructive;
 
@@ -404,13 +384,12 @@ class _SettingTile extends StatelessWidget {
               ),
             )
           : null,
-      trailing: trailing ??
-          (onTap != null
-              ? Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                )
-              : null),
+      trailing: onTap != null
+          ? Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+            )
+          : null,
       onTap: onTap,
     );
   }

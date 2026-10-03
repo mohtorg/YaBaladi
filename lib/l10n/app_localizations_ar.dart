@@ -326,4 +326,43 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errorNameShort => 'الاسم قصير جدًا';
+
+  @override
+  String get profileActivity => 'نشاطي';
+
+  @override
+  String get profileStatsFavorites => 'مفضلة';
+
+  @override
+  String get profileStatsRatings => 'تقييمات';
+
+  @override
+  String get profileStatsPlaces => 'أماكني';
+
+  @override
+  String get profileStatsPhotos => 'صوري';
+
+  @override
+  String get profileGovernorateUnknown => 'غير محدد';
+
+  @override
+  String get favoritesEmptyTitle => 'لا توجد أماكن في المفضلة';
+
+  @override
+  String get favoritesEmptySubtitle => 'ابدأ باستكشاف الأماكن واحفظ ما يعجبك';
+
+  @override
+  String get discoverPlaces => 'اكتشف الأماكن';
+
+  @override
+  String get searchComingSoon => 'البحث قادم قريبًا';
+
+  @override
+  String get settingsAppearance => 'المظهر';
+
+  @override
+  String get settingsPrivacySection => 'الخصوصية والأذونات';
+
+  @override
+  String get settingsDangerSection => 'منطقة الخطر';
 }

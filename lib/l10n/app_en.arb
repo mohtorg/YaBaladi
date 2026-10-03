@@ -121,5 +121,18 @@
   "errorPasswordShort": "Password is too short (min 6 chars)",
   "errorPasswordsMismatch": "Passwords don't match",
   "errorNameRequired": "Name is required",
-  "errorNameShort": "Name is too short"
+  "errorNameShort": "Name is too short",
+  "profileActivity": "My Activity",
+  "profileStatsFavorites": "Favorites",
+  "profileStatsRatings": "Ratings",
+  "profileStatsPlaces": "My Places",
+  "profileStatsPhotos": "My Photos",
+  "profileGovernorateUnknown": "Not set",
+  "favoritesEmptyTitle": "No favorites yet",
+  "favoritesEmptySubtitle": "Start exploring places and save what you like",
+  "discoverPlaces": "Discover Places",
+  "searchComingSoon": "Search coming soon",
+  "settingsAppearance": "Appearance",
+  "settingsPrivacySection": "Privacy & Permissions",
+  "settingsDangerSection": "Danger Zone"
 }

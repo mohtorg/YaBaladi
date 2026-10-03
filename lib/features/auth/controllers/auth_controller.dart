@@ -16,22 +16,29 @@ class AuthResult {
 }
 
 /// يغلّف Firebase Auth + Firestore user profile
+///
+/// آمن للاختبار: إذا لم يكن Firebase مُهيَّأً، يظل Controller صالحًا
+/// (بـ isInitialized=false) بدون رمي استثناءات.
 class AuthController extends ChangeNotifier {
   AuthController({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance {
-    _userSub = _auth.authStateChanges().listen(_onAuthStateChanged);
+  })  : _injectedAuth = auth,
+        _injectedFirestore = firestore {
+    _initFirebase();
   }
 
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth? _injectedAuth;
+  final FirebaseFirestore? _injectedFirestore;
+
+  FirebaseAuth? _auth;
+  FirebaseFirestore? _firestore;
   StreamSubscription<User?>? _userSub;
 
   User? _user;
   bool _isLoading = false;
   bool _isInitialized = false;
+  bool _firebaseAvailable = false;
 
   // ============================================================
   // GETTERS
@@ -41,13 +48,28 @@ class AuthController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   bool get isLoggedIn => _user != null;
+  bool get firebaseAvailable => _firebaseAvailable;
   String? get uid => _user?.uid;
   String? get email => _user?.email;
   String? get displayName => _user?.displayName;
 
   // ============================================================
-  // INIT
+  // INIT (آمن للاختبار)
   // ============================================================
+
+  void _initFirebase() {
+    try {
+      _auth = _injectedAuth ?? FirebaseAuth.instance;
+      _firestore = _injectedFirestore ?? FirebaseFirestore.instance;
+      _firebaseAvailable = true;
+      _userSub = _auth!.authStateChanges().listen(_onAuthStateChanged);
+    } catch (e) {
+      // Firebase غير مُهيَّأ (بيئة اختبار) — نستمر بدون auth
+      _firebaseAvailable = false;
+      _isInitialized = true;
+      debugPrint('AuthController: Firebase not available ($e)');
+    }
+  }
 
   void _onAuthStateChanged(User? user) {
     _user = user;
@@ -63,9 +85,13 @@ class AuthController extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
+    if (_auth == null) {
+      return const AuthResult.failure('Firebase غير متاح');
+    }
+
     _setLoading(true);
     try {
-      await _auth.signInWithEmailAndPassword(
+      await _auth!.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
@@ -88,9 +114,13 @@ class AuthController extends ChangeNotifier {
     required String password,
     required String displayName,
   }) async {
+    if (_auth == null || _firestore == null) {
+      return const AuthResult.failure('Firebase غير متاح');
+    }
+
     _setLoading(true);
     try {
-      final cred = await _auth.createUserWithEmailAndPassword(
+      final cred = await _auth!.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
@@ -99,7 +129,7 @@ class AuthController extends ChangeNotifier {
 
       final user = cred.user;
       if (user != null) {
-        await _firestore.collection('users').doc(user.uid).set({
+        await _firestore!.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email,
           'displayName': displayName.trim(),
@@ -123,9 +153,11 @@ class AuthController extends ChangeNotifier {
   // ============================================================
 
   Future<void> signOut() async {
+    if (_auth == null) return;
+
     _setLoading(true);
     try {
-      await _auth.signOut();
+      await _auth!.signOut();
     } finally {
       _setLoading(false);
     }
@@ -136,9 +168,13 @@ class AuthController extends ChangeNotifier {
   // ============================================================
 
   Future<AuthResult> resetPassword(String email) async {
+    if (_auth == null) {
+      return const AuthResult.failure('Firebase غير متاح');
+    }
+
     _setLoading(true);
     try {
-      await _auth.sendPasswordResetEmail(email: email.trim());
+      await _auth!.sendPasswordResetEmail(email: email.trim());
       return const AuthResult.success();
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_mapAuthError(e));

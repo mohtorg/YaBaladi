@@ -1,35 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../core/router/route_paths.dart';
+import '../l10n/app_localizations.dart';
+import '../theme/design_tokens.dart';
 
 class SearchScreen extends StatelessWidget {
   const SearchScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('البحث'),
+        title: Text(l10n.search),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: l10n.home,
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(RoutePaths.home);
+            }
+          },
+        ),
       ),
-      body: SafeArea(
+      body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(YaBaladiDesignTokens.space5),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                textDirection: TextDirection.rtl,
-                decoration: InputDecoration(
-                  hintText: 'ابحث عن مكان أو خدمة',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              Icon(
+                Icons.search,
+                size: 72,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: YaBaladiDesignTokens.space4),
               Text(
-                'اكتب كلمة البحث للوصول إلى الأماكن والخدمات.',
-                textAlign: TextAlign.right,
-                style: Theme.of(context).textTheme.bodyMedium,
+                l10n.searchComingSoon,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),

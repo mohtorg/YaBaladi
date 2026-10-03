@@ -2,35 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/router/route_paths.dart';
+import '../l10n/app_localizations.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});
 
   final Widget child;
 
-  static const List<_NavDest> _destinations = [
-    _NavDest(Icons.home_outlined, Icons.home, 'الرئيسية', RoutePaths.home),
-    _NavDest(Icons.person_outline, Icons.person, 'حسابي', RoutePaths.profile),
-    _NavDest(Icons.favorite_border, Icons.favorite, 'المفضلة', RoutePaths.favorites),
-    _NavDest(Icons.settings_outlined, Icons.settings, 'الإعدادات', RoutePaths.settings),
-  ];
-
   int _indexFromLocation(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    final idx = _destinations.indexWhere((d) => d.path == location);
+    final paths = [
+      RoutePaths.home,
+      RoutePaths.profile,
+      RoutePaths.favorites,
+      RoutePaths.settings,
+    ];
+    final idx = paths.indexWhere((p) => p == location);
     return idx < 0 ? 0 : idx;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final index = _indexFromLocation(context);
+
+    final destinations = [
+      _NavDest(Icons.home_outlined, Icons.home, l10n.home, RoutePaths.home),
+      _NavDest(Icons.person_outline, Icons.person, l10n.profile, RoutePaths.profile),
+      _NavDest(Icons.favorite_border, Icons.favorite, l10n.favorites, RoutePaths.favorites),
+      _NavDest(Icons.settings_outlined, Icons.settings, l10n.settings, RoutePaths.settings),
+    ];
+
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
-        onDestinationSelected: (i) => context.go(_destinations[i].path),
+        onDestinationSelected: (i) => context.go(destinations[i].path),
         destinations: [
-          for (final d in _destinations)
+          for (final d in destinations)
             NavigationDestination(
               icon: Icon(d.icon),
               selectedIcon: Icon(d.selectedIcon),
