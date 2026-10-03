@@ -1,8 +1,7 @@
-/// ثوابت أسماء المسارات — تُستخدم مع context.goNamed()
 class RouteNames {
   RouteNames._();
 
-  // Shell (Bottom Navigation)
+  // Shell
   static const String home = 'home';
   static const String profile = 'profile';
   static const String favorites = 'favorites';
@@ -10,4 +9,9 @@ class RouteNames {
 
   // Standalone
   static const String search = 'search';
+
+  // Auth
+  static const String login = 'login';
+  static const String register = 'register';
+  static const String forgotPassword = 'forgotPassword';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../features/auth/controllers/auth_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/locale_controller.dart';
 import '../l10n/theme_controller.dart';
@@ -16,8 +17,8 @@ import '../widgets/theme_picker_dialog.dart';
 /// - Legal & Policies (Privacy, Terms, About, Version)
 /// - Advanced (Clear Cache, Delete Account)
 ///
-/// Controllers (LocaleController, ThemeController) are provided
-/// via Provider at the app root (see lib/main.dart).
+/// Controllers (LocaleController, ThemeController, AuthController)
+/// are provided via Provider at the app root (see lib/main.dart).
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -28,6 +29,7 @@ class SettingsScreen extends StatelessWidget {
     // === Controllers from Provider ===
     final localeController = context.watch<LocaleController>();
     final themeController = context.watch<ThemeController>();
+    final auth = context.watch<AuthController>();
 
     return Scaffold(
       appBar: AppBar(
@@ -87,12 +89,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {},
           ),
 
-          _SettingTile(
-            icon: Icons.logout,
-            title: l10n.logout,
-            isDestructive: true,
-            onTap: () => _confirmLogout(context),
-          ),
+          // Logout — يعمل فقط إذا كان المستخدم مسجل دخول
+          if (auth.isLoggedIn)
+            _SettingTile(
+              icon: Icons.logout,
+              title: l10n.logout,
+              isDestructive: true,
+              onTap: () => _confirmLogout(context, auth),
+            ),
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
 
@@ -143,13 +147,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _confirmClearCache(context),
           ),
 
-          _SettingTile(
-            icon: Icons.delete_outline,
-            title: l10n.deleteAccountLabel,
-            subtitle: l10n.deleteAccountSubtitle,
-            isDestructive: true,
-            onTap: () => _confirmDeleteAccount(context),
-          ),
+          if (auth.isLoggedIn)
+            _SettingTile(
+              icon: Icons.delete_outline,
+              title: l10n.deleteAccountLabel,
+              subtitle: l10n.deleteAccountSubtitle,
+              isDestructive: true,
+              onTap: () => _confirmDeleteAccount(context),
+            ),
 
           const SizedBox(height: YaBaladiDesignTokens.space6),
         ],
@@ -161,7 +166,10 @@ class SettingsScreen extends StatelessWidget {
   // CONFIRMATIONS
   // ============================================================
 
-  Future<void> _confirmLogout(BuildContext context) async {
+  Future<void> _confirmLogout(
+    BuildContext context,
+    AuthController auth,
+  ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await _showConfirmDialog(
       context: context,
@@ -170,11 +178,8 @@ class SettingsScreen extends StatelessWidget {
       confirmLabel: l10n.confirm,
       cancelLabel: l10n.cancel,
     );
-    // TODO(G2.4): call authService.logout() when Auth is wired
-    if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.logoutConfirmTitle)),
-      );
+    if (confirmed == true) {
+      await auth.signOut();
     }
   }
 

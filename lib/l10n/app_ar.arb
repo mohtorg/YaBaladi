@@ -101,5 +101,25 @@
   "yes": "نعم",
   "no": "لا",
   "apply": "تطبيق",
-  "select": "اختيار"
+  "select": "اختيار",
+
+  "loginTitle": "تسجيل الدخول",
+  "loginSubtitle": "أدخل بياناتك للوصول إلى حسابك",
+  "registerTitle": "إنشاء حساب جديد",
+  "registerSubtitle": "انضم إلى مجتمع يا بلادي",
+  "forgotPasswordTitle": "استعادة كلمة المرور",
+  "forgotPasswordSubtitle": "أدخل بريدك لإرسال رابط الاستعادة",
+  "displayName": "الاسم الكامل",
+  "confirmPassword": "تأكيد كلمة المرور",
+  "noAccountYet": "ليس لديك حساب؟",
+  "haveAccountAlready": "لديك حساب بالفعل؟",
+  "sendResetLink": "إرسال رابط الاستعادة",
+  "resetEmailSent": "تم إرسال رابط الاستعادة إلى بريدك الإلكتروني",
+  "errorEmailRequired": "البريد الإلكتروني مطلوب",
+  "errorEmailInvalid": "البريد الإلكتروني غير صالح",
+  "errorPasswordRequired": "كلمة المرور مطلوبة",
+  "errorPasswordShort": "كلمة المرور قصيرة جدًا (6 أحرف على الأقل)",
+  "errorPasswordsMismatch": "كلمتا المرور غير متطابقتين",
+  "errorNameRequired": "الاسم مطلوب",
+  "errorNameShort": "الاسم قصير جدًا"
 }

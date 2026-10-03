@@ -112,25 +112,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get languageSelectTitle => 'Select Language';
+  String get languageSelectTitle => 'Choose Language';
 
   @override
   String get languageSelectSubtitle => 'Changes apply immediately';
 
   @override
-  String get languageArabicSubtitle => 'RTL — Right to Left';
+  String get languageArabicSubtitle => 'RTL — Right to left';
 
   @override
-  String get languageEnglishSubtitle => 'LTR — Left to Right';
+  String get languageEnglishSubtitle => 'LTR — Left to right';
 
   @override
   String get languageCurrent => 'Current language';
 
   @override
-  String get themeLabel => 'Appearance';
+  String get themeLabel => 'Theme';
 
   @override
-  String get themeSelectTitle => 'Select Appearance';
+  String get themeSelectTitle => 'Choose Theme';
 
   @override
   String get themeSelectSubtitle => 'Changes apply immediately';
@@ -139,22 +139,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeSystem => 'System';
 
   @override
-  String get themeSystemSubtitle => 'Follow device settings';
+  String get themeSystemSubtitle => 'Follows device settings';
 
   @override
   String get themeLight => 'Light';
 
   @override
-  String get themeLightSubtitle => 'Day mode';
+  String get themeLightSubtitle => 'Daytime interface';
 
   @override
   String get themeDark => 'Dark';
 
   @override
-  String get themeDarkSubtitle => 'Night mode';
+  String get themeDarkSubtitle => 'Night interface';
 
   @override
-  String get themeCurrent => 'Current appearance';
+  String get themeCurrent => 'Current theme';
 
   @override
   String get locationLabel => 'Location';
@@ -163,7 +163,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get locationOnDemand => 'On demand';
 
   @override
-  String get locationOnDemandSubtitle => 'Requested only when needed';
+  String get locationOnDemandSubtitle => 'Only requested when used';
 
   @override
   String get locationAlways => 'Always';
@@ -175,7 +175,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get locationDisabled => 'Disabled';
 
   @override
-  String get locationDisabledSubtitle => 'Nearby search will not work';
+  String get locationDisabledSubtitle => 'Nearby search won\'t work';
 
   @override
   String get notificationsLabel => 'Notifications';
@@ -205,7 +205,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutLabel => 'About';
 
   @override
-  String get aboutSubtitle => 'Information and licenses';
+  String get aboutSubtitle => 'Info & licenses';
 
   @override
   String get versionLabel => 'Version';
@@ -217,25 +217,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearCacheLabel => 'Clear Cache';
 
   @override
-  String get clearCacheSubtitle => 'Delete temporarily stored data';
+  String get clearCacheSubtitle => 'Delete cached data';
 
   @override
-  String get clearCacheConfirm => 'Clear temporary stored data?';
+  String get clearCacheConfirm => 'Do you want to clear cached data?';
 
   @override
-  String get clearCacheSuccess => 'Cache cleared successfully';
+  String get clearCacheSuccess => 'Cache cleared';
 
   @override
   String get deleteAccountLabel => 'Delete Account';
 
   @override
-  String get deleteAccountSubtitle => 'Permanent — cannot be undone';
+  String get deleteAccountSubtitle => 'Permanent, irreversible';
 
   @override
   String get deleteAccountWarning => 'This action cannot be undone';
 
   @override
-  String get deleteAccountConfirm => 'Delete your account permanently?';
+  String get deleteAccountConfirm =>
+      'Do you want to delete your account permanently?';
 
   @override
   String get deleteAccountButton => 'Delete my account';
@@ -269,4 +270,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get select => 'Select';
+
+  @override
+  String get loginTitle => 'Sign In';
+
+  @override
+  String get loginSubtitle => 'Enter your credentials to access your account';
+
+  @override
+  String get registerTitle => 'Create Account';
+
+  @override
+  String get registerSubtitle => 'Join the Ya Baladi community';
+
+  @override
+  String get forgotPasswordTitle => 'Reset Password';
+
+  @override
+  String get forgotPasswordSubtitle =>
+      'Enter your email to receive a reset link';
+
+  @override
+  String get displayName => 'Full Name';
+
+  @override
+  String get confirmPassword => 'Confirm Password';
+
+  @override
+  String get noAccountYet => 'Don\'t have an account?';
+
+  @override
+  String get haveAccountAlready => 'Already have an account?';
+
+  @override
+  String get sendResetLink => 'Send Reset Link';
+
+  @override
+  String get resetEmailSent => 'A reset link has been sent to your email';
+
+  @override
+  String get errorEmailRequired => 'Email is required';
+
+  @override
+  String get errorEmailInvalid => 'Invalid email';
+
+  @override
+  String get errorPasswordRequired => 'Password is required';
+
+  @override
+  String get errorPasswordShort => 'Password is too short (min 6 chars)';
+
+  @override
+  String get errorPasswordsMismatch => 'Passwords don\'t match';
+
+  @override
+  String get errorNameRequired => 'Name is required';
+
+  @override
+  String get errorNameShort => 'Name is too short';
 }

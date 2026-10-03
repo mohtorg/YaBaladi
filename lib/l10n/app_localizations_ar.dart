@@ -269,4 +269,61 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get select => 'اختيار';
+
+  @override
+  String get loginTitle => 'تسجيل الدخول';
+
+  @override
+  String get loginSubtitle => 'أدخل بياناتك للوصول إلى حسابك';
+
+  @override
+  String get registerTitle => 'إنشاء حساب جديد';
+
+  @override
+  String get registerSubtitle => 'انضم إلى مجتمع يا بلادي';
+
+  @override
+  String get forgotPasswordTitle => 'استعادة كلمة المرور';
+
+  @override
+  String get forgotPasswordSubtitle => 'أدخل بريدك لإرسال رابط الاستعادة';
+
+  @override
+  String get displayName => 'الاسم الكامل';
+
+  @override
+  String get confirmPassword => 'تأكيد كلمة المرور';
+
+  @override
+  String get noAccountYet => 'ليس لديك حساب؟';
+
+  @override
+  String get haveAccountAlready => 'لديك حساب بالفعل؟';
+
+  @override
+  String get sendResetLink => 'إرسال رابط الاستعادة';
+
+  @override
+  String get resetEmailSent => 'تم إرسال رابط الاستعادة إلى بريدك الإلكتروني';
+
+  @override
+  String get errorEmailRequired => 'البريد الإلكتروني مطلوب';
+
+  @override
+  String get errorEmailInvalid => 'البريد الإلكتروني غير صالح';
+
+  @override
+  String get errorPasswordRequired => 'كلمة المرور مطلوبة';
+
+  @override
+  String get errorPasswordShort => 'كلمة المرور قصيرة جدًا (6 أحرف على الأقل)';
+
+  @override
+  String get errorPasswordsMismatch => 'كلمتا المرور غير متطابقتين';
+
+  @override
+  String get errorNameRequired => 'الاسم مطلوب';
+
+  @override
+  String get errorNameShort => 'الاسم قصير جدًا';
 }

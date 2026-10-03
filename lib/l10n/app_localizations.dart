@@ -619,6 +619,120 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اختيار'**
   String get select;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الدخول'**
+  String get loginTitle;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل بياناتك للوصول إلى حسابك'**
+  String get loginSubtitle;
+
+  /// No description provided for @registerTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'إنشاء حساب جديد'**
+  String get registerTitle;
+
+  /// No description provided for @registerSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'انضم إلى مجتمع يا بلادي'**
+  String get registerSubtitle;
+
+  /// No description provided for @forgotPasswordTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'استعادة كلمة المرور'**
+  String get forgotPasswordTitle;
+
+  /// No description provided for @forgotPasswordSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل بريدك لإرسال رابط الاستعادة'**
+  String get forgotPasswordSubtitle;
+
+  /// No description provided for @displayName.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاسم الكامل'**
+  String get displayName;
+
+  /// No description provided for @confirmPassword.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد كلمة المرور'**
+  String get confirmPassword;
+
+  /// No description provided for @noAccountYet.
+  ///
+  /// In ar, this message translates to:
+  /// **'ليس لديك حساب؟'**
+  String get noAccountYet;
+
+  /// No description provided for @haveAccountAlready.
+  ///
+  /// In ar, this message translates to:
+  /// **'لديك حساب بالفعل؟'**
+  String get haveAccountAlready;
+
+  /// No description provided for @sendResetLink.
+  ///
+  /// In ar, this message translates to:
+  /// **'إرسال رابط الاستعادة'**
+  String get sendResetLink;
+
+  /// No description provided for @resetEmailSent.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إرسال رابط الاستعادة إلى بريدك الإلكتروني'**
+  String get resetEmailSent;
+
+  /// No description provided for @errorEmailRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'البريد الإلكتروني مطلوب'**
+  String get errorEmailRequired;
+
+  /// No description provided for @errorEmailInvalid.
+  ///
+  /// In ar, this message translates to:
+  /// **'البريد الإلكتروني غير صالح'**
+  String get errorEmailInvalid;
+
+  /// No description provided for @errorPasswordRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور مطلوبة'**
+  String get errorPasswordRequired;
+
+  /// No description provided for @errorPasswordShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور قصيرة جدًا (6 أحرف على الأقل)'**
+  String get errorPasswordShort;
+
+  /// No description provided for @errorPasswordsMismatch.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمتا المرور غير متطابقتين'**
+  String get errorPasswordsMismatch;
+
+  /// No description provided for @errorNameRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاسم مطلوب'**
+  String get errorNameRequired;
+
+  /// No description provided for @errorNameShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاسم قصير جدًا'**
+  String get errorNameShort;
 }
 
 class _AppLocalizationsDelegate

@@ -1,4 +1,3 @@
-/// ثوابت مسارات التنقل — تُستخدم مع context.go()
 class RoutePaths {
   RoutePaths._();
 
@@ -10,4 +9,9 @@ class RoutePaths {
 
   // Standalone
   static const String search = '/search';
+
+  // Auth (Standalone, بدون BottomNav)
+  static const String login = '/login';
+  static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
 }
