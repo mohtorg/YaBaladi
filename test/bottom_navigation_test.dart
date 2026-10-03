@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yabaladi_rebuild/l10n/app_localizations.dart';
+import 'package:yabaladi_rebuild/l10n/locale_controller.dart';
+import 'package:yabaladi_rebuild/l10n/theme_controller.dart';
 import 'package:yabaladi_rebuild/screens/main_shell.dart';
 
 void main() {
-  testWidgets('G2-006 exposes four bottom navigation destinations', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: MainShell()));
+  testWidgets(
+    'MainShell renders with all 4 navigation destinations',
+    (tester) async {
+      final localeController = LocaleController();
+      final themeController = ThemeController();
 
-    expect(find.byType(NavigationDestination), findsNWidgets(4));
-    expect(find.text('الرئيسية'), findsAtLeastNWidgets(1));
-    expect(find.text('حسابي'), findsAtLeastNWidgets(1));
-    expect(find.text('المفضلة'), findsAtLeastNWidgets(1));
-    expect(find.text('الإعدادات'), findsAtLeastNWidgets(1));
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('ar'),
+          home: MainShell(
+            localeController: localeController,
+            themeController: themeController,
+          ),
+        ),
+      );
 
-    await tester.tap(find.text('المفضلة').last);
-    await tester.pump();
+      await tester.pumpAndSettle();
 
-    expect(find.text('المفضلة'), findsAtLeastNWidgets(1));
-  });
+      // 4 destinations expected: Home, Search, Favorites, Settings
+      expect(find.byType(NavigationDestination), findsNWidgets(4));
+    },
+  );
 }

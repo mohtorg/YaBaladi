@@ -1,17 +1,23 @@
 {
   "@@locale": "ar",
+
   "appName": "يا بلادي",
   "welcome": "أهلاً بك",
+
   "home": "الرئيسية",
   "search": "البحث",
   "profile": "حسابي",
   "settings": "الإعدادات",
+  "favorites": "المفضلة",
+  "notifications": "الإشعارات",
+
   "login": "تسجيل الدخول",
   "register": "إنشاء حساب",
   "logout": "تسجيل الخروج",
   "email": "البريد الإلكتروني",
   "password": "كلمة المرور",
   "forgotPassword": "هل نسيت كلمة المرور؟",
+
   "categories": "التصنيفات",
   "restaurants": "مطاعم",
   "cafes": "مقاهي",
@@ -19,11 +25,81 @@
   "historicalPlaces": "أماكن تاريخية",
   "cinema": "سينما",
   "gyms": "صالات رياضية",
-  "favorites": "المفضلة",
   "nearby": "بالقرب مني",
+
   "loading": "جارٍ التحميل...",
   "error": "حدث خطأ",
   "retry": "إعادة المحاولة",
   "noResults": "لا توجد نتائج",
-  "noInternet": "لا يوجد اتصال بالإنترنت"
+  "noInternet": "لا يوجد اتصال بالإنترنت",
+
+  "settingsGeneral": "عام",
+  "settingsAccount": "الحساب",
+  "settingsLegal": "القانوني والسياسات",
+  "settingsAdvanced": "متقدم",
+
+  "languageLabel": "اللغة",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "languageSelectTitle": "اختر اللغة",
+  "languageSelectSubtitle": "سيتم تطبيق التغيير فورًا",
+  "languageArabicSubtitle": "RTL — من اليمين لليسار",
+  "languageEnglishSubtitle": "LTR — من اليسار لليمين",
+  "languageCurrent": "اللغة الحالية",
+
+  "themeLabel": "المظهر",
+  "themeSelectTitle": "اختر المظهر",
+  "themeSelectSubtitle": "سيتم تطبيق التغيير فورًا",
+  "themeSystem": "النظام",
+  "themeSystemSubtitle": "يتبع إعدادات الجهاز",
+  "themeLight": "فاتح",
+  "themeLightSubtitle": "واجهة نهارية",
+  "themeDark": "داكن",
+  "themeDarkSubtitle": "واجهة ليلية",
+  "themeCurrent": "المظهر الحالي",
+
+  "locationLabel": "الموقع",
+  "locationOnDemand": "حسب الحاجة",
+  "locationOnDemandSubtitle": "يُطلب عند الاستخدام فقط",
+  "locationAlways": "دائمًا",
+  "locationAlwaysSubtitle": "متاح دائمًا (غير موصى به)",
+  "locationDisabled": "معطّل",
+  "locationDisabledSubtitle": "لن يعمل البحث القريب",
+
+  "notificationsLabel": "الإشعارات",
+  "notificationsSubtitle": "تنبيهات التطبيق",
+  "notificationsEnabled": "مفعّلة",
+  "notificationsDisabled": "معطّلة",
+
+  "privacyPolicyLabel": "سياسة الخصوصية",
+  "privacyPolicySubtitle": "كيف نحمي بياناتك",
+  "termsLabel": "الشروط والأحكام",
+  "termsSubtitle": "قواعد الاستخدام",
+  "aboutLabel": "عن التطبيق",
+  "aboutSubtitle": "معلومات وتراخيص",
+  "versionLabel": "الإصدار",
+  "versionValue": "1.0.0+1",
+
+  "clearCacheLabel": "مسح الذاكرة المؤقتة",
+  "clearCacheSubtitle": "حذف البيانات المخزنة مؤقتًا",
+  "clearCacheConfirm": "هل تريد مسح البيانات المخزنة مؤقتًا؟",
+  "clearCacheSuccess": "تم مسح الذاكرة المؤقتة",
+
+  "deleteAccountLabel": "حذف الحساب",
+  "deleteAccountSubtitle": "حذف دائم لا يمكن التراجع عنه",
+  "deleteAccountWarning": "هذا الإجراء لا يمكن التراجع عنه",
+  "deleteAccountConfirm": "هل تريد حذف حسابك نهائيًا؟",
+  "deleteAccountButton": "حذف حسابي",
+
+  "logoutConfirmTitle": "تسجيل الخروج",
+  "logoutConfirmMessage": "هل تريد تسجيل الخروج؟",
+
+  "confirm": "تأكيد",
+  "cancel": "إلغاء",
+  "save": "حفظ",
+  "close": "إغلاق",
+  "yes": "نعم",
+  "no": "لا",
+  "apply": "تطبيق",
+  "select": "اختيار"
 }

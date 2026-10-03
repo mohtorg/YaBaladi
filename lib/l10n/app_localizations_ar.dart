@@ -28,6 +28,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settings => 'الإعدادات';
 
   @override
+  String get favorites => 'المفضلة';
+
+  @override
+  String get notifications => 'الإشعارات';
+
+  @override
   String get login => 'تسجيل الدخول';
 
   @override
@@ -67,9 +73,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get gyms => 'صالات رياضية';
 
   @override
-  String get favorites => 'المفضلة';
-
-  @override
   String get nearby => 'بالقرب مني';
 
   @override
@@ -86,4 +89,184 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noInternet => 'لا يوجد اتصال بالإنترنت';
+
+  @override
+  String get settingsGeneral => 'عام';
+
+  @override
+  String get settingsAccount => 'الحساب';
+
+  @override
+  String get settingsLegal => 'القانوني والسياسات';
+
+  @override
+  String get settingsAdvanced => 'متقدم';
+
+  @override
+  String get languageLabel => 'اللغة';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get languageSelectTitle => 'اختر اللغة';
+
+  @override
+  String get languageSelectSubtitle => 'سيتم تطبيق التغيير فورًا';
+
+  @override
+  String get languageArabicSubtitle => 'RTL — من اليمين لليسار';
+
+  @override
+  String get languageEnglishSubtitle => 'LTR — من اليسار لليمين';
+
+  @override
+  String get languageCurrent => 'اللغة الحالية';
+
+  @override
+  String get themeLabel => 'المظهر';
+
+  @override
+  String get themeSelectTitle => 'اختر المظهر';
+
+  @override
+  String get themeSelectSubtitle => 'سيتم تطبيق التغيير فورًا';
+
+  @override
+  String get themeSystem => 'النظام';
+
+  @override
+  String get themeSystemSubtitle => 'يتبع إعدادات الجهاز';
+
+  @override
+  String get themeLight => 'فاتح';
+
+  @override
+  String get themeLightSubtitle => 'واجهة نهارية';
+
+  @override
+  String get themeDark => 'داكن';
+
+  @override
+  String get themeDarkSubtitle => 'واجهة ليلية';
+
+  @override
+  String get themeCurrent => 'المظهر الحالي';
+
+  @override
+  String get locationLabel => 'الموقع';
+
+  @override
+  String get locationOnDemand => 'حسب الحاجة';
+
+  @override
+  String get locationOnDemandSubtitle => 'يُطلب عند الاستخدام فقط';
+
+  @override
+  String get locationAlways => 'دائمًا';
+
+  @override
+  String get locationAlwaysSubtitle => 'متاح دائمًا (غير موصى به)';
+
+  @override
+  String get locationDisabled => 'معطّل';
+
+  @override
+  String get locationDisabledSubtitle => 'لن يعمل البحث القريب';
+
+  @override
+  String get notificationsLabel => 'الإشعارات';
+
+  @override
+  String get notificationsSubtitle => 'تنبيهات التطبيق';
+
+  @override
+  String get notificationsEnabled => 'مفعّلة';
+
+  @override
+  String get notificationsDisabled => 'معطّلة';
+
+  @override
+  String get privacyPolicyLabel => 'سياسة الخصوصية';
+
+  @override
+  String get privacyPolicySubtitle => 'كيف نحمي بياناتك';
+
+  @override
+  String get termsLabel => 'الشروط والأحكام';
+
+  @override
+  String get termsSubtitle => 'قواعد الاستخدام';
+
+  @override
+  String get aboutLabel => 'عن التطبيق';
+
+  @override
+  String get aboutSubtitle => 'معلومات وتراخيص';
+
+  @override
+  String get versionLabel => 'الإصدار';
+
+  @override
+  String get versionValue => '1.0.0+1';
+
+  @override
+  String get clearCacheLabel => 'مسح الذاكرة المؤقتة';
+
+  @override
+  String get clearCacheSubtitle => 'حذف البيانات المخزنة مؤقتًا';
+
+  @override
+  String get clearCacheConfirm => 'هل تريد مسح البيانات المخزنة مؤقتًا؟';
+
+  @override
+  String get clearCacheSuccess => 'تم مسح الذاكرة المؤقتة';
+
+  @override
+  String get deleteAccountLabel => 'حذف الحساب';
+
+  @override
+  String get deleteAccountSubtitle => 'حذف دائم لا يمكن التراجع عنه';
+
+  @override
+  String get deleteAccountWarning => 'هذا الإجراء لا يمكن التراجع عنه';
+
+  @override
+  String get deleteAccountConfirm => 'هل تريد حذف حسابك نهائيًا؟';
+
+  @override
+  String get deleteAccountButton => 'حذف حسابي';
+
+  @override
+  String get logoutConfirmTitle => 'تسجيل الخروج';
+
+  @override
+  String get logoutConfirmMessage => 'هل تريد تسجيل الخروج؟';
+
+  @override
+  String get confirm => 'تأكيد';
+
+  @override
+  String get cancel => 'إلغاء';
+
+  @override
+  String get save => 'حفظ';
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
+  String get yes => 'نعم';
+
+  @override
+  String get no => 'لا';
+
+  @override
+  String get apply => 'تطبيق';
+
+  @override
+  String get select => 'اختيار';
 }

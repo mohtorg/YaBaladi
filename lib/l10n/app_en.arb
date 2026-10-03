@@ -1,17 +1,23 @@
 {
   "@@locale": "en",
+
   "appName": "Ya Baladi",
   "welcome": "Welcome",
+
   "home": "Home",
   "search": "Search",
   "profile": "Profile",
   "settings": "Settings",
+  "favorites": "Favorites",
+  "notifications": "Notifications",
+
   "login": "Login",
   "register": "Register",
   "logout": "Logout",
   "email": "Email",
   "password": "Password",
   "forgotPassword": "Forgot password?",
+
   "categories": "Categories",
   "restaurants": "Restaurants",
   "cafes": "Cafes",
@@ -19,11 +25,81 @@
   "historicalPlaces": "Historical Places",
   "cinema": "Cinema",
   "gyms": "Gyms",
-  "favorites": "Favorites",
   "nearby": "Nearby",
+
   "loading": "Loading...",
   "error": "An error occurred",
   "retry": "Retry",
   "noResults": "No results",
-  "noInternet": "No internet connection"
+  "noInternet": "No internet connection",
+
+  "settingsGeneral": "General",
+  "settingsAccount": "Account",
+  "settingsLegal": "Legal & Policies",
+  "settingsAdvanced": "Advanced",
+
+  "languageLabel": "Language",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "languageSelectTitle": "Select Language",
+  "languageSelectSubtitle": "Changes apply immediately",
+  "languageArabicSubtitle": "RTL — Right to Left",
+  "languageEnglishSubtitle": "LTR — Left to Right",
+  "languageCurrent": "Current language",
+
+  "themeLabel": "Appearance",
+  "themeSelectTitle": "Select Appearance",
+  "themeSelectSubtitle": "Changes apply immediately",
+  "themeSystem": "System",
+  "themeSystemSubtitle": "Follow device settings",
+  "themeLight": "Light",
+  "themeLightSubtitle": "Day mode",
+  "themeDark": "Dark",
+  "themeDarkSubtitle": "Night mode",
+  "themeCurrent": "Current appearance",
+
+  "locationLabel": "Location",
+  "locationOnDemand": "On demand",
+  "locationOnDemandSubtitle": "Requested only when needed",
+  "locationAlways": "Always",
+  "locationAlwaysSubtitle": "Always available (not recommended)",
+  "locationDisabled": "Disabled",
+  "locationDisabledSubtitle": "Nearby search will not work",
+
+  "notificationsLabel": "Notifications",
+  "notificationsSubtitle": "App alerts",
+  "notificationsEnabled": "Enabled",
+  "notificationsDisabled": "Disabled",
+
+  "privacyPolicyLabel": "Privacy Policy",
+  "privacyPolicySubtitle": "How we protect your data",
+  "termsLabel": "Terms & Conditions",
+  "termsSubtitle": "Usage rules",
+  "aboutLabel": "About",
+  "aboutSubtitle": "Information and licenses",
+  "versionLabel": "Version",
+  "versionValue": "1.0.0+1",
+
+  "clearCacheLabel": "Clear Cache",
+  "clearCacheSubtitle": "Delete temporarily stored data",
+  "clearCacheConfirm": "Clear temporary stored data?",
+  "clearCacheSuccess": "Cache cleared successfully",
+
+  "deleteAccountLabel": "Delete Account",
+  "deleteAccountSubtitle": "Permanent — cannot be undone",
+  "deleteAccountWarning": "This action cannot be undone",
+  "deleteAccountConfirm": "Delete your account permanently?",
+  "deleteAccountButton": "Delete my account",
+
+  "logoutConfirmTitle": "Logout",
+  "logoutConfirmMessage": "Do you want to logout?",
+
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "save": "Save",
+  "close": "Close",
+  "yes": "Yes",
+  "no": "No",
+  "apply": "Apply",
+  "select": "Select"
 }

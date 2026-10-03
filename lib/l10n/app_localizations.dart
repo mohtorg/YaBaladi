@@ -134,6 +134,18 @@ abstract class AppLocalizations {
   /// **'الإعدادات'**
   String get settings;
 
+  /// No description provided for @favorites.
+  ///
+  /// In ar, this message translates to:
+  /// **'المفضلة'**
+  String get favorites;
+
+  /// No description provided for @notifications.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإشعارات'**
+  String get notifications;
+
   /// No description provided for @login.
   ///
   /// In ar, this message translates to:
@@ -212,12 +224,6 @@ abstract class AppLocalizations {
   /// **'صالات رياضية'**
   String get gyms;
 
-  /// No description provided for @favorites.
-  ///
-  /// In ar, this message translates to:
-  /// **'المفضلة'**
-  String get favorites;
-
   /// No description provided for @nearby.
   ///
   /// In ar, this message translates to:
@@ -253,6 +259,366 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا يوجد اتصال بالإنترنت'**
   String get noInternet;
+
+  /// No description provided for @settingsGeneral.
+  ///
+  /// In ar, this message translates to:
+  /// **'عام'**
+  String get settingsGeneral;
+
+  /// No description provided for @settingsAccount.
+  ///
+  /// In ar, this message translates to:
+  /// **'الحساب'**
+  String get settingsAccount;
+
+  /// No description provided for @settingsLegal.
+  ///
+  /// In ar, this message translates to:
+  /// **'القانوني والسياسات'**
+  String get settingsLegal;
+
+  /// No description provided for @settingsAdvanced.
+  ///
+  /// In ar, this message translates to:
+  /// **'متقدم'**
+  String get settingsAdvanced;
+
+  /// No description provided for @languageLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللغة'**
+  String get languageLabel;
+
+  /// No description provided for @languageArabic.
+  ///
+  /// In ar, this message translates to:
+  /// **'العربية'**
+  String get languageArabic;
+
+  /// No description provided for @languageEnglish.
+  ///
+  /// In ar, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
+
+  /// No description provided for @languageSelectTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر اللغة'**
+  String get languageSelectTitle;
+
+  /// No description provided for @languageSelectSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتم تطبيق التغيير فورًا'**
+  String get languageSelectSubtitle;
+
+  /// No description provided for @languageArabicSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'RTL — من اليمين لليسار'**
+  String get languageArabicSubtitle;
+
+  /// No description provided for @languageEnglishSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'LTR — من اليسار لليمين'**
+  String get languageEnglishSubtitle;
+
+  /// No description provided for @languageCurrent.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللغة الحالية'**
+  String get languageCurrent;
+
+  /// No description provided for @themeLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'المظهر'**
+  String get themeLabel;
+
+  /// No description provided for @themeSelectTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر المظهر'**
+  String get themeSelectTitle;
+
+  /// No description provided for @themeSelectSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتم تطبيق التغيير فورًا'**
+  String get themeSelectSubtitle;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In ar, this message translates to:
+  /// **'النظام'**
+  String get themeSystem;
+
+  /// No description provided for @themeSystemSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'يتبع إعدادات الجهاز'**
+  String get themeSystemSubtitle;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In ar, this message translates to:
+  /// **'فاتح'**
+  String get themeLight;
+
+  /// No description provided for @themeLightSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'واجهة نهارية'**
+  String get themeLightSubtitle;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In ar, this message translates to:
+  /// **'داكن'**
+  String get themeDark;
+
+  /// No description provided for @themeDarkSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'واجهة ليلية'**
+  String get themeDarkSubtitle;
+
+  /// No description provided for @themeCurrent.
+  ///
+  /// In ar, this message translates to:
+  /// **'المظهر الحالي'**
+  String get themeCurrent;
+
+  /// No description provided for @locationLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الموقع'**
+  String get locationLabel;
+
+  /// No description provided for @locationOnDemand.
+  ///
+  /// In ar, this message translates to:
+  /// **'حسب الحاجة'**
+  String get locationOnDemand;
+
+  /// No description provided for @locationOnDemandSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'يُطلب عند الاستخدام فقط'**
+  String get locationOnDemandSubtitle;
+
+  /// No description provided for @locationAlways.
+  ///
+  /// In ar, this message translates to:
+  /// **'دائمًا'**
+  String get locationAlways;
+
+  /// No description provided for @locationAlwaysSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'متاح دائمًا (غير موصى به)'**
+  String get locationAlwaysSubtitle;
+
+  /// No description provided for @locationDisabled.
+  ///
+  /// In ar, this message translates to:
+  /// **'معطّل'**
+  String get locationDisabled;
+
+  /// No description provided for @locationDisabledSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لن يعمل البحث القريب'**
+  String get locationDisabledSubtitle;
+
+  /// No description provided for @notificationsLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإشعارات'**
+  String get notificationsLabel;
+
+  /// No description provided for @notificationsSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تنبيهات التطبيق'**
+  String get notificationsSubtitle;
+
+  /// No description provided for @notificationsEnabled.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفعّلة'**
+  String get notificationsEnabled;
+
+  /// No description provided for @notificationsDisabled.
+  ///
+  /// In ar, this message translates to:
+  /// **'معطّلة'**
+  String get notificationsDisabled;
+
+  /// No description provided for @privacyPolicyLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'سياسة الخصوصية'**
+  String get privacyPolicyLabel;
+
+  /// No description provided for @privacyPolicySubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'كيف نحمي بياناتك'**
+  String get privacyPolicySubtitle;
+
+  /// No description provided for @termsLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الشروط والأحكام'**
+  String get termsLabel;
+
+  /// No description provided for @termsSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'قواعد الاستخدام'**
+  String get termsSubtitle;
+
+  /// No description provided for @aboutLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'عن التطبيق'**
+  String get aboutLabel;
+
+  /// No description provided for @aboutSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'معلومات وتراخيص'**
+  String get aboutSubtitle;
+
+  /// No description provided for @versionLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإصدار'**
+  String get versionLabel;
+
+  /// No description provided for @versionValue.
+  ///
+  /// In ar, this message translates to:
+  /// **'1.0.0+1'**
+  String get versionValue;
+
+  /// No description provided for @clearCacheLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسح الذاكرة المؤقتة'**
+  String get clearCacheLabel;
+
+  /// No description provided for @clearCacheSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف البيانات المخزنة مؤقتًا'**
+  String get clearCacheSubtitle;
+
+  /// No description provided for @clearCacheConfirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'هل تريد مسح البيانات المخزنة مؤقتًا؟'**
+  String get clearCacheConfirm;
+
+  /// No description provided for @clearCacheSuccess.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم مسح الذاكرة المؤقتة'**
+  String get clearCacheSuccess;
+
+  /// No description provided for @deleteAccountLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف الحساب'**
+  String get deleteAccountLabel;
+
+  /// No description provided for @deleteAccountSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف دائم لا يمكن التراجع عنه'**
+  String get deleteAccountSubtitle;
+
+  /// No description provided for @deleteAccountWarning.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا الإجراء لا يمكن التراجع عنه'**
+  String get deleteAccountWarning;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'هل تريد حذف حسابك نهائيًا؟'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @deleteAccountButton.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف حسابي'**
+  String get deleteAccountButton;
+
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الخروج'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmMessage.
+  ///
+  /// In ar, this message translates to:
+  /// **'هل تريد تسجيل الخروج؟'**
+  String get logoutConfirmMessage;
+
+  /// No description provided for @confirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد'**
+  String get confirm;
+
+  /// No description provided for @cancel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء'**
+  String get cancel;
+
+  /// No description provided for @save.
+  ///
+  /// In ar, this message translates to:
+  /// **'حفظ'**
+  String get save;
+
+  /// No description provided for @close.
+  ///
+  /// In ar, this message translates to:
+  /// **'إغلاق'**
+  String get close;
+
+  /// No description provided for @yes.
+  ///
+  /// In ar, this message translates to:
+  /// **'نعم'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا'**
+  String get no;
+
+  /// No description provided for @apply.
+  ///
+  /// In ar, this message translates to:
+  /// **'تطبيق'**
+  String get apply;
+
+  /// No description provided for @select.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختيار'**
+  String get select;
 }
 
 class _AppLocalizationsDelegate
