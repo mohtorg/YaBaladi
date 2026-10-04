@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -12,11 +13,29 @@ import 'l10n/locale_controller.dart';
 import 'l10n/theme_controller.dart';
 import 'theme/app_theme.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+// 🔔 Background message handler
+// لازم تكون top-level function (برة أي كلاس)
+// و@pragma('vm:entry-point') ضرورية عشان Flutter ميخليهاش tree-shaken
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // تهيئة Firebase جوه الـ handler — ده جوهر الحل
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  debugPrint('📩 Background message: ${message.messageId}');
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // 🔔 سجّل الـ background handler بعد التهيئة
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   runApp(const YaBaladiApp());
 }
 
@@ -73,8 +92,7 @@ class _AppRootState extends State<_AppRoot> {
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      onGenerateTitle: (context) =>
-          AppLocalizations.of(context).appName,
+      onGenerateTitle: (context) => AppLocalizations.of(context).appName,
 
       localizationsDelegates: const [
         AppLocalizations.delegate,
