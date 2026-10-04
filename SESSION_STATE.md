@@ -150,3 +150,26 @@ git log --oneline -3
 - ✅ docs/YA_BALADI_GUARDRAILS.md
 - ✅ Tag v0.2.5.2-docs-master-plan
 - ✅ GitHub Release published
+
+## إضافة 2026-10-04 (مساءً)
+
+### FCM Background Handler Fix
+- ✅ lib/main.dart: أضفت _firebaseMessagingBackgroundHandler
+- ✅ Firebase.initializeApp() جوه الـ handler
+- ✅ FirebaseMessaging.onBackgroundMessage() في main()
+- ✅ حل مشكلة [core/no-app] No Firebase App
+- ✅ حل مشكلة Gradle journal lock (PID عالقة)
+
+### معلّق للجلسة القادمة
+- ⏳ تثبيت GitHub CLI (gh) — فشل winget بخطأ 1603
+  → الحل: تنزيل gh_2.102.0_windows_amd64.msi يدويًا
+  → رابط: https://github.com/cli/cli/releases/latest
+- ⏳ إنشاء Release على GitHub لـ v0.2.5.2-docs-master-plan
+  → الأمر: gh release create v0.2.5.2-docs-master-plan --repo mohtorg/YaBaladi --title "v0.2.5.2 - Master Plan & Roadmap" --notes-file notes.md
+  → بديل: من المتصفح https://github.com/mohtorg/YaBaladi/releases/new
+- ⏳ اختبار FCM background notification على الجهاز
+
+### نقاط مهمة
+- Tag v0.2.5.2-docs-master-plan مثبّت على commit 43fe895 ✅
+- ملفات docs (3 ملفات) مرفوعة على main ✅
+- التطبيق يبني ويشتغل بدون أخطاء Gradle ✅
