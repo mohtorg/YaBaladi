@@ -142,3 +142,11 @@ git commit -m "docs: update session state at end of G2.2"
 git push origin main
 git log --oneline -3
 
+## إضافة 2026-10-04
+
+### Documentation Release
+- ✅ docs/YA_BALADI_MASTER_PLAN_v1.0.md
+- ✅ docs/YA_BALADI_ROADMAP_40_DAYS.md
+- ✅ docs/YA_BALADI_GUARDRAILS.md
+- ✅ Tag v0.2.5.2-docs-master-plan
+- ✅ GitHub Release published
