@@ -212,3 +212,22 @@ git log --oneline -3
 - لو Codespace اتعمله restart، تأكد من:
   flutter --version
   cd /workspaces/YaBaladi && git pull origin main
+
+  ## إضافة 2026-10-05 (ليلاً)
+
+### G2.6 — Category Grid + Places List ✅
+- main.dart: CategoriesController + PlacesController في Provider
+- route_paths/names: /category/:id
+- app_router: PlacesListScreen route
+- home_screen: Grid 3×3 للتصنيفات من Firestore
+- places_list_screen: قائمة أماكن التصنيف
+
+### Line-up الحالي
+- G2.5 ✅ v0.2.5-g2.5-models
+- G2.6 ✅ v0.2.6-g2.6-category-grid
+- Guest Mode Stage 1 ✅ 04e34b0
+
+### الخطوة القادمة (Stage 2 + Place Details)
+- حماية profile/favorites للزوار
+- Place Details Screen (G3.3)
+- Search يعرض التصنيفات + الأماكن
