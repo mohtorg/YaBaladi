@@ -18,7 +18,7 @@ dependencies:
   firebase_core: 3.6.0
   cloud_firestore: 5.4.4
   firebase_auth: 5.3.1
-
+  google_sign_in: ^6.2.1
   # Storage
   shared_preferences: ^2.3.0
 
@@ -45,6 +45,10 @@ flutter:
   uses-material-design: true
   generate: true
 
+  # === Assets ===
+  assets:
+    - assets/icon/app_icon.png
+
   # === Fonts ===
   fonts:
     - family: Cairo
@@ -57,10 +61,6 @@ flutter:
           weight: 600
         - asset: assets/fonts/Cairo-Bold.ttf
           weight: 700
-
-  # === Assets ===
-  assets:
-    - assets/icon/
 
 flutter_launcher_icons:
   android: "ic_launcher"
