@@ -433,4 +433,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noResultsWithFilters => 'لا توجد نتائج بهذه الفلاتر';
+
+  @override
+  String get viewOnMap => 'عرض على الخريطة';
+
+  @override
+  String get directions => 'الاتجاهات';
+
+  @override
+  String get details => 'التفاصيل';
+
+  @override
+  String get recenter => 'إعادة التمركز';
+
+  @override
+  String get noCoordinates => 'لا توجد إحداثيات لعرض هذا المكان على الخريطة';
 }

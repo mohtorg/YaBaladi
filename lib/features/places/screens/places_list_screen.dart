@@ -59,6 +59,14 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
           },
         ),
         actions: [
+          // زر عرض التصنيف على الخريطة
+          IconButton(
+            icon: const Icon(Icons.map_outlined),
+            tooltip: l10n.viewOnMap,
+            onPressed: () => context.go(
+              RoutePaths.categoryMapPath(widget.categoryId),
+            ),
+          ),
           // زر الفلتر + Badge
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 8),

@@ -379,7 +379,7 @@ class _FavoriteButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ACTION BUTTONS (Call + WhatsApp + Maps)
+// ACTION BUTTONS (Call + WhatsApp + Map + Directions)
 // ═══════════════════════════════════════════════════════════════
 
 class _ActionButtons extends StatelessWidget {
@@ -408,12 +408,18 @@ class _ActionButtons extends StatelessWidget {
               backgroundColor: Colors.green.shade600,
             ),
           ),
-        if (place.location != null)
+        if (place.location != null) ...[
+          FilledButton.icon(
+            onPressed: () => context.go(RoutePaths.placeMapPath(place.id)),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('عرض على الخريطة'),
+          ),
           OutlinedButton.icon(
             onPressed: () => _openInMaps(place),
-            icon: const Icon(Icons.map_outlined),
-            label: const Text('الخريطة'),
+            icon: const Icon(Icons.directions_outlined),
+            label: const Text('الاتجاهات'),
           ),
+        ],
       ],
     );
   }
@@ -435,7 +441,7 @@ class _ActionButtons extends StatelessWidget {
     final lat = place.location!.latitude;
     final lng = place.location!.longitude;
     final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);

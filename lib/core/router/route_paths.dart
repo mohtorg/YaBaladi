@@ -15,7 +15,13 @@ class RoutePaths {
   static const String category = '/category/:id';
   static String categoryPath(String id) => '/category/$id';
 
-  // ─── تفاصيل المكان ───
   static const String place = '/place/:id';
   static String placePath(String id) => '/place/$id';
+
+  // ─── الخرائط ───
+  static const String placeMap = '/place/:id/map';
+  static String placeMapPath(String id) => '/place/$id/map';
+
+  static const String categoryMap = '/category/:id/map';
+  static String categoryMapPath(String id) => '/category/$id/map';
 }

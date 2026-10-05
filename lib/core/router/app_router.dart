@@ -7,6 +7,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
+import '../../features/places/screens/place_map_screen.dart';
 import '../../features/places/screens/places_list_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../screens/home_screen.dart';
@@ -51,7 +52,8 @@ GoRouter createAppRouter(AuthController auth) {
             name: RouteNames.settings,
             builder: (context, state) => const SettingsScreen(),
           ),
-          // ─── قائمة أماكن تصنيف ───
+
+          // ─── تصنيف ───
           GoRoute(
             path: RoutePaths.category,
             name: RouteNames.category,
@@ -59,7 +61,18 @@ GoRouter createAppRouter(AuthController auth) {
               final id = state.pathParameters['id'] ?? '';
               return PlacesListScreen(categoryId: id);
             },
+            routes: [
+              GoRoute(
+                path: 'map',
+                name: RouteNames.categoryMap,
+                builder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return PlaceMapScreen(categoryId: id);
+                },
+              ),
+            ],
           ),
+
           // ─── تفاصيل مكان ───
           GoRoute(
             path: RoutePaths.place,
@@ -68,6 +81,16 @@ GoRouter createAppRouter(AuthController auth) {
               final id = state.pathParameters['id'] ?? '';
               return PlaceDetailsScreen(placeId: id);
             },
+            routes: [
+              GoRoute(
+                path: 'map',
+                name: RouteNames.placeMap,
+                builder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return PlaceMapScreen(placeId: id);
+                },
+              ),
+            ],
           ),
         ],
       ),

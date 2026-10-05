@@ -436,4 +436,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noResultsWithFilters => 'No results with these filters';
+
+  @override
+  String get viewOnMap => 'View on map';
+
+  @override
+  String get directions => 'Directions';
+
+  @override
+  String get details => 'Details';
+
+  @override
+  String get recenter => 'Recenter';
+
+  @override
+  String get noCoordinates =>
+      'No coordinates available to show this place on the map';
 }

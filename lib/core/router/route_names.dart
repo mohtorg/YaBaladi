@@ -11,7 +11,10 @@ class RouteNames {
   static const String register = 'register';
   static const String forgotPassword = 'forgotPassword';
 
-  // ─── تصنيف / أماكن ───
   static const String category = 'category';
   static const String place = 'place';
+
+  // ─── الخرائط ───
+  static const String placeMap = 'placeMap';
+  static const String categoryMap = 'categoryMap';
 }

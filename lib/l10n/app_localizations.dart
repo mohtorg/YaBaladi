@@ -943,6 +943,36 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا توجد نتائج بهذه الفلاتر'**
   String get noResultsWithFilters;
+
+  /// No description provided for @viewOnMap.
+  ///
+  /// In ar, this message translates to:
+  /// **'عرض على الخريطة'**
+  String get viewOnMap;
+
+  /// No description provided for @directions.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاتجاهات'**
+  String get directions;
+
+  /// No description provided for @details.
+  ///
+  /// In ar, this message translates to:
+  /// **'التفاصيل'**
+  String get details;
+
+  /// No description provided for @recenter.
+  ///
+  /// In ar, this message translates to:
+  /// **'إعادة التمركز'**
+  String get recenter;
+
+  /// No description provided for @noCoordinates.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد إحداثيات لعرض هذا المكان على الخريطة'**
+  String get noCoordinates;
 }
 
 class _AppLocalizationsDelegate

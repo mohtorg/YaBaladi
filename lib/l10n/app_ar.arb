@@ -160,5 +160,10 @@
   "sortNewest": "الأحدث",
   "applyFilters": "تطبيق",
   "clearFilters": "مسح",
-  "noResultsWithFilters": "لا توجد نتائج بهذه الفلاتر"
+  "noResultsWithFilters": "لا توجد نتائج بهذه الفلاتر",
+    "viewOnMap": "عرض على الخريطة",
+  "directions": "الاتجاهات",
+  "details": "التفاصيل",
+  "recenter": "إعادة التمركز",
+  "noCoordinates": "لا توجد إحداثيات لعرض هذا المكان على الخريطة"
 }

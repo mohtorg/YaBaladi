@@ -160,5 +160,10 @@
   "sortNewest": "Newest",
   "applyFilters": "Apply",
   "clearFilters": "Clear",
-  "noResultsWithFilters": "No results with these filters"
+  "noResultsWithFilters": "No results with these filters",
+    "viewOnMap": "View on map",
+  "directions": "Directions",
+  "details": "Details",
+  "recenter": "Recenter",
+  "noCoordinates": "No coordinates available to show this place on the map"
 }
