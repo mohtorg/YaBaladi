@@ -56,4 +56,38 @@ class PlacesRepository {
         'reviewCount': count,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+        /// بحث نصي في الأماكن — يفلتر محليًا (client-side).
+  ///
+  /// - [query]: النص (عربي أو إنجليزي)
+  /// - [categoryId]: لو ممرَّر → يفلتر على تصنيف معيّن
+  ///
+  /// يبحث في: nameAr, nameEn, description.
+  Future<List<Place>> search({
+    required String query,
+    String? categoryId,
+  }) async {
+    final snap = await _ref
+        .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .get();
+
+    final all = snap.docs
+        .map((d) => Place.fromMap(d.id, d.data()))
+        .toList();
+
+    final q = query.trim().toLowerCase();
+
+    return all.where((p) {
+      // filter by category
+      if (categoryId != null && categoryId.isNotEmpty) {
+        if (p.categoryId != categoryId) return false;
+      }
+
+      // filter by text
+      if (q.isEmpty) return true;
+      return p.nameAr.toLowerCase().contains(q) ||
+          p.nameEn.toLowerCase().contains(q) ||
+          p.description.toLowerCase().contains(q);
+    }).toList();
+  }
 }

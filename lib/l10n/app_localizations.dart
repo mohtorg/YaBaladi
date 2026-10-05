@@ -853,6 +853,24 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.'**
   String get guestNote;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'ابحث عن مكان...'**
+  String get searchHint;
+
+  /// No description provided for @searchIdleHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'ابدأ بالبحث عن مكان'**
+  String get searchIdleHint;
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد نتائج مطابقة'**
+  String get noSearchResults;
 }
 
 class _AppLocalizationsDelegate

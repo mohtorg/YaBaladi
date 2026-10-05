@@ -388,4 +388,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get guestNote =>
       'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.';
+
+  @override
+  String get searchHint => 'ابحث عن مكان...';
+
+  @override
+  String get searchIdleHint => 'ابدأ بالبحث عن مكان';
+
+  @override
+  String get noSearchResults => 'لا توجد نتائج مطابقة';
 }

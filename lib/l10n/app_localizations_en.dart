@@ -391,4 +391,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get guestNote =>
       'You can browse as a guest. Some features require sign-in.';
+
+  @override
+  String get searchHint => 'Search for a place...';
+
+  @override
+  String get searchIdleHint => 'Start by searching for a place';
+
+  @override
+  String get noSearchResults => 'No matching results';
 }
