@@ -7,8 +7,8 @@ class Place {
   final String nameAr;
   final String nameEn;
   final String description;
-  final String categoryId;     // يطابق Category.id
-  final String ownerId;        // uid صاحب المكان (Merchant)
+  final String categoryId;
+  final String ownerId;
   final GeoPoint? location;
   final String address;
   final String city;
@@ -19,6 +19,11 @@ class Place {
   final List<String> tags;
   final double averageRating;
   final int reviewCount;
+
+  /// 1=$ · 2=$$ · 3=$$$ · 4=$$$$
+  /// 0 = غير محدد
+  final int priceLevel;
+
   final bool isApproved;
   final bool isActive;
   final DateTime? createdAt;
@@ -41,6 +46,7 @@ class Place {
     this.tags = const [],
     this.averageRating = 0.0,
     this.reviewCount = 0,
+    this.priceLevel = 0,
     this.isApproved = false,
     this.isActive = true,
     this.createdAt,
@@ -65,6 +71,7 @@ class Place {
       tags: List<String>.from(map['tags'] ?? const []),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
+      priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 0,
       isApproved: (map['isApproved'] as bool?) ?? false,
       isActive: (map['isActive'] as bool?) ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -88,6 +95,7 @@ class Place {
         'tags': tags,
         'averageRating': averageRating,
         'reviewCount': reviewCount,
+        'priceLevel': priceLevel,
         'isApproved': isApproved,
         'isActive': isActive,
         'createdAt': createdAt != null
@@ -113,6 +121,7 @@ class Place {
     List<String>? tags,
     double? averageRating,
     int? reviewCount,
+    int? priceLevel,
     bool? isApproved,
     bool? isActive,
     DateTime? createdAt,
@@ -135,6 +144,7 @@ class Place {
         tags: tags ?? this.tags,
         averageRating: averageRating ?? this.averageRating,
         reviewCount: reviewCount ?? this.reviewCount,
+        priceLevel: priceLevel ?? this.priceLevel,
         isApproved: isApproved ?? this.isApproved,
         isActive: isActive ?? this.isActive,
         createdAt: createdAt ?? this.createdAt,

@@ -144,5 +144,21 @@
   "guestNote": "يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.",
     "searchHint": "ابحث عن مكان...",
   "searchIdleHint": "ابدأ بالبحث عن مكان",
-  "noSearchResults": "لا توجد نتائج مطابقة"
+  "noSearchResults": "لا توجد نتائج مطابقة",
+    "searchHint": "ابحث عن مكان...",
+  "searchIdleHint": "ابدأ بالبحث عن مكان",
+  "noSearchResults": "لا توجد نتائج مطابقة",
+
+  "filters": "الفلاتر",
+  "filterRating": "التقييم",
+  "filterPrice": "السعر",
+  "filterSort": "الترتيب",
+  "filterAll": "الكل",
+  "sortRatingDesc": "الأعلى تقييمًا",
+  "sortReviewsDesc": "الأكثر مراجعات",
+  "sortNameAsc": "الأبجدي",
+  "sortNewest": "الأحدث",
+  "applyFilters": "تطبيق",
+  "clearFilters": "مسح",
+  "noResultsWithFilters": "لا توجد نتائج بهذه الفلاتر"
 }

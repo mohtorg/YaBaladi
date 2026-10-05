@@ -871,6 +871,78 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا توجد نتائج مطابقة'**
   String get noSearchResults;
+
+  /// No description provided for @filters.
+  ///
+  /// In ar, this message translates to:
+  /// **'الفلاتر'**
+  String get filters;
+
+  /// No description provided for @filterRating.
+  ///
+  /// In ar, this message translates to:
+  /// **'التقييم'**
+  String get filterRating;
+
+  /// No description provided for @filterPrice.
+  ///
+  /// In ar, this message translates to:
+  /// **'السعر'**
+  String get filterPrice;
+
+  /// No description provided for @filterSort.
+  ///
+  /// In ar, this message translates to:
+  /// **'الترتيب'**
+  String get filterSort;
+
+  /// No description provided for @filterAll.
+  ///
+  /// In ar, this message translates to:
+  /// **'الكل'**
+  String get filterAll;
+
+  /// No description provided for @sortRatingDesc.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأعلى تقييمًا'**
+  String get sortRatingDesc;
+
+  /// No description provided for @sortReviewsDesc.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأكثر مراجعات'**
+  String get sortReviewsDesc;
+
+  /// No description provided for @sortNameAsc.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأبجدي'**
+  String get sortNameAsc;
+
+  /// No description provided for @sortNewest.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأحدث'**
+  String get sortNewest;
+
+  /// No description provided for @applyFilters.
+  ///
+  /// In ar, this message translates to:
+  /// **'تطبيق'**
+  String get applyFilters;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسح'**
+  String get clearFilters;
+
+  /// No description provided for @noResultsWithFilters.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد نتائج بهذه الفلاتر'**
+  String get noResultsWithFilters;
 }
 
 class _AppLocalizationsDelegate

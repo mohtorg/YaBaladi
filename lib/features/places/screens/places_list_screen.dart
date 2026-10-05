@@ -5,11 +5,12 @@ import 'package:provider/provider.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/categories/controllers/categories_controller.dart';
 import '../../../features/places/controllers/places_controller.dart';
+import '../../../features/places/widgets/places_filter_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/place.dart';
 import '../../../theme/design_tokens.dart';
 
-/// تعرض قائمة أماكن تصنيف معيّن.
+/// تعرض قائمة أماكن تصنيف معيّن مع فلاتر متقدمة.
 class PlacesListScreen extends StatefulWidget {
   const PlacesListScreen({super.key, required this.categoryId});
 
@@ -41,6 +42,8 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
         : (isArabic ? cat.nameAr : cat.nameEn);
 
     final places = context.watch<PlacesController>();
+    final activeFilters = (places.minRating != null ? 1 : 0) +
+        (places.priceLevel != null ? 1 : 0);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,6 +58,25 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
             }
           },
         ),
+        actions: [
+          // زر الفلتر + Badge
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: IconButton(
+              icon: activeFilters > 0
+                  ? Badge(
+                      label: Text('$activeFilters'),
+                      child: const Icon(Icons.tune),
+                    )
+                  : const Icon(Icons.tune),
+              tooltip: 'الفلاتر',
+              onPressed: () => showPlacesFilterSheet(
+                context: context,
+                controller: places,
+              ),
+            ),
+          ),
+        ],
       ),
       body: _buildBody(context, places, isArabic),
     );
@@ -78,7 +100,10 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
 
       case PlacesStatus.loaded:
         if (controller.places.isEmpty) {
-          return const _EmptyView();
+          return _EmptyView(
+            hasFilters: controller.hasActiveFilters,
+            onClearFilters: controller.clearFilters,
+          );
         }
         return ListView.separated(
           padding: const EdgeInsets.all(12),
@@ -172,6 +197,16 @@ class _PlaceCard extends StatelessWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        if (place.priceLevel > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '\$' * place.priceLevel,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -191,22 +226,43 @@ class _PlaceCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({
+    required this.hasFilters,
+    required this.onClearFilters,
+  });
+
+  final bool hasFilters;
+  final VoidCallback onClearFilters;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.place_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 12),
-          const Text('لا توجد أماكن في هذا التصنيف بعد'),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              hasFilters ? Icons.filter_alt_off : Icons.place_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hasFilters
+                  ? 'لا توجد نتائج بهذه الفلاتر'
+                  : 'لا توجد أماكن في هذا التصنيف بعد',
+              textAlign: TextAlign.center,
+            ),
+            if (hasFilters) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: onClearFilters,
+                child: const Text('مسح الفلاتر'),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

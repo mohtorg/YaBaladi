@@ -400,4 +400,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noSearchResults => 'No matching results';
+
+  @override
+  String get filters => 'Filters';
+
+  @override
+  String get filterRating => 'Rating';
+
+  @override
+  String get filterPrice => 'Price';
+
+  @override
+  String get filterSort => 'Sort';
+
+  @override
+  String get filterAll => 'All';
+
+  @override
+  String get sortRatingDesc => 'Top rated';
+
+  @override
+  String get sortReviewsDesc => 'Most reviewed';
+
+  @override
+  String get sortNameAsc => 'Alphabetical';
+
+  @override
+  String get sortNewest => 'Newest';
+
+  @override
+  String get applyFilters => 'Apply';
+
+  @override
+  String get clearFilters => 'Clear';
+
+  @override
+  String get noResultsWithFilters => 'No results with these filters';
 }

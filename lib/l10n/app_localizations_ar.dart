@@ -397,4 +397,40 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noSearchResults => 'لا توجد نتائج مطابقة';
+
+  @override
+  String get filters => 'الفلاتر';
+
+  @override
+  String get filterRating => 'التقييم';
+
+  @override
+  String get filterPrice => 'السعر';
+
+  @override
+  String get filterSort => 'الترتيب';
+
+  @override
+  String get filterAll => 'الكل';
+
+  @override
+  String get sortRatingDesc => 'الأعلى تقييمًا';
+
+  @override
+  String get sortReviewsDesc => 'الأكثر مراجعات';
+
+  @override
+  String get sortNameAsc => 'الأبجدي';
+
+  @override
+  String get sortNewest => 'الأحدث';
+
+  @override
+  String get applyFilters => 'تطبيق';
+
+  @override
+  String get clearFilters => 'مسح';
+
+  @override
+  String get noResultsWithFilters => 'لا توجد نتائج بهذه الفلاتر';
 }

@@ -32,6 +32,7 @@ class SeedService {
 
   // ════════════════════════════════════════════════════════════
   // 12 مكان تجريبي — موزّعين على التصنيفات
+  // priceLevel: 1=$ · 2=$$ · 3=$$$ · 4=$$$$
   // ════════════════════════════════════════════════════════════
   static final List<Place> seedPlaces = [
     Place(
@@ -48,6 +49,7 @@ class SeedService {
       phone: '+20 100 000 0001',
       averageRating: 4.7,
       reviewCount: 312,
+      priceLevel: 1,
       isApproved: true,
       isActive: true,
     ),
@@ -65,6 +67,7 @@ class SeedService {
       phone: '+20 100 000 0002',
       averageRating: 4.5,
       reviewCount: 180,
+      priceLevel: 3,
       isApproved: true,
       isActive: true,
     ),
@@ -82,6 +85,7 @@ class SeedService {
       phone: '+20 100 000 0003',
       averageRating: 4.6,
       reviewCount: 95,
+      priceLevel: 2,
       isApproved: true,
       isActive: true,
     ),
@@ -99,6 +103,7 @@ class SeedService {
       phone: '+20 100 000 0004',
       averageRating: 4.8,
       reviewCount: 210,
+      priceLevel: 1,
       isApproved: true,
       isActive: true,
     ),
@@ -116,6 +121,7 @@ class SeedService {
       phone: '+20 100 000 0005',
       averageRating: 4.9,
       reviewCount: 420,
+      priceLevel: 4,
       isApproved: true,
       isActive: true,
     ),
@@ -133,6 +139,7 @@ class SeedService {
       phone: '+20 100 000 0006',
       averageRating: 4.3,
       reviewCount: 165,
+      priceLevel: 1,
       isApproved: true,
       isActive: true,
     ),
@@ -150,6 +157,7 @@ class SeedService {
       phone: '+20 100 000 0007',
       averageRating: 4.6,
       reviewCount: 530,
+      priceLevel: 4,
       isApproved: true,
       isActive: true,
     ),
@@ -167,6 +175,7 @@ class SeedService {
       phone: '+20 100 000 0008',
       averageRating: 4.8,
       reviewCount: 780,
+      priceLevel: 4,
       isApproved: true,
       isActive: true,
     ),
@@ -184,6 +193,7 @@ class SeedService {
       phone: '+20 100 000 0009',
       averageRating: 4.4,
       reviewCount: 620,
+      priceLevel: 2,
       isApproved: true,
       isActive: true,
     ),
@@ -201,6 +211,7 @@ class SeedService {
       phone: '+20 100 000 0010',
       averageRating: 4.5,
       reviewCount: 290,
+      priceLevel: 3,
       isApproved: true,
       isActive: true,
     ),
@@ -218,6 +229,7 @@ class SeedService {
       phone: '+20 100 000 0011',
       averageRating: 4.9,
       reviewCount: 1540,
+      priceLevel: 2,
       isApproved: true,
       isActive: true,
     ),
@@ -235,6 +247,7 @@ class SeedService {
       phone: '+20 100 000 0012',
       averageRating: 4.6,
       reviewCount: 890,
+      priceLevel: 3,
       isApproved: true,
       isActive: true,
     ),
