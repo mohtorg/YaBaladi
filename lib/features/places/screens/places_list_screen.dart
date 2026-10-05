@@ -33,9 +33,9 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
     final l10n = AppLocalizations.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    // اسم التصنيف من CategoriesController
     final categories = context.watch<CategoriesController>().categories;
-    final cat = categories.where((c) => c.id == widget.categoryId).firstOrNull;
+    final cat =
+        categories.where((c) => c.id == widget.categoryId).firstOrNull;
     final title = cat == null
         ? l10n.appName
         : (isArabic ? cat.nameAr : cat.nameEn);
@@ -111,71 +111,75 @@ class _PlaceCard extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => context.go(RoutePaths.placePath(place.id)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.place_outlined,
+                  size: 36,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              child: Icon(
-                Icons.place_outlined,
-                size: 36,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  if (place.description.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      place.description,
-                      maxLines: 2,
+                      name,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.star,
-                        size: 16,
-                        color: Colors.amber.shade700,
-                      ),
-                      const SizedBox(width: 4),
+                    if (place.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Text(
-                        place.averageRating.toStringAsFixed(1),
+                        place.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '(${place.reviewCount})',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          size: 16,
+                          color: Colors.amber.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          place.averageRating.toStringAsFixed(1),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${place.reviewCount})',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_left, size: 20),
+            ],
+          ),
         ),
       ),
     );

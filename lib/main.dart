@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
+import 'features/favorites/controllers/favorites_controller.dart';
 import 'features/places/controllers/places_controller.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
@@ -57,6 +58,9 @@ class YaBaladiApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<PlacesController>(
           create: (_) => PlacesController(),
+        ),
+        ChangeNotifierProvider<FavoritesController>(
+          create: (_) => FavoritesController(),
         ),
       ],
       child: const _AppRoot(),

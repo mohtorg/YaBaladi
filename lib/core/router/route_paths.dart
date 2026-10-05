@@ -12,9 +12,10 @@ class RoutePaths {
   static const String forgotPassword = '/forgot-password';
 
   // ─── تصنيف / أماكن ───
-  /// مسار قائمة أماكن تصنيف معيّن: /category/:id
   static const String category = '/category/:id';
-
-  /// دالة لبناء مسار تصنيف معيّن
   static String categoryPath(String id) => '/category/$id';
+
+  // ─── تفاصيل المكان ───
+  static const String place = '/place/:id';
+  static String placePath(String id) => '/place/$id';
 }

@@ -13,4 +13,5 @@ class RouteNames {
 
   // ─── تصنيف / أماكن ───
   static const String category = 'category';
+  static const String place = 'place';
 }
