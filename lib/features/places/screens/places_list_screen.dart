@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/router/route_paths.dart';
 import '../../../features/categories/controllers/categories_controller.dart';
 import '../../../features/places/controllers/places_controller.dart';
 import '../../../l10n/app_localizations.dart';
@@ -46,7 +47,13 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
         title: Text(title),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(RoutePaths.home);
+            }
+          },
         ),
       ),
       body: _buildBody(context, places, isArabic),
@@ -77,7 +84,8 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
           padding: const EdgeInsets.all(12),
           itemCount: controller.places.length,
           separatorBuilder: (_, _) =>
-              const SizedBox(height: YaBaladiDesignTokens.space3),          itemBuilder: (_, i) => _PlaceCard(
+              const SizedBox(height: YaBaladiDesignTokens.space3),
+          itemBuilder: (_, i) => _PlaceCard(
             place: controller.places[i],
             isArabic: isArabic,
           ),
@@ -108,7 +116,6 @@ class _PlaceCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // صورة أو أيقونة بديلة
             Container(
               width: 72,
               height: 72,
@@ -146,8 +153,11 @@ class _PlaceCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.star,
-                          size: 16, color: Colors.amber.shade700),
+                      Icon(
+                        Icons.star,
+                        size: 16,
+                        color: Colors.amber.shade700,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         place.averageRating.toStringAsFixed(1),

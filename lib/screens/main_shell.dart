@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -7,10 +8,17 @@ import '../features/auth/controllers/auth_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/login_required_dialog.dart';
 
-class MainShell extends StatelessWidget {
+class MainShell extends StatefulWidget {
   const MainShell({super.key, required this.child});
 
   final Widget child;
+
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  DateTime? _lastBackPress;
 
   int _indexFromLocation(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
@@ -24,23 +32,48 @@ class MainShell extends StatelessWidget {
     return idx < 0 ? 0 : idx;
   }
 
-  Future<void> _onTap(
-    BuildContext context,
-    _NavDest dest,
-  ) async {
+  Future<void> _onTap(BuildContext context, _NavDest dest) async {
     final auth = context.read<AuthController>();
 
-    // لو الميزة تتطلب تسجيل دخول والمستخدم زائر → Dialog
     if (dest.requiresLogin && auth.isGuest) {
-      await showLoginRequiredDialog(
-        context,
-        featureName: dest.label,
-      );
+      await showLoginRequiredDialog(context, featureName: dest.label);
       return;
     }
 
-    // غير كده → انتقل عادي
     if (context.mounted) context.go(dest.path);
+  }
+
+  /// منطق زر الرجوع:
+  /// - لو مش في Home → ارجع للـ Home
+  /// - لو في Home → "اضغط مرة أخرى للخروج"
+  void _handleBack(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+
+    // مش في Home → ارجع للـ Home بدل الخروج
+    if (location != RoutePaths.home) {
+      context.go(RoutePaths.home);
+      return;
+    }
+
+    // إحنا في Home → منطق "اضغط مرتين"
+    final now = DateTime.now();
+    if (_lastBackPress == null ||
+        now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('اضغط مرة أخرى للخروج من التطبيق'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+
+    // ضغط مرتين خلال ثانيتين → اخرج
+    SystemNavigator.pop();
   }
 
   @override
@@ -81,32 +114,38 @@ class MainShell extends StatelessWidget {
       ),
     ];
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => _onTap(context, destinations[i]),
-        destinations: [
-          for (final d in destinations)
-            NavigationDestination(
-              icon: _maybeLocked(
-                context,
-                Icon(d.icon),
-                locked: d.requiresLogin && isGuest,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: Scaffold(
+        body: widget.child,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (i) => _onTap(context, destinations[i]),
+          destinations: [
+            for (final d in destinations)
+              NavigationDestination(
+                icon: _maybeLocked(
+                  context,
+                  Icon(d.icon),
+                  locked: d.requiresLogin && isGuest,
+                ),
+                selectedIcon: _maybeLocked(
+                  context,
+                  Icon(d.selectedIcon),
+                  locked: d.requiresLogin && isGuest,
+                ),
+                label: d.label,
               ),
-              selectedIcon: _maybeLocked(
-                context,
-                Icon(d.selectedIcon),
-                locked: d.requiresLogin && isGuest,
-              ),
-              label: d.label,
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// يضيف Badge صغير للتابات المحمية أثناء وضع الزائر
   Widget _maybeLocked(
     BuildContext context,
     Widget icon, {
