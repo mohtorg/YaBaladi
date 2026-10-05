@@ -12,29 +12,71 @@ class PlacesRepository {
   CollectionReference<Map<String, dynamic>> get _ref =>
       _firestore.collection(collection);
 
-  Stream<List<Place>> watchApproved({int limit = 50}) => _ref
-      .where('isApproved', isEqualTo: true)
-      .where('isActive', isEqualTo: true)
-      .orderBy('createdAt', descending: true)
-      .limit(limit)
-      .snapshots()
-      .map((s) => s.docs.map((d) => Place.fromMap(d.id, d.data())).toList());
+  // ═══════════════════════════════════════════════════════════════
+  // WATCHERS
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // ملاحظة مهمة: كل الاستعلامات تحت تستخدم **حقل واحد فقط**
+  // في الفلترة على السيرفر، والباقي (isActive / ترتيب) على الـ client.
+  //
+  // السبب: تفادي composite indexes في Firestore.
+  // Firestore بيتطلب index مركّب لأي query فيه أكثر من حقل + orderBy.
+  // الفلترة على الـ client أبطأ شوية، لكن مع بيانات قليلة (12 مكان حالياً)
+  // الفرق مش محسوس، ومفيش indexes محتاجة إدارة.
+  // ═══════════════════════════════════════════════════════════════
 
-  Stream<List<Place>> watchByCategory(String categoryId, {int limit = 50}) =>
-      _ref
-          .where('categoryId', isEqualTo: categoryId)
-          .where('isApproved', isEqualTo: true)
-          .where('isActive', isEqualTo: true)
-          .orderBy('averageRating', descending: true)
-          .limit(limit)
-          .snapshots()
-          .map((s) =>
-              s.docs.map((d) => Place.fromMap(d.id, d.data())).toList());
+  /// يعرض كل الأماكن المعتمدة (isApproved = true).
+  ///
+  /// الفلترة على `isActive` والترتيب بـ `createdAt` على الـ client.
+  Stream<List<Place>> watchApproved({int limit = 50}) {
+    return _ref
+        .where('isApproved', isEqualTo: true)
+        .snapshots()
+        .map((s) {
+      final places = s.docs
+          .map((d) => Place.fromMap(d.id, d.data()))
+          .where((p) => p.isActive)
+          .toList()
+        ..sort((a, b) {
+          final da = a.createdAt ?? DateTime(2000);
+          final db = b.createdAt ?? DateTime(2000);
+          return db.compareTo(da);
+        });
+
+      return places.take(limit).toList();
+    });
+  }
+
+  /// يعرض أماكن تصنيف معيّن.
+  ///
+  /// الفلترة على `isApproved`/`isActive` والترتيب بـ `averageRating` على الـ client.
+  Stream<List<Place>> watchByCategory(String categoryId, {int limit = 50}) {
+    return _ref
+        .where('categoryId', isEqualTo: categoryId)
+        .snapshots()
+        .map((s) {
+      final places = s.docs
+          .map((d) => Place.fromMap(d.id, d.data()))
+          .where((p) => p.isApproved && p.isActive)
+          .toList()
+        ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
+
+      return places.take(limit).toList();
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // GET BY ID
+  // ═══════════════════════════════════════════════════════════════
 
   Future<Place?> getById(String id) async {
     final doc = await _ref.doc(id).get();
     return doc.exists ? Place.fromMap(doc.id, doc.data()!) : null;
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CRUD
+  // ═══════════════════════════════════════════════════════════════
 
   Future<String> create(Place place) async {
     final doc = await _ref.add(place.toMap());
@@ -56,7 +98,12 @@ class PlacesRepository {
         'reviewCount': count,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-        /// بحث نصي في الأماكن — يفلتر محليًا (client-side).
+
+  // ═══════════════════════════════════════════════════════════════
+  // SEARCH
+  // ═══════════════════════════════════════════════════════════════
+
+  /// بحث نصي في الأماكن — يفلتر محليًا (client-side).
   ///
   /// - [query]: النص (عربي أو إنجليزي)
   /// - [categoryId]: لو ممرَّر → يفلتر على تصنيف معيّن
@@ -66,28 +113,30 @@ class PlacesRepository {
     required String query,
     String? categoryId,
   }) async {
-    final snap = await _ref
-        .where('isApproved', isEqualTo: true)
-        .where('isActive', isEqualTo: true)
-        .get();
+    // لو categoryId ممرَّر → استخدمه (حقل واحد فقط، مفيش composite index)
+    // غير كده → جيب كل الأماكن
+    Query<Map<String, dynamic>> q = _ref;
+    if (categoryId != null && categoryId.isNotEmpty) {
+      q = q.where('categoryId', isEqualTo: categoryId);
+    }
 
+    final snap = await q.get();
+
+    // فلترة isApproved/isActive على الـ client
     final all = snap.docs
         .map((d) => Place.fromMap(d.id, d.data()))
+        .where((p) => p.isApproved && p.isActive)
         .toList();
 
-    final q = query.trim().toLowerCase();
+    // فلترة النص
+    final q2 = query.trim().toLowerCase();
+
+    if (q2.isEmpty) return all;
 
     return all.where((p) {
-      // filter by category
-      if (categoryId != null && categoryId.isNotEmpty) {
-        if (p.categoryId != categoryId) return false;
-      }
-
-      // filter by text
-      if (q.isEmpty) return true;
-      return p.nameAr.toLowerCase().contains(q) ||
-          p.nameEn.toLowerCase().contains(q) ||
-          p.description.toLowerCase().contains(q);
+      return p.nameAr.toLowerCase().contains(q2) ||
+          p.nameEn.toLowerCase().contains(q2) ||
+          p.description.toLowerCase().contains(q2);
     }).toList();
   }
 }
