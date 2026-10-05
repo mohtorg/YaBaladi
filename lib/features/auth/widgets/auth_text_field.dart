@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../theme/design_tokens.dart';
 
@@ -15,6 +16,7 @@ class AuthTextField extends StatelessWidget {
     this.validator,
     this.onFieldSubmitted,
     this.suffixIcon,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -28,6 +30,9 @@ class AuthTextField extends StatelessWidget {
   final void Function(String)? onFieldSubmitted;
   final Widget? suffixIcon;
 
+  /// لتفiltering/تحديد الإدخال (أرقام فقط، حد الطول، إلخ)
+  final List<TextInputFormatter>? inputFormatters;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -39,6 +44,7 @@ class AuthTextField extends StatelessWidget {
         textInputAction: textInputAction,
         validator: validator,
         onFieldSubmitted: onFieldSubmitted,
+        inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
           hintText: hintText,
