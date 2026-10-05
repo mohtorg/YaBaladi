@@ -1,23 +1,19 @@
 {
   "@@locale": "en",
-
   "appName": "Ya Baladi",
   "welcome": "Welcome",
-
   "home": "Home",
   "search": "Search",
   "profile": "Profile",
   "settings": "Settings",
   "favorites": "Favorites",
   "notifications": "Notifications",
-
   "login": "Login",
   "register": "Register",
   "logout": "Logout",
   "email": "Email",
   "password": "Password",
   "forgotPassword": "Forgot password?",
-
   "categories": "Categories",
   "restaurants": "Restaurants",
   "cafes": "Cafes",
@@ -26,18 +22,15 @@
   "cinema": "Cinema",
   "gyms": "Gyms",
   "nearby": "Nearby",
-
   "loading": "Loading...",
   "error": "An error occurred",
   "retry": "Retry",
   "noResults": "No results",
   "noInternet": "No internet connection",
-
   "settingsGeneral": "General",
   "settingsAccount": "Account",
   "settingsLegal": "Legal & Policies",
   "settingsAdvanced": "Advanced",
-
   "languageLabel": "Language",
   "languageArabic": "العربية",
   "languageEnglish": "English",
@@ -46,7 +39,6 @@
   "languageArabicSubtitle": "RTL — Right to left",
   "languageEnglishSubtitle": "LTR — Left to right",
   "languageCurrent": "Current language",
-
   "themeLabel": "Theme",
   "themeSelectTitle": "Choose Theme",
   "themeSelectSubtitle": "Changes apply immediately",
@@ -57,7 +49,6 @@
   "themeDark": "Dark",
   "themeDarkSubtitle": "Night interface",
   "themeCurrent": "Current theme",
-
   "locationLabel": "Location",
   "locationOnDemand": "On demand",
   "locationOnDemandSubtitle": "Only requested when used",
@@ -65,12 +56,10 @@
   "locationAlwaysSubtitle": "Always available (not recommended)",
   "locationDisabled": "Disabled",
   "locationDisabledSubtitle": "Nearby search won't work",
-
   "notificationsLabel": "Notifications",
   "notificationsSubtitle": "App alerts",
   "notificationsEnabled": "Enabled",
   "notificationsDisabled": "Disabled",
-
   "privacyPolicyLabel": "Privacy Policy",
   "privacyPolicySubtitle": "How we protect your data",
   "termsLabel": "Terms & Conditions",
@@ -79,21 +68,17 @@
   "aboutSubtitle": "Info & licenses",
   "versionLabel": "Version",
   "versionValue": "1.0.0+1",
-
   "clearCacheLabel": "Clear Cache",
   "clearCacheSubtitle": "Delete cached data",
   "clearCacheConfirm": "Do you want to clear cached data?",
   "clearCacheSuccess": "Cache cleared",
-
   "deleteAccountLabel": "Delete Account",
   "deleteAccountSubtitle": "Permanent, irreversible",
   "deleteAccountWarning": "This action cannot be undone",
   "deleteAccountConfirm": "Do you want to delete your account permanently?",
   "deleteAccountButton": "Delete my account",
-
   "logoutConfirmTitle": "Logout",
   "logoutConfirmMessage": "Do you want to logout?",
-
   "confirm": "Confirm",
   "cancel": "Cancel",
   "save": "Save",
@@ -102,7 +87,6 @@
   "no": "No",
   "apply": "Apply",
   "select": "Select",
-
   "loginTitle": "Sign In",
   "loginSubtitle": "Enter your credentials to access your account",
   "registerTitle": "Create Account",
@@ -135,20 +119,16 @@
   "settingsAppearance": "Appearance",
   "settingsPrivacySection": "Privacy & Permissions",
   "settingsDangerSection": "Danger Zone",
-    "continueAsGuest": "Continue as guest",
+  "continueAsGuest": "Continue as guest",
   "guest": "Guest",
   "loginRequired": "Login required",
   "loginRequiredMessage": "This feature is available for registered users only. Sign in to unlock all features.",
   "maybeLater": "Maybe later",
   "or": "or",
   "guestNote": "You can browse as a guest. Some features require sign-in.",
-    "searchHint": "Search for a place...",
+  "searchHint": "Search for a place...",
   "searchIdleHint": "Start by searching for a place",
   "noSearchResults": "No matching results",
-    "searchHint": "Search for a place...",
-  "searchIdleHint": "Start by searching for a place",
-  "noSearchResults": "No matching results",
-
   "filters": "Filters",
   "filterRating": "Rating",
   "filterPrice": "Price",
@@ -161,9 +141,26 @@
   "applyFilters": "Apply",
   "clearFilters": "Clear",
   "noResultsWithFilters": "No results with these filters",
-    "viewOnMap": "View on map",
+  "viewOnMap": "View on map",
   "directions": "Directions",
   "details": "Details",
   "recenter": "Recenter",
-  "noCoordinates": "No coordinates available to show this place on the map"
+  "noCoordinates": "No coordinates available to show this place on the map",
+  "continueWithGoogle": "Continue with Google",
+  "continueWithPhone": "Continue with Phone",
+  "googleSignInFailed": "Google sign-in failed",
+  "invalidPhone": "Invalid phone number",
+  "otpInvalidLength": "Code must be 6 digits",
+  "otpRequired": "Enter verification code",
+  "otpSentTo": "Code sent to",
+  "otpSubtitle": "Enter the 6-digit code sent to your phone",
+  "otpTitle": "Verification Code",
+  "phoneLoginSubtitle": "Enter your phone number to receive a verification code",
+  "phoneLoginTitle": "Sign in with Phone",
+  "phoneNumber": "Phone Number",
+  "phoneNumberHint": "01xxxxxxxxx",
+  "registerCta": "Create New Account",
+  "resendCode": "Resend Code",
+  "sendCode": "Send Verification Code",
+  "verifyCode": "Verify"
 }

@@ -973,6 +973,108 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا توجد إحداثيات لعرض هذا المكان على الخريطة'**
   String get noCoordinates;
+
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In ar, this message translates to:
+  /// **'المتابعة باستخدام Google'**
+  String get continueWithGoogle;
+
+  /// No description provided for @continueWithPhone.
+  ///
+  /// In ar, this message translates to:
+  /// **'المتابعة برقم الموبايل'**
+  String get continueWithPhone;
+
+  /// No description provided for @phoneLoginTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الدخول برقم الموبايل'**
+  String get phoneLoginTitle;
+
+  /// No description provided for @phoneLoginSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل رقم موبايلك لإرسال رمز التحقق'**
+  String get phoneLoginSubtitle;
+
+  /// No description provided for @phoneNumber.
+  ///
+  /// In ar, this message translates to:
+  /// **'رقم الموبايل'**
+  String get phoneNumber;
+
+  /// No description provided for @phoneNumberHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'01xxxxxxxxx'**
+  String get phoneNumberHint;
+
+  /// No description provided for @sendCode.
+  ///
+  /// In ar, this message translates to:
+  /// **'إرسال رمز التحقق'**
+  String get sendCode;
+
+  /// No description provided for @otpTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'رمز التحقق'**
+  String get otpTitle;
+
+  /// No description provided for @otpSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل الرمز المكوّن من 6 أرقام المُرسل إلى هاتفك'**
+  String get otpSubtitle;
+
+  /// No description provided for @otpSentTo.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إرسال الرمز إلى'**
+  String get otpSentTo;
+
+  /// No description provided for @verifyCode.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحقق'**
+  String get verifyCode;
+
+  /// No description provided for @resendCode.
+  ///
+  /// In ar, this message translates to:
+  /// **'إعادة إرسال الرمز'**
+  String get resendCode;
+
+  /// No description provided for @invalidPhone.
+  ///
+  /// In ar, this message translates to:
+  /// **'رقم الموبايل غير صالح'**
+  String get invalidPhone;
+
+  /// No description provided for @otpRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل رمز التحقق'**
+  String get otpRequired;
+
+  /// No description provided for @otpInvalidLength.
+  ///
+  /// In ar, this message translates to:
+  /// **'الرمز يجب أن يكون 6 أرقام'**
+  String get otpInvalidLength;
+
+  /// No description provided for @registerCta.
+  ///
+  /// In ar, this message translates to:
+  /// **'إنشاء حساب جديد'**
+  String get registerCta;
+
+  /// No description provided for @googleSignInFailed.
+  ///
+  /// In ar, this message translates to:
+  /// **'فشل تسجيل الدخول بـ Google'**
+  String get googleSignInFailed;
 }
 
 class _AppLocalizationsDelegate

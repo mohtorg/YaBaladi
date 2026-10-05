@@ -452,4 +452,56 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noCoordinates =>
       'No coordinates available to show this place on the map';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get continueWithPhone => 'Continue with Phone';
+
+  @override
+  String get phoneLoginTitle => 'Sign in with Phone';
+
+  @override
+  String get phoneLoginSubtitle =>
+      'Enter your phone number to receive a verification code';
+
+  @override
+  String get phoneNumber => 'Phone Number';
+
+  @override
+  String get phoneNumberHint => '01xxxxxxxxx';
+
+  @override
+  String get sendCode => 'Send Verification Code';
+
+  @override
+  String get otpTitle => 'Verification Code';
+
+  @override
+  String get otpSubtitle => 'Enter the 6-digit code sent to your phone';
+
+  @override
+  String get otpSentTo => 'Code sent to';
+
+  @override
+  String get verifyCode => 'Verify';
+
+  @override
+  String get resendCode => 'Resend Code';
+
+  @override
+  String get invalidPhone => 'Invalid phone number';
+
+  @override
+  String get otpRequired => 'Enter verification code';
+
+  @override
+  String get otpInvalidLength => 'Code must be 6 digits';
+
+  @override
+  String get registerCta => 'Create New Account';
+
+  @override
+  String get googleSignInFailed => 'Google sign-in failed';
 }
