@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/phone_login_screen.dart'; // ← جديد
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
@@ -114,6 +115,13 @@ GoRouter createAppRouter(AuthController auth) {
         path: RoutePaths.forgotPassword,
         name: RouteNames.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
+      // ✅ جديد: تسجيل الدخول برقم الموبايل
+      GoRoute(
+        path: RoutePaths.phoneLogin,
+        name: RouteNames.phoneLogin,
+        builder: (context, state) => const PhoneLoginScreen(),
       ),
 
       GoRoute(

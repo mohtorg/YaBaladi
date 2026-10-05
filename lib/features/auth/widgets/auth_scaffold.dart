@@ -8,7 +8,7 @@ import '../../../theme/design_tokens.dart';
 ///
 /// يحتوي على PopScope للتحكم في زر الرجوع:
 /// - إذا كانت الشاشة الرئيسية (Login) → يغلق التطبيق
-/// - إذا كانت ثانوية (Register/ForgotPassword) → يعود لـ Login
+/// - إذا كانت شاشة ثانوية (Register/ForgotPassword) → يعود لـ Login
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
@@ -33,12 +33,9 @@ class AuthScaffold extends StatelessWidget {
     final theme = Theme.of(context);
 
     return PopScope(
-      // إذا كانت شاشة الدخول → نسمح للنظام بإغلاق التطبيق
-      // إذا كانت شاشة ثانوية → نمنع الإغلاق ونعود لـ Login
       canPop: exitOnBack,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        // الشاشة ثانوية → نعود لـ Login
         context.go(RoutePaths.login);
       },
       child: Scaffold(
@@ -50,7 +47,6 @@ class AuthScaffold extends StatelessWidget {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {
                     if (exitOnBack) {
-                      // اترك النظام يتعامل معه
                       Navigator.of(context).maybePop();
                     } else {
                       context.go(RoutePaths.login);
@@ -67,10 +63,20 @@ class AuthScaffold extends StatelessWidget {
               children: [
                 const SizedBox(height: YaBaladiDesignTokens.space4),
 
-                Icon(
-                  Icons.location_city_rounded,
-                  size: 64,
-                  color: theme.colorScheme.primary,
+                // ✅ المهمة #5: شعار التطبيق (نفس صورة الأيقونة)
+                // في حال عدم توفر الملف، يظهر fallback تلقائيًا
+                Center(
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    height: 100,
+                    width: 100,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.location_city_rounded,
+                      size: 64,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: YaBaladiDesignTokens.space4),
 
