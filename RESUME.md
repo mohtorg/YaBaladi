@@ -2,7 +2,7 @@
 
 ## 🎯 انسخ هذا في DeepSeek:
 
-مشروع: يا بلادي (Ya Baladi)
+مشروع: يا بلدي (Ya Baladi)
 GitHub: https://github.com/mohtorg/YaBaladi
 آخر tag: v0.2.2-g2.2-design
 آخر commit: 403395a

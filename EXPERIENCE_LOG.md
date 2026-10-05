@@ -81,7 +81,7 @@ curl -L -o Cairo-Bold.ttf "https://github.com/google/fonts/raw/main/ofl/cairo/st
 **الصق:**
 
 ```markdown
-# حالة مشروع يا بلادي — Project State
+# حالة مشروع يا بلدي — Project State
 
 **آخر تحديث:** 2026-10-03
 **المرحلة:** G2.2 — مكتمل تقنيًا

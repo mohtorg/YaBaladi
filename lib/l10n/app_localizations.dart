@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appName.
   ///
   /// In ar, this message translates to:
-  /// **'يا بلادي'**
+  /// **'يا بلدي'**
   String get appName;
 
   /// No description provided for @welcome.
@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @registerSubtitle.
   ///
   /// In ar, this message translates to:
-  /// **'انضم إلى مجتمع يا بلادي'**
+  /// **'انضم إلى مجتمع يا بلدي'**
   String get registerSubtitle;
 
   /// No description provided for @forgotPasswordTitle.

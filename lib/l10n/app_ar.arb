@@ -1,7 +1,7 @@
 {
   "@@locale": "ar",
 
-  "appName": "يا بلادي",
+  "appName": "يا بلدي",
   "welcome": "أهلاً بك",
 
   "home": "الرئيسية",
@@ -106,7 +106,7 @@
   "loginTitle": "تسجيل الدخول",
   "loginSubtitle": "أدخل بياناتك للوصول إلى حسابك",
   "registerTitle": "إنشاء حساب جديد",
-  "registerSubtitle": "انضم إلى مجتمع يا بلادي",
+  "registerSubtitle": "انضم إلى مجتمع يا بلدي",
   "forgotPasswordTitle": "استعادة كلمة المرور",
   "forgotPasswordSubtitle": "أدخل بريدك لإرسال رابط الاستعادة",
   "displayName": "الاسم الكامل",

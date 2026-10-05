@@ -10,7 +10,7 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appName => 'يا بلادي';
+  String get appName => 'يا بلدي';
 
   @override
   String get welcome => 'أهلاً بك';
@@ -280,7 +280,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get registerTitle => 'إنشاء حساب جديد';
 
   @override
-  String get registerSubtitle => 'انضم إلى مجتمع يا بلادي';
+  String get registerSubtitle => 'انضم إلى مجتمع يا بلدي';
 
   @override
   String get forgotPasswordTitle => 'استعادة كلمة المرور';
