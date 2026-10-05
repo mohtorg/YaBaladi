@@ -39,6 +39,7 @@ class AuthController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   bool _firebaseAvailable = false;
+  bool _isGuest = false;
 
   // ============================================================
   // GETTERS
@@ -48,6 +49,8 @@ class AuthController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   bool get isLoggedIn => _user != null;
+  bool get isGuest => _isGuest;
+  bool get isActiveUser => _user != null;
   bool get firebaseAvailable => _firebaseAvailable;
   String? get uid => _user?.uid;
   String? get email => _user?.email;
@@ -64,7 +67,6 @@ class AuthController extends ChangeNotifier {
       _firebaseAvailable = true;
       _userSub = _auth!.authStateChanges().listen(_onAuthStateChanged);
     } catch (e) {
-      // Firebase غير مُهيَّأ (بيئة اختبار) — نستمر بدون auth
       _firebaseAvailable = false;
       _isInitialized = true;
       debugPrint('AuthController: Firebase not available ($e)');
@@ -73,6 +75,8 @@ class AuthController extends ChangeNotifier {
 
   void _onAuthStateChanged(User? user) {
     _user = user;
+    // لو المستخدم سجّل دخول فعليًا → اخرج من وضع الزائر
+    if (user != null) _isGuest = false;
     _isInitialized = true;
     notifyListeners();
   }
@@ -95,6 +99,7 @@ class AuthController extends ChangeNotifier {
         email: email.trim(),
         password: password,
       );
+      _isGuest = false;
       return const AuthResult.success();
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_mapAuthError(e));
@@ -138,6 +143,7 @@ class AuthController extends ChangeNotifier {
         }, SetOptions(merge: true));
       }
 
+      _isGuest = false;
       return const AuthResult.success();
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_mapAuthError(e));
@@ -153,14 +159,31 @@ class AuthController extends ChangeNotifier {
   // ============================================================
 
   Future<void> signOut() async {
-    if (_auth == null) return;
+    if (_auth == null) {
+      _isGuest = false;
+      notifyListeners();
+      return;
+    }
 
     _setLoading(true);
     try {
       await _auth!.signOut();
     } finally {
+      _isGuest = false;
       _setLoading(false);
+      notifyListeners();
     }
+  }
+
+  // ============================================================
+  // GUEST MODE
+  // ============================================================
+
+  /// يسمح للمستخدم بتصفح التطبيق بدون تسجيل دخول.
+  /// الميزات الحسّاسة تبقى "notActive" لحد ما يسجّل.
+  void continueAsGuest() {
+    _isGuest = true;
+    notifyListeners();
   }
 
   // ============================================================

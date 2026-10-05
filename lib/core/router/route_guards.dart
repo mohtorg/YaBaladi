@@ -3,35 +3,35 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import 'route_paths.dart';
 
-/// المسارات العامة (بدون تسجيل دخول)
-const Set<String> _publicRoutes = {
-  RoutePaths.home,
-  RoutePaths.search,
-  RoutePaths.settings,
+/// مسارات متاحة بدون تسجيل دخول ولا وضع زائر
+/// (شاشات المصادقة نفسها).
+const Set<String> _authOnlyRoutes = {
   RoutePaths.login,
   RoutePaths.register,
   RoutePaths.forgotPassword,
 };
 
-/// Guard رئيسي: يُعيد مسارًا للـ redirect أو null
+/// Guard مركزي:
+///
+/// - مش مسجل ومش زائر → Login
+/// - مسجل أو زائر + على شاشة Auth → Home
+/// - غير كده → مسموح
 String? authGuard({
   required AuthController auth,
   required GoRouterState state,
 }) {
   final location = state.matchedLocation;
 
-  final isPublic = _publicRoutes.contains(location);
-  final isAuthRoute = location == RoutePaths.login ||
-      location == RoutePaths.register ||
-      location == RoutePaths.forgotPassword;
+  final hasAccess = auth.isLoggedIn || auth.isGuest;
+  final isAuthRoute = _authOnlyRoutes.contains(location);
 
-  // مسجل دخول ويحاول فتح صفحة Auth → Home
-  if (auth.isLoggedIn && isAuthRoute) {
+  // لو مسجل/زائر وبيحاول يدخل شاشة Login → Home
+  if (hasAccess && isAuthRoute) {
     return RoutePaths.home;
   }
 
-  // غير مسجل ويحاول فتح صفحة محمية → Login
-  if (!auth.isLoggedIn && !isPublic) {
+  // لو مش مسجل ومش زائر → Login
+  if (!hasAccess && !isAuthRoute) {
     return '${RoutePaths.login}?from=$location';
   }
 

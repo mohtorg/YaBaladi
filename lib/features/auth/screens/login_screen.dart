@@ -43,9 +43,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'خطأ')),
+        SnackBar(content: Text(result.error ?? 'حدث خطأ')),
       );
     }
+    // النجاح: authGuard هيعمل redirect تلقائي إلى /home
+  }
+
+  void _continueAsGuest() {
+    context.read<AuthController>().continueAsGuest();
+    // authGuard هيعمل redirect تلقائي إلى /home
   }
 
   @override
@@ -126,6 +132,50 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Text(l10n.register),
                 ),
               ],
+            ),
+
+            const SizedBox(height: YaBaladiDesignTokens.space4),
+
+            // ═══════════ فاصل "أو" ═══════════
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    l10n.or,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+
+            const SizedBox(height: YaBaladiDesignTokens.space4),
+
+            // ═══════════ زر "متابعة كزائر" ═══════════
+            OutlinedButton.icon(
+              onPressed: _continueAsGuest,
+              icon: const Icon(Icons.person_outline),
+              label: Text(l10n.continueAsGuest),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: YaBaladiDesignTokens.space2),
+
+            Center(
+              child: Text(
+                l10n.guestNote,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
             ),
           ],
         ),

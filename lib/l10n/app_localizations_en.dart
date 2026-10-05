@@ -368,4 +368,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDangerSection => 'Danger Zone';
+
+  @override
+  String get continueAsGuest => 'Continue as guest';
+
+  @override
+  String get guest => 'Guest';
+
+  @override
+  String get loginRequired => 'Login required';
+
+  @override
+  String get loginRequiredMessage =>
+      'This feature is available for registered users only. Sign in to unlock all features.';
+
+  @override
+  String get maybeLater => 'Maybe later';
+
+  @override
+  String get or => 'or';
+
+  @override
+  String get guestNote =>
+      'You can browse as a guest. Some features require sign-in.';
 }

@@ -365,4 +365,27 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsDangerSection => 'منطقة الخطر';
+
+  @override
+  String get continueAsGuest => 'متابعة كزائر';
+
+  @override
+  String get guest => 'زائر';
+
+  @override
+  String get loginRequired => 'تسجيل الدخول مطلوب';
+
+  @override
+  String get loginRequiredMessage =>
+      'هذه الميزة متاحة للمسجلين فقط. سجّل دخولك للاستفادة من كل إمكانيات التطبيق.';
+
+  @override
+  String get maybeLater => 'لاحقًا';
+
+  @override
+  String get or => 'أو';
+
+  @override
+  String get guestNote =>
+      'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.';
 }

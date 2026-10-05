@@ -173,3 +173,42 @@ git log --oneline -3
 - Tag v0.2.5.2-docs-master-plan مثبّت على commit 43fe895 ✅
 - ملفات docs (3 ملفات) مرفوعة على main ✅
 - التطبيق يبني ويشتغل بدون أخطاء Gradle ✅
+
+## إضافة 2026-10-04 (ليلاً)
+
+### G2.5 — مكتمل ✅
+- 4 models: Category, Place, Review, Favorite
+- 4 repositories: Categories, Places, Reviews, Favorites
+- 2 controllers: Categories, Places
+- Tag: v0.2.5-g2.5-models
+
+### G2.6 — جزء 1 (Seed) مكتمل ✅
+- lib/services/seed_service.dart
+- lib/main_seed.dart
+- seed.sh (REST API)
+- زرع 21 doc في Firestore (9 categories + 12 places)
+- Firestore rules محدّثة (categories, favorites, reviews)
+
+### الحالة الحالية
+- الـ APK: build/app/outputs/flutter-apk/app-release.apk (56.2 MB)
+- Rules: النسخة الدائمة (isAdmin)
+- Firestore: 9 categories + 12 places
+
+### معلّق للجلسة القادمة — G2.6 جزء 2
+- ⏳ تحديث home_screen.dart — Grid 3×3 للتصنيفات
+- ⏳ إضافة route جديد /category/:id
+- ⏳ PlacesListScreen لعرض أماكن كل تصنيف
+- ⏳ تسجيل CategoriesController في main.dart Provider
+
+### ملفات محتاج أشوفها في الجلسة القادمة
+- lib/screens/home_screen.dart (الحالي)
+- lib/core/router/route_names.dart
+- lib/core/router/route_paths.dart
+- lib/core/router/app_router.dart
+- lib/main.dart (لتسجيل Provider)
+
+### ملاحظة عن Codespaces
+- flutter SDK في: /workspaces/flutter-sdk/flutter/bin
+- لو Codespace اتعمله restart، تأكد من:
+  flutter --version
+  cd /workspaces/YaBaladi && git pull origin main

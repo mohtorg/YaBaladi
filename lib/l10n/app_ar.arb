@@ -134,5 +134,12 @@
   "searchComingSoon": "البحث قادم قريبًا",
   "settingsAppearance": "المظهر",
   "settingsPrivacySection": "الخصوصية والأذونات",
-  "settingsDangerSection": "منطقة الخطر"
+  "settingsDangerSection": "منطقة الخطر",
+  "continueAsGuest": "متابعة كزائر",
+  "guest": "زائر",
+  "loginRequired": "تسجيل الدخول مطلوب",
+  "loginRequiredMessage": "هذه الميزة متاحة للمسجلين فقط. سجّل دخولك للاستفادة من كل إمكانيات التطبيق.",
+  "maybeLater": "لاحقًا",
+  "or": "أو",
+  "guestNote": "يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول."
 }

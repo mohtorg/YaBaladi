@@ -134,5 +134,12 @@
   "searchComingSoon": "Search coming soon",
   "settingsAppearance": "Appearance",
   "settingsPrivacySection": "Privacy & Permissions",
-  "settingsDangerSection": "Danger Zone"
+  "settingsDangerSection": "Danger Zone",
+    "continueAsGuest": "Continue as guest",
+  "guest": "Guest",
+  "loginRequired": "Login required",
+  "loginRequiredMessage": "This feature is available for registered users only. Sign in to unlock all features.",
+  "maybeLater": "Maybe later",
+  "or": "or",
+  "guestNote": "You can browse as a guest. Some features require sign-in."
 }

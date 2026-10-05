@@ -811,6 +811,48 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'منطقة الخطر'**
   String get settingsDangerSection;
+
+  /// No description provided for @continueAsGuest.
+  ///
+  /// In ar, this message translates to:
+  /// **'متابعة كزائر'**
+  String get continueAsGuest;
+
+  /// No description provided for @guest.
+  ///
+  /// In ar, this message translates to:
+  /// **'زائر'**
+  String get guest;
+
+  /// No description provided for @loginRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الدخول مطلوب'**
+  String get loginRequired;
+
+  /// No description provided for @loginRequiredMessage.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذه الميزة متاحة للمسجلين فقط. سجّل دخولك للاستفادة من كل إمكانيات التطبيق.'**
+  String get loginRequiredMessage;
+
+  /// No description provided for @maybeLater.
+  ///
+  /// In ar, this message translates to:
+  /// **'لاحقًا'**
+  String get maybeLater;
+
+  /// No description provided for @or.
+  ///
+  /// In ar, this message translates to:
+  /// **'أو'**
+  String get or;
+
+  /// No description provided for @guestNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.'**
+  String get guestNote;
 }
 
 class _AppLocalizationsDelegate
