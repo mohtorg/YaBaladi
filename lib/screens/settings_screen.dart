@@ -1,24 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/locale_controller.dart';
 import '../l10n/theme_controller.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/language_picker_dialog.dart';
 import '../widgets/theme_picker_dialog.dart';
+import '../widgets/ya_app_bar.dart';
 
-/// شاشة الإعدادات — تخصيص التطبيق
-///
-/// الأقسام:
+/// شاشة الإعدادات — كل ما يخص تخصيص التطبيق:
 /// - المظهر (اللغة + الثيم)
 /// - الخصوصية والأذونات (الموقع + مسح الذاكرة)
 /// - القانوني والسياسات (4 بنود)
 /// - منطقة الخطر (حذف الحساب)
+///
+/// ملاحظة: بيانات المستخدم موجودة في ProfileScreen.
+/// لا يوجد تكرار.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -30,29 +31,13 @@ class SettingsScreen extends StatelessWidget {
     final auth = context.watch<AuthController>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settings),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: l10n.home,
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              // ignore: use_build_context_synchronously
-              context.go(RoutePaths.home);
-            }
-          },
-        ),
-      ),
+      appBar: YaAppBar(title: l10n.settings),
       body: ListView(
         padding: const EdgeInsets.symmetric(
           vertical: YaBaladiDesignTokens.space2,
         ),
         children: [
-          // ============================================================
-          // المظهر
-          // ============================================================
+          // ═══════ المظهر ═══════
           _SectionHeader(title: l10n.settingsAppearance),
 
           _LanguageTile(localeController: localeController),
@@ -60,9 +45,7 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
 
-          // ============================================================
-          // الخصوصية والأذونات
-          // ============================================================
+          // ═══════ الخصوصية والأذونات ═══════
           _SectionHeader(title: l10n.settingsPrivacySection),
 
           _SettingTile(
@@ -81,9 +64,7 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
 
-          // ============================================================
-          // القانوني والسياسات
-          // ============================================================
+          // ═══════ القانوني والسياسات ═══════
           _SectionHeader(title: l10n.settingsLegal),
 
           _SettingTile(
@@ -114,9 +95,7 @@ class SettingsScreen extends StatelessWidget {
             onTap: null,
           ),
 
-          // ============================================================
-          // منطقة الخطر
-          // ============================================================
+          // ═══════ منطقة الخطر ═══════
           if (auth.isLoggedIn) ...[
             const SizedBox(height: YaBaladiDesignTokens.space4),
             _SectionHeader(title: l10n.settingsDangerSection),
@@ -136,13 +115,13 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // ============================================================
+  // ═══════════════════════════════════════════════════════════════
   // CONFIRMATIONS
-  // ============================================================
+  // ═══════════════════════════════════════════════════════════════
 
   Future<void> _confirmClearCache(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await _showConfirmDialog(
+    final confirmed = await showYaConfirmDialog(
       context: context,
       title: l10n.clearCacheLabel,
       message: l10n.clearCacheConfirm,
@@ -175,7 +154,7 @@ class SettingsScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     // الحوار الأول: تأكيد عام
-    final confirmed = await _showConfirmDialog(
+    final confirmed = await showYaConfirmDialog(
       context: context,
       title: l10n.deleteAccountLabel,
       message: l10n.deleteAccountWarning,
@@ -188,7 +167,7 @@ class SettingsScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     // الحوار الثاني: تحذير إضافي
-    await _showConfirmDialog(
+    await showYaConfirmDialog(
       context: context,
       title: l10n.deleteAccountLabel,
       message: l10n.deleteAccountConfirm,
@@ -198,45 +177,11 @@ class SettingsScreen extends StatelessWidget {
     );
     // TODO(G4): call authService.deleteAccount() when wired
   }
-
-  Future<bool?> _showConfirmDialog({
-    required BuildContext context,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required String cancelLabel,
-    bool isDestructive = false,
-  }) {
-    final theme = Theme.of(context);
-    return showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(cancelLabel),
-          ),
-          FilledButton(
-            style: isDestructive
-                ? FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error,
-                    foregroundColor: theme.colorScheme.onError,
-                  )
-                : null,
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // SECTION HEADER
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
@@ -266,9 +211,9 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // LANGUAGE TILE
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 
 class _LanguageTile extends StatelessWidget {
   const _LanguageTile({required this.localeController});
@@ -300,9 +245,9 @@ class _LanguageTile extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // THEME TILE
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 
 class _ThemeTile extends StatelessWidget {
   const _ThemeTile({required this.themeController});
@@ -336,9 +281,9 @@ class _ThemeTile extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 // SETTING TILE
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
 
 class _SettingTile extends StatelessWidget {
   const _SettingTile({
@@ -386,7 +331,7 @@ class _SettingTile extends StatelessWidget {
           : null,
       trailing: onTap != null
           ? Icon(
-              Icons.chevron_right,
+              Icons.chevron_left,
               color: theme.colorScheme.onSurfaceVariant,
             )
           : null,
