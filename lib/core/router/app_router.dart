@@ -6,6 +6,7 @@ import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
+import '../../features/places/screens/places_list_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
@@ -15,9 +16,7 @@ import 'route_guards.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
-/// إنشاء GoRouter مع AuthController مُمرَّر (بدل context.read)
-///
-/// هذا يحل مشكلة الوصول لـ Provider من داخل redirect
+/// إنشاء GoRouter مع AuthController مُمرَّر
 GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
     initialLocation: RoutePaths.home,
@@ -51,6 +50,15 @@ GoRouter createAppRouter(AuthController auth) {
             name: RouteNames.settings,
             builder: (context, state) => const SettingsScreen(),
           ),
+          // ─── قائمة أماكن تصنيف معيّن ───
+          GoRoute(
+            path: RoutePaths.category,
+            name: RouteNames.category,
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return PlacesListScreen(categoryId: id);
+            },
+          ),
         ],
       ),
 
@@ -79,7 +87,9 @@ GoRouter createAppRouter(AuthController auth) {
 
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('خطأ 404')),
-      body: Center(child: Text('المسار غير موجود: ${state.uri}')),
+      body: Center(
+        child: Text('الصفحة غير موجودة: ${state.uri}'),
+      ),
     ),
   );
 }

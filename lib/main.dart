@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 
 import 'core/router/app_router.dart';
 import 'features/auth/controllers/auth_controller.dart';
+import 'features/categories/controllers/categories_controller.dart';
+import 'features/places/controllers/places_controller.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/locale_controller.dart';
@@ -14,15 +16,11 @@ import 'l10n/theme_controller.dart';
 import 'theme/app_theme.dart';
 
 // 🔔 Background message handler
-// لازم تكون top-level function (برة أي كلاس)
-// و@pragma('vm:entry-point') ضرورية عشان Flutter ميخليهاش tree-shaken
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // تهيئة Firebase جوه الـ handler — ده جوهر الحل
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   debugPrint('📩 Background message: ${message.messageId}');
 }
 
@@ -33,7 +31,6 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 🔔 سجّل الـ background handler بعد التهيئة
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(const YaBaladiApp());
@@ -54,6 +51,12 @@ class YaBaladiApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<AuthController>(
           create: (_) => AuthController(),
+        ),
+        ChangeNotifierProvider<CategoriesController>(
+          create: (_) => CategoriesController()..start(),
+        ),
+        ChangeNotifierProvider<PlacesController>(
+          create: (_) => PlacesController(),
         ),
       ],
       child: const _AppRoot(),
@@ -78,7 +81,6 @@ class _AppRootState extends State<_AppRoot> {
 
     final auth = context.read<AuthController>();
 
-    // نبني router مرة واحدة فقط (أو عند تغيّر auth)
     if (_router == null || _authController != auth) {
       _router = createAppRouter(auth);
       _authController = auth;
