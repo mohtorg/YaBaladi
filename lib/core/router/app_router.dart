@@ -24,6 +24,11 @@ GoRouter createAppRouter(AuthController auth) {
     initialLocation: RoutePaths.home,
     debugLogDiagnostics: true,
 
+    // ✅ المهمة 1 + 6: يخلي GoRouter يعيد تقييم redirect
+    // كل ما AuthController ينبّه (login / signup / guest / signout).
+    // AuthController extends ChangeNotifier → Listenable صالح.
+    refreshListenable: auth,
+
     redirect: (context, state) {
       return authGuard(auth: auth, state: state);
     },
