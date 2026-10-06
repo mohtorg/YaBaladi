@@ -26,6 +26,15 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- Location Permissions -->
+	<!-- ═══════════════════════════════════════════════════ -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>يستخدم يا بلدي موقعك لعرض الأماكن القريبة منك واسم محافظتك</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>يستخدم يا بلدي موقعك لعرض الأماكن القريبة منك واسم محافظتك</string>
+
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

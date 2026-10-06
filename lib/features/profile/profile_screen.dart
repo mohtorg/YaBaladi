@@ -4,15 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../services/location_service.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
-
-/// ⚠️ مؤقتًا: المحافظة الافتراضية.
-/// عند تفعيل GPS (الملاحظة #2)، هتتجاب ديناميكيًا من موقع المستخدم.
-const String _defaultGovernorateAr = 'بورسعيد';
-const String _defaultGovernorateEn = 'Port Said';
 
 /// شاشة حسابي:
 /// - Guest → بطاقة ترقية الحساب (تسجيل دخول / إنشاء حساب)
@@ -49,9 +45,6 @@ class ProfileScreen extends StatelessWidget {
     // ═══════════════════════════════════════════════════════════
     final displayName = auth.displayName ?? '—';
     final email = auth.email ?? '—';
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final governorate =
-        isArabic ? _defaultGovernorateAr : _defaultGovernorateEn;
 
     return Scaffold(
       appBar: YaAppBar(title: l10n.profile),
@@ -60,60 +53,16 @@ class ProfileScreen extends StatelessWidget {
           vertical: YaBaladiDesignTokens.space4,
         ),
         children: [
-          // ─── العنوان الرئيسي: يا بلدي — [المحافظة] ───
-          Center(
-            child: Text(
-              isArabic
-                  ? 'يا بلدي — $governorate'
-                  : 'Ya Baladi — $governorate',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
+          // ─── Governorate Header ───
+          const _GovernorateHeader(),
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
 
-          // ─── Header (Avatar + Welcome + Email) ───
+          // ─── Profile Header ───
           _ProfileHeader(
             name: displayName,
             email: email,
             initials: _initials(displayName),
-            isArabic: isArabic,
-          ),
-
-          const SizedBox(height: YaBaladiDesignTokens.space3),
-
-          // ─── Governorate Chip ───
-          Center(
-            child: Chip(
-              avatar: Icon(
-                Icons.location_on_outlined,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
-              label: Text(
-                isArabic ? governorate : governorate,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: YaBaladiDesignTokens.space3),
-
-          // ─── Edit Profile Button ───
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO(G4): edit profile screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('قريبًا')),
-                );
-              },
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('تعديل الملف الشخصي'),
-            ),
           ),
 
           const SizedBox(height: YaBaladiDesignTokens.space5),
@@ -171,6 +120,91 @@ class ProfileScreen extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// GOVERNORATE HEADER (stateful — بتجلب الموقع تلقائيًا)
+// ═══════════════════════════════════════════════════════════════
+
+class _GovernorateHeader extends StatefulWidget {
+  const _GovernorateHeader();
+
+  @override
+  State<_GovernorateHeader> createState() => _GovernorateHeaderState();
+}
+
+class _GovernorateHeaderState extends State<_GovernorateHeader> {
+  LocationData? _location;
+  _LocationState _state = _LocationState.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocation();
+  }
+
+  Future<void> _fetchLocation() async {
+    setState(() => _state = _LocationState.loading);
+
+    final loc = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+
+    setState(() {
+      _location = loc;
+      _state = loc == null ? _LocationState.denied : _LocationState.loaded;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final governorate = switch (_state) {
+      _LocationState.loading => isArabic ? 'جارٍ تحديد الموقع…' : 'Locating…',
+      _LocationState.denied => isArabic ? 'الموقع غير مفعّل' : 'Location off',
+      _LocationState.loaded => isArabic
+          ? (_location?.governorateAr ?? '')
+          : (_location?.governorateEn ?? ''),
+    };
+
+    return Column(
+      children: [
+        Text(
+          isArabic ? 'يا بلدي — $governorate' : 'Ya Baladi — $governorate',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: YaBaladiDesignTokens.space2),
+        if (_state == _LocationState.loading)
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (_state == _LocationState.denied)
+          TextButton.icon(
+            onPressed: _fetchLocation,
+            icon: const Icon(Icons.location_off_outlined, size: 18),
+            label: Text(isArabic ? 'تفعيل الموقع' : 'Enable location'),
+          )
+        else if (_location != null)
+          Chip(
+            avatar: Icon(
+              Icons.location_on_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            label: Text(governorate),
+          ),
+      ],
+    );
+  }
+}
+
+enum _LocationState { loading, loaded, denied }
+
+// ═══════════════════════════════════════════════════════════════
 // GUEST UPGRADE CARD
 // ═══════════════════════════════════════════════════════════════
 
@@ -195,8 +229,6 @@ class _GuestUpgradeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: YaBaladiDesignTokens.space5),
-
-          // ─── Icon ───
           Center(
             child: Container(
               width: 110,
@@ -212,10 +244,7 @@ class _GuestUpgradeCard extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space5),
-
-          // ─── Title ───
           Text(
             isArabic ? 'أنت تتصفّح كزائر' : "You're browsing as guest",
             textAlign: TextAlign.center,
@@ -223,10 +252,7 @@ class _GuestUpgradeCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space2),
-
-          // ─── Subtitle ───
           Text(
             isArabic
                 ? 'أنشئ حسابًا الآن لحفظ الأماكن المفضلة،\nإضافة تقييماتك، ومتابعة عروض يا بلدي.'
@@ -237,10 +263,7 @@ class _GuestUpgradeCard extends StatelessWidget {
               height: 1.5,
             ),
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space5),
-
-          // ─── Benefits Cards ───
           _BenefitRow(
             icon: Icons.favorite_border,
             label: isArabic
@@ -261,10 +284,7 @@ class _GuestUpgradeCard extends StatelessWidget {
                 ? 'احصل على عروض حصرية'
                 : 'Get exclusive offers',
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space5),
-
-          // ─── Register Button (Primary) ───
           FilledButton.icon(
             onPressed: onRegister,
             icon: const Icon(Icons.person_add_alt_1),
@@ -277,10 +297,7 @@ class _GuestUpgradeCard extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space3),
-
-          // ─── Login Button (Secondary) ───
           OutlinedButton.icon(
             onPressed: onLogin,
             icon: const Icon(Icons.login),
@@ -316,10 +333,7 @@ class _BenefitRow extends StatelessWidget {
           Icon(icon, size: 20, color: theme.colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium,
-            ),
+            child: Text(label, style: theme.textTheme.bodyMedium),
           ),
         ],
       ),
@@ -328,7 +342,7 @@ class _BenefitRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PROFILE HEADER (Avatar + Welcome + Email)
+// PROFILE HEADER
 // ═══════════════════════════════════════════════════════════════
 
 class _ProfileHeader extends StatelessWidget {
@@ -336,26 +350,22 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.email,
     required this.initials,
-    required this.isArabic,
   });
 
   final String name;
   final String email;
   final String initials;
-  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    // "أهلاً بك يا سلمى" / "Welcome, Salma"
-    final greeting = isArabic
-        ? 'أهلاً بك يا $name'
-        : 'Welcome, $name';
+    final greeting =
+        isArabic ? 'أهلاً بك يا $name' : 'Welcome, $name';
 
     return Column(
       children: [
-        // ─── Avatar ───
         CircleAvatar(
           radius: 48,
           backgroundColor: theme.colorScheme.primaryContainer,
@@ -367,10 +377,7 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(height: YaBaladiDesignTokens.space3),
-
-        // ─── Greeting (primary) ───
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -381,10 +388,7 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(height: YaBaladiDesignTokens.space1),
-
-        // ─── Email (secondary) ───
         Text(
           email,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -474,10 +478,6 @@ class _StatsSection extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// STAT CARD
-// ═══════════════════════════════════════════════════════════════
-
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.icon,
@@ -522,7 +522,7 @@ class _StatCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOGIN REQUIRED (للمستخدمين اللي ما فتحوش كزائر)
+// LOGIN REQUIRED
 // ═══════════════════════════════════════════════════════════════
 
 class _LoginRequired extends StatelessWidget {
@@ -559,8 +559,6 @@ class _LoginRequired extends StatelessWidget {
               ),
             ),
             const SizedBox(height: YaBaladiDesignTokens.space5),
-
-            // Login (Primary)
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -572,8 +570,6 @@ class _LoginRequired extends StatelessWidget {
               ),
             ),
             const SizedBox(height: YaBaladiDesignTokens.space3),
-
-            // Register (Secondary)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
