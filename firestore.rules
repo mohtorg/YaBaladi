@@ -1,0 +1,121 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userData().role == 'admin';
+    }
+
+    function isMerchant() {
+      return isSignedIn() && userData().role == 'merchant';
+    }
+
+    function isOwnerOfUser(userId) {
+      return isSignedIn() && uid() == userId;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // USERS
+    // ═══════════════════════════════════════════════════════════
+    match /users/{userId} {
+
+      allow read: if isOwnerOfUser(userId) || isAdmin();
+
+      allow create: if isOwnerOfUser(userId)
+                    && request.resource.data.role == 'user'
+                    && request.resource.data.status == 'active';
+
+      allow update: if isOwnerOfUser(userId)
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.status == resource.data.status;
+
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin();
+
+      match /favorites/{placeId} {
+        allow read, write: if isOwnerOfUser(userId);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PLACES
+    // ═══════════════════════════════════════════════════════════
+    match /places/{placeId} {
+
+      allow read: if (resource.data.isApproved == true
+                      && resource.data.isActive == true)
+                  || (isSignedIn() && (
+                       resource.data.ownerId == uid() || isAdmin()
+                     ));
+
+      allow create: if isSignedIn()
+                    && (isMerchant() || isAdmin())
+                    && request.resource.data.ownerId == uid()
+                    && request.resource.data.isApproved == false;
+
+      allow update: if isSignedIn()
+                    && (
+                      (resource.data.ownerId == uid()
+                       && request.resource.data.isApproved == resource.data.isApproved)
+                      || isAdmin()
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CATEGORIES
+    // ═══════════════════════════════════════════════════════════
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // REVIEWS
+    // ═══════════════════════════════════════════════════════════
+    match /reviews/{reviewId} {
+
+      allow read: if true;
+
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid();
+
+      allow update, delete: if isSignedIn()
+                            && (resource.data.userId == uid() || isAdmin());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MERCHANTS
+    // ═══════════════════════════════════════════════════════════
+    match /merchants/{merchantId} {
+      allow read: if isSignedIn()
+                  && (merchantId == uid() || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DEFAULT: رفض
+    // ═══════════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

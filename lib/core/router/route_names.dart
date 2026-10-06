@@ -10,7 +10,6 @@ class RouteNames {
   static const String login = 'login';
   static const String register = 'register';
   static const String forgotPassword = 'forgotPassword';
-  static const String phoneLogin = 'phoneLogin'; // ← جديد
 
   static const String category = 'category';
   static const String place = 'place';

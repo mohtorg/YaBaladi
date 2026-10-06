@@ -1,23 +1,19 @@
 {
   "@@locale": "ar",
-
   "appName": "يا بلدي",
   "welcome": "أهلاً بك",
-
   "home": "الرئيسية",
   "search": "البحث",
   "profile": "حسابي",
   "settings": "الإعدادات",
   "favorites": "المفضلة",
   "notifications": "الإشعارات",
-
   "login": "تسجيل الدخول",
   "register": "إنشاء حساب",
   "logout": "تسجيل الخروج",
   "email": "البريد الإلكتروني",
   "password": "كلمة المرور",
   "forgotPassword": "هل نسيت كلمة المرور؟",
-
   "categories": "التصنيفات",
   "restaurants": "مطاعم",
   "cafes": "مقاهي",
@@ -26,18 +22,15 @@
   "cinema": "سينما",
   "gyms": "صالات رياضية",
   "nearby": "بالقرب مني",
-
   "loading": "جارٍ التحميل...",
   "error": "حدث خطأ",
   "retry": "إعادة المحاولة",
   "noResults": "لا توجد نتائج",
   "noInternet": "لا يوجد اتصال بالإنترنت",
-
   "settingsGeneral": "عام",
   "settingsAccount": "الحساب",
   "settingsLegal": "القانوني والسياسات",
   "settingsAdvanced": "متقدم",
-
   "languageLabel": "اللغة",
   "languageArabic": "العربية",
   "languageEnglish": "English",
@@ -46,7 +39,6 @@
   "languageArabicSubtitle": "RTL — من اليمين لليسار",
   "languageEnglishSubtitle": "LTR — من اليسار لليمين",
   "languageCurrent": "اللغة الحالية",
-
   "themeLabel": "المظهر",
   "themeSelectTitle": "اختر المظهر",
   "themeSelectSubtitle": "سيتم تطبيق التغيير فورًا",
@@ -57,7 +49,6 @@
   "themeDark": "داكن",
   "themeDarkSubtitle": "واجهة ليلية",
   "themeCurrent": "المظهر الحالي",
-
   "locationLabel": "الموقع",
   "locationOnDemand": "حسب الحاجة",
   "locationOnDemandSubtitle": "يُطلب عند الاستخدام فقط",
@@ -65,12 +56,10 @@
   "locationAlwaysSubtitle": "متاح دائمًا (غير موصى به)",
   "locationDisabled": "معطّل",
   "locationDisabledSubtitle": "لن يعمل البحث القريب",
-
   "notificationsLabel": "الإشعارات",
   "notificationsSubtitle": "تنبيهات التطبيق",
   "notificationsEnabled": "مفعّلة",
   "notificationsDisabled": "معطّلة",
-
   "privacyPolicyLabel": "سياسة الخصوصية",
   "privacyPolicySubtitle": "كيف نحمي بياناتك",
   "termsLabel": "الشروط والأحكام",
@@ -79,21 +68,17 @@
   "aboutSubtitle": "معلومات وتراخيص",
   "versionLabel": "الإصدار",
   "versionValue": "1.0.0+1",
-
   "clearCacheLabel": "مسح الذاكرة المؤقتة",
   "clearCacheSubtitle": "حذف البيانات المخزنة مؤقتًا",
   "clearCacheConfirm": "هل تريد مسح البيانات المخزنة مؤقتًا؟",
   "clearCacheSuccess": "تم مسح الذاكرة المؤقتة",
-
   "deleteAccountLabel": "حذف الحساب",
   "deleteAccountSubtitle": "حذف دائم لا يمكن التراجع عنه",
   "deleteAccountWarning": "هذا الإجراء لا يمكن التراجع عنه",
   "deleteAccountConfirm": "هل تريد حذف حسابك نهائيًا؟",
   "deleteAccountButton": "حذف حسابي",
-
   "logoutConfirmTitle": "تسجيل الخروج",
   "logoutConfirmMessage": "هل تريد تسجيل الخروج؟",
-
   "confirm": "تأكيد",
   "cancel": "إلغاء",
   "save": "حفظ",
@@ -102,7 +87,6 @@
   "no": "لا",
   "apply": "تطبيق",
   "select": "اختيار",
-
   "loginTitle": "تسجيل الدخول",
   "loginSubtitle": "أدخل بياناتك للوصول إلى حسابك",
   "registerTitle": "إنشاء حساب جديد",
@@ -142,13 +126,9 @@
   "maybeLater": "لاحقًا",
   "or": "أو",
   "guestNote": "يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.",
-    "searchHint": "ابحث عن مكان...",
+  "searchHint": "ابحث عن مكان...",
   "searchIdleHint": "ابدأ بالبحث عن مكان",
   "noSearchResults": "لا توجد نتائج مطابقة",
-    "searchHint": "ابحث عن مكان...",
-  "searchIdleHint": "ابدأ بالبحث عن مكان",
-  "noSearchResults": "لا توجد نتائج مطابقة",
-
   "filters": "الفلاتر",
   "filterRating": "التقييم",
   "filterPrice": "السعر",
@@ -161,26 +141,12 @@
   "applyFilters": "تطبيق",
   "clearFilters": "مسح",
   "noResultsWithFilters": "لا توجد نتائج بهذه الفلاتر",
-    "viewOnMap": "عرض على الخريطة",
+  "viewOnMap": "عرض على الخريطة",
   "directions": "الاتجاهات",
   "details": "التفاصيل",
   "recenter": "إعادة التمركز",
   "noCoordinates": "لا توجد إحداثيات لعرض هذا المكان على الخريطة",
-    "continueWithGoogle": "المتابعة باستخدام Google",
-  "continueWithPhone": "المتابعة برقم الموبايل",
-  "phoneLoginTitle": "تسجيل الدخول برقم الموبايل",
-  "phoneLoginSubtitle": "أدخل رقم موبايلك لإرسال رمز التحقق",
-  "phoneNumber": "رقم الموبايل",
-  "phoneNumberHint": "01xxxxxxxxx",
-  "sendCode": "إرسال رمز التحقق",
-  "otpTitle": "رمز التحقق",
-  "otpSubtitle": "أدخل الرمز المكوّن من 6 أرقام المُرسل إلى هاتفك",
-  "otpSentTo": "تم إرسال الرمز إلى",
-  "verifyCode": "تحقق",
-  "resendCode": "إعادة إرسال الرمز",
-  "invalidPhone": "رقم الموبايل غير صالح",
-  "otpRequired": "أدخل رمز التحقق",
-  "otpInvalidLength": "الرمز يجب أن يكون 6 أرقام",
+  "continueWithGoogle": "المتابعة باستخدام Google",
   "registerCta": "إنشاء حساب جديد",
   "googleSignInFailed": "فشل تسجيل الدخول بـ Google"
 }
