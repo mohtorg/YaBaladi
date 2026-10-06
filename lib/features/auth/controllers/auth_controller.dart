@@ -63,6 +63,9 @@ class AuthController extends ChangeNotifier {
   String? get email => _user?.email;
   String? get displayName => _user?.displayName;
 
+  /// صورة المستخدم (من Google Sign-In أو أي مزود).
+  String? get photoUrl => _user?.photoURL;
+
   // ============================================================
   // INIT
   // ============================================================

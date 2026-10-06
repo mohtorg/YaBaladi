@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// نتيجة تحديد الموقع.
 class LocationData {
@@ -16,13 +18,170 @@ class LocationData {
   final double longitude;
   final String governorateAr;
   final String governorateEn;
+
+  Map<String, dynamic> toJson() => {
+        'lat': latitude,
+        'lng': longitude,
+        'ar': governorateAr,
+        'en': governorateEn,
+      };
+
+  static LocationData? fromJson(Map<String, dynamic> json) {
+    try {
+      return LocationData(
+        latitude: (json['lat'] as num).toDouble(),
+        longitude: (json['lng'] as num).toDouble(),
+        governorateAr: json['ar'] as String? ?? '',
+        governorateEn: json['en'] as String? ?? '',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
-/// خدمة الموقع: صلاحيات + جلب الإحداثيات + تحديد المحافظة (من 27 محافظة).
+/// خدمة الموقع: صلاحيات + جلب الإحداثيات + تحديد المحافظة + cache.
 class LocationService {
   LocationService._();
 
-  /// مراكز المحافظات المصرية الـ 27 (lat, lng) + الاسم عربي/إنجليزي.
+  // ═══════════════════════════════════════════════════════════════
+  // CACHE (30 دقيقة)
+  // ═══════════════════════════════════════════════════════════════
+  static const String _cacheKey = 'last_location_data';
+  static const String _cacheTimeKey = 'last_location_time';
+  static const Duration _cacheDuration = Duration(minutes: 30);
+
+  /// يجلب آخر عنوان محفوظ (لو مش قديم).
+  static Future<LocationData?> getCachedLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timeStr = prefs.getInt(_cacheTimeKey);
+      if (timeStr == null) return null;
+
+      final savedTime = DateTime.fromMillisecondsSinceEpoch(timeStr);
+      if (DateTime.now().difference(savedTime) > _cacheDuration) {
+        return null;
+      }
+
+      final jsonStr = prefs.getString(_cacheKey);
+      if (jsonStr == null) return null;
+
+      return LocationData.fromJson(
+        jsonDecode(jsonStr) as Map<String, dynamic>,
+      );
+    } catch (e) {
+      debugPrint('LocationService.getCachedLocation: $e');
+      return null;
+    }
+  }
+
+  static Future<void> _saveToCache(LocationData data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(data.toJson()));
+      await prefs.setInt(
+        _cacheTimeKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (e) {
+      debugPrint('LocationService._saveToCache: $e');
+    }
+  }
+
+  /// يمسح الـ cache (عند force refresh).
+  static Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_cacheTimeKey);
+    } catch (e) {
+      debugPrint('LocationService.clearCache: $e');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PERMISSIONS
+  // ═══════════════════════════════════════════════════════════════
+
+  static Future<bool> isServiceEnabled() =>
+      Geolocator.isLocationServiceEnabled();
+
+  static Future<bool> requestPermission() async {
+    var perm = await Geolocator.checkPermission();
+
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+
+    return perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MAIN
+  // ═══════════════════════════════════════════════════════════════
+
+  /// يجلب الموقع الحالي ويحدّد المحافظة.
+  ///
+  /// - [forceRefresh]: تجاهل الـ cache.
+  /// - يعيد `null` لو الخدمة معطّلة أو الصلاحية مرفوضة.
+  static Future<LocationData?> getCurrentLocation({
+    bool forceRefresh = false,
+  }) async {
+    // 1. حاول من الـ cache
+    if (!forceRefresh) {
+      final cached = await getCachedLocation();
+      if (cached != null) {
+        debugPrint('LocationService: from cache');
+        return cached;
+      }
+    }
+
+    try {
+      // 2. تأكد إن خدمة الموقع مفعّلة
+      if (!await isServiceEnabled()) {
+        debugPrint('LocationService: services disabled');
+        return null;
+      }
+
+      // 3. اطلب الصلاحية
+      if (!await requestPermission()) {
+        debugPrint('LocationService: permission denied');
+        return null;
+      }
+
+      // 4. اجلب الموقع
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+
+      // 5. حدّد المحافظة الأقرب
+      final gov = _nearestGovernorate(pos.latitude, pos.longitude);
+
+      final data = LocationData(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        governorateAr: gov.nameAr,
+        governorateEn: gov.nameEn,
+      );
+
+      // 6. احفظ في الـ cache
+      await _saveToCache(data);
+
+      return data;
+    } catch (e) {
+      debugPrint('LocationService: error $e');
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // GOVERNORATES (27 Egyptian)
+  // ═══════════════════════════════════════════════════════════════
+
   static const List<_Gov> _governorates = [
     _Gov('القاهرة', 'Cairo', 30.0444, 31.2357),
     _Gov('الجيزة', 'Giza', 30.0131, 31.2089),
@@ -53,63 +212,6 @@ class LocationService {
     _Gov('الشرقية', 'Sharqia', 30.5877, 31.5020),
   ];
 
-  /// يفحص إذا خدمة الموقع مفعّلة على الجهاز.
-  static Future<bool> isServiceEnabled() =>
-      Geolocator.isLocationServiceEnabled();
-
-  /// يطلب صلاحية الموقع (إذا لم تُمنح بعد).
-  /// يعيد `true` لو ممنوحة، `false` لو مرفوضة.
-  static Future<bool> requestPermission() async {
-    var perm = await Geolocator.checkPermission();
-
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-    }
-
-    return perm == LocationPermission.always ||
-        perm == LocationPermission.whileInUse;
-  }
-
-  /// يجلب الموقع الحالي ويحدّد المحافظة.
-  /// يعيد `null` لو الخدمة معطّلة أو الصلاحية مرفوضة.
-  static Future<LocationData?> getCurrentLocation() async {
-    try {
-      // 1. تأكد إن خدمة الموقع مفعّلة
-      if (!await isServiceEnabled()) {
-        debugPrint('LocationService: services disabled');
-        return null;
-      }
-
-      // 2. اطلب الصلاحية
-      if (!await requestPermission()) {
-        debugPrint('LocationService: permission denied');
-        return null;
-      }
-
-      // 3. اجلب الموقع (API الحديث — geolocator 13.x)
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-
-      // 4. حدّد المحافظة الأقرب
-      final gov = _nearestGovernorate(pos.latitude, pos.longitude);
-
-      return LocationData(
-        latitude: pos.latitude,
-        longitude: pos.longitude,
-        governorateAr: gov.nameAr,
-        governorateEn: gov.nameEn,
-      );
-    } catch (e) {
-      debugPrint('LocationService: error $e');
-      return null;
-    }
-  }
-
-  /// يجد المحافظة الأقرب بالإحداثيات (Haversine distance).
   static _Gov _nearestGovernorate(double lat, double lng) {
     _Gov nearest = _governorates.first;
     double minDist = double.infinity;
@@ -124,9 +226,9 @@ class LocationService {
     return nearest;
   }
 
-  /// المسافة بالكيلومترات بين نقطتين (Haversine).
-  static double _haversine(double lat1, double lng1, double lat2, double lng2) {
-    const R = 6371.0; // نصف قطر الأرض بالكم
+  static double _haversine(
+      double lat1, double lng1, double lat2, double lng2) {
+    const R = 6371.0;
     final dLat = _rad(lat2 - lat1);
     final dLng = _rad(lng2 - lng1);
 
@@ -143,7 +245,6 @@ class LocationService {
   static double _rad(double deg) => deg * math.pi / 180.0;
 }
 
-/// بيانات محافظة.
 class _Gov {
   const _Gov(this.nameAr, this.nameEn, this.lat, this.lng);
 
