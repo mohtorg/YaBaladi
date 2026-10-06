@@ -14,43 +14,60 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(uid()));
+    }
+
     function userData() {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
     function isAdmin() {
-      return isSignedIn() && userData().role == 'admin';
+      return isSignedIn()
+             && userExists()
+             && userData().role == 'admin';
     }
 
     function isMerchant() {
-      return isSignedIn() && userData().role == 'merchant';
+      return isSignedIn()
+             && userExists()
+             && userData().role == 'merchant';
     }
 
-    function isOwnerOfUser(userId) {
+    function isSelf(userId) {
       return isSignedIn() && uid() == userId;
     }
 
     // ═══════════════════════════════════════════════════════════
-    // USERS
+    // USERS + FAVORITES (subcollection)
     // ═══════════════════════════════════════════════════════════
     match /users/{userId} {
 
-      allow read: if isOwnerOfUser(userId) || isAdmin();
+      // ─── User document ───
+      allow read: if isSelf(userId) || isAdmin();
 
-      allow create: if isOwnerOfUser(userId)
+      allow create: if isSelf(userId)
                     && request.resource.data.role == 'user'
                     && request.resource.data.status == 'active';
 
-      allow update: if isOwnerOfUser(userId)
+      allow update: if isSelf(userId)
                     && request.resource.data.role == resource.data.role
                     && request.resource.data.status == resource.data.status;
 
-      allow update: if isAdmin();
+      allow update, delete: if isAdmin();
 
-      allow delete: if isAdmin();
-
+      // ─── Favorites subcollection ───
+      // Path: users/{userId}/favorites/{placeId}
       match /favorites/{placeId} {
-        allow read, write: if isOwnerOfUser(userId);
+
+        allow read: if isSelf(userId);
+
+        allow create: if isSelf(userId)
+                      && request.resource.data.placeId == placeId;
+
+        allow delete: if isSelf(userId);
+
+        allow update: if false;  // لا تعديل
       }
     }
 
@@ -73,11 +90,21 @@ service cloud.firestore {
       allow update: if isSignedIn()
                     && (
                       (resource.data.ownerId == uid()
-                       && request.resource.data.isApproved == resource.data.isApproved)
+                       && request.resource.data.isApproved
+                          == resource.data.isApproved)
                       || isAdmin()
                     );
 
       allow delete: if isAdmin();
+
+      // ─── Reviews subcollection (مستقبلًا) ───
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+                      && request.resource.data.userId == uid();
+        allow update, delete: if isSignedIn()
+                              && (resource.data.userId == uid() || isAdmin());
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -89,21 +116,18 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REVIEWS
+    // REVIEWS (top-level — احتياطيًا)
     // ═══════════════════════════════════════════════════════════
     match /reviews/{reviewId} {
-
       allow read: if true;
-
       allow create: if isSignedIn()
                     && request.resource.data.userId == uid();
-
       allow update, delete: if isSignedIn()
                             && (resource.data.userId == uid() || isAdmin());
     }
 
     // ═══════════════════════════════════════════════════════════
-    // MERCHANTS
+    // MERCHANTS (Phase 2)
     // ═══════════════════════════════════════════════════════════
     match /merchants/{merchantId} {
       allow read: if isSignedIn()

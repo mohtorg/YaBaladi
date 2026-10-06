@@ -1,9 +1,21 @@
 // models/favorite.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// موديل المفضلة.
+///
+/// المسار في Firestore: users/{uid}/favorites/{placeId}
+/// - `id` = placeId (الـ Document ID)
+/// - `userId` = يأتي من الـ path (مش مخزّن في الوثيقة)
+///
+/// مطابق لـ Master Plan v1.0:
+///   users/{uid}/favorites/{pid}   ← المفضلة
 class Favorite {
-  final String id;      // userId_placeId (unique)
+  /// = placeId (الـ Document ID)
+  final String id;
+
+  /// يأتي من الـ path — مش مخزّن في الوثيقة
   final String userId;
+
   final String placeId;
   final DateTime? createdAt;
 
@@ -14,20 +26,22 @@ class Favorite {
     this.createdAt,
   });
 
-  /// docId موحّد لمنع التكرار
-  static String buildId(String userId, String placeId) => '${userId}_$placeId';
-
-  factory Favorite.fromMap(String id, Map<String, dynamic> map) {
+  /// يحوّل من Firestore — `userId` يوصل من الـ path.
+  factory Favorite.fromMap(
+    String userId,
+    String docId,
+    Map<String, dynamic> map,
+  ) {
     return Favorite(
-      id: id,
-      userId: (map['userId'] as String?) ?? '',
-      placeId: (map['placeId'] as String?) ?? '',
+      id: docId,
+      userId: userId,
+      placeId: (map['placeId'] as String?) ?? docId,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
     );
   }
 
+  /// للكتابة في Firestore — بدون `userId` (موجود في الـ path).
   Map<String, dynamic> toMap() => {
-        'userId': userId,
         'placeId': placeId,
         'createdAt': createdAt != null
             ? Timestamp.fromDate(createdAt!)
@@ -35,5 +49,5 @@ class Favorite {
       };
 
   @override
-  String toString() => 'Favorite($id, user=$userId, place=$placeId)';
+  String toString() => 'Favorite(user=$userId, place=$placeId)';
 }
