@@ -20,9 +20,26 @@ class Place {
   final double averageRating;
   final int reviewCount;
 
-  /// 1=$ · 2=$$ · 3=$$$ · 4=$$$$
+  /// 1=< 100 · 2=< 500 · 3=< 1000 · 4=> 1000 ج.م
   /// 0 = غير محدد
   final int priceLevel;
+
+  // ─── Amenities (المرافق) ───
+  final bool hasWifi;
+  final bool hasParking;
+  final bool hasRestroom;
+  final bool hasAccessibility;
+
+  // ─── Features (المميزات) ───
+  final bool isFamilyFriendly;
+  final bool isHalal;
+  final bool hasDelivery;
+  final bool hasReservation;
+  final bool hasOffers;
+
+  // ─── Payment Methods (طرق الدفع) ───
+  /// القيم المتاحة: 'cash', 'card', 'instapay', 'wallet'
+  final List<String> paymentMethods;
 
   final bool isApproved;
   final bool isActive;
@@ -47,6 +64,16 @@ class Place {
     this.averageRating = 0.0,
     this.reviewCount = 0,
     this.priceLevel = 0,
+    this.hasWifi = false,
+    this.hasParking = false,
+    this.hasRestroom = false,
+    this.hasAccessibility = false,
+    this.isFamilyFriendly = false,
+    this.isHalal = false,
+    this.hasDelivery = false,
+    this.hasReservation = false,
+    this.hasOffers = false,
+    this.paymentMethods = const [],
     this.isApproved = false,
     this.isActive = true,
     this.createdAt,
@@ -72,6 +99,16 @@ class Place {
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 0,
+      hasWifi: (map['hasWifi'] as bool?) ?? false,
+      hasParking: (map['hasParking'] as bool?) ?? false,
+      hasRestroom: (map['hasRestroom'] as bool?) ?? false,
+      hasAccessibility: (map['hasAccessibility'] as bool?) ?? false,
+      isFamilyFriendly: (map['isFamilyFriendly'] as bool?) ?? false,
+      isHalal: (map['isHalal'] as bool?) ?? false,
+      hasDelivery: (map['hasDelivery'] as bool?) ?? false,
+      hasReservation: (map['hasReservation'] as bool?) ?? false,
+      hasOffers: (map['hasOffers'] as bool?) ?? false,
+      paymentMethods: List<String>.from(map['paymentMethods'] ?? const []),
       isApproved: (map['isApproved'] as bool?) ?? false,
       isActive: (map['isActive'] as bool?) ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -96,6 +133,16 @@ class Place {
         'averageRating': averageRating,
         'reviewCount': reviewCount,
         'priceLevel': priceLevel,
+        'hasWifi': hasWifi,
+        'hasParking': hasParking,
+        'hasRestroom': hasRestroom,
+        'hasAccessibility': hasAccessibility,
+        'isFamilyFriendly': isFamilyFriendly,
+        'isHalal': isHalal,
+        'hasDelivery': hasDelivery,
+        'hasReservation': hasReservation,
+        'hasOffers': hasOffers,
+        'paymentMethods': paymentMethods,
         'isApproved': isApproved,
         'isActive': isActive,
         'createdAt': createdAt != null
@@ -122,6 +169,16 @@ class Place {
     double? averageRating,
     int? reviewCount,
     int? priceLevel,
+    bool? hasWifi,
+    bool? hasParking,
+    bool? hasRestroom,
+    bool? hasAccessibility,
+    bool? isFamilyFriendly,
+    bool? isHalal,
+    bool? hasDelivery,
+    bool? hasReservation,
+    bool? hasOffers,
+    List<String>? paymentMethods,
     bool? isApproved,
     bool? isActive,
     DateTime? createdAt,
@@ -145,6 +202,16 @@ class Place {
         averageRating: averageRating ?? this.averageRating,
         reviewCount: reviewCount ?? this.reviewCount,
         priceLevel: priceLevel ?? this.priceLevel,
+        hasWifi: hasWifi ?? this.hasWifi,
+        hasParking: hasParking ?? this.hasParking,
+        hasRestroom: hasRestroom ?? this.hasRestroom,
+        hasAccessibility: hasAccessibility ?? this.hasAccessibility,
+        isFamilyFriendly: isFamilyFriendly ?? this.isFamilyFriendly,
+        isHalal: isHalal ?? this.isHalal,
+        hasDelivery: hasDelivery ?? this.hasDelivery,
+        hasReservation: hasReservation ?? this.hasReservation,
+        hasOffers: hasOffers ?? this.hasOffers,
+        paymentMethods: paymentMethods ?? this.paymentMethods,
         isApproved: isApproved ?? this.isApproved,
         isActive: isActive ?? this.isActive,
         createdAt: createdAt ?? this.createdAt,
