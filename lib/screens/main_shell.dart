@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
+import '../features/favorites/controllers/favorites_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/login_required_dialog.dart';
 
@@ -19,6 +20,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   DateTime? _lastBackPress;
+  String? _lastSyncedUid;
 
   int _indexFromLocation(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
@@ -32,6 +34,22 @@ class _MainShellState extends State<MainShell> {
     return idx < 0 ? 0 : idx;
   }
 
+  /// زامن الـ FavoritesController مع حالة المصادقة.
+  void _syncFavoritesWatcher(String? uid) {
+    if (_lastSyncedUid == uid) return;
+    _lastSyncedUid = uid;
+
+    final fav = context.read<FavoritesController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (uid != null) {
+        fav.startWatching(uid);
+      } else {
+        fav.stopWatching();
+      }
+    });
+  }
+
   Future<void> _onTap(BuildContext context, _NavDest dest) async {
     final auth = context.read<AuthController>();
 
@@ -43,19 +61,14 @@ class _MainShellState extends State<MainShell> {
     if (context.mounted) context.go(dest.path);
   }
 
-  /// منطق زر الرجوع:
-  /// - لو مش في Home → ارجع للـ Home
-  /// - لو في Home → "اضغط مرة أخرى للخروج"
   void _handleBack(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
-    // مش في Home → ارجع للـ Home بدل الخروج
     if (location != RoutePaths.home) {
       context.go(RoutePaths.home);
       return;
     }
 
-    // إحنا في Home → منطق "اضغط مرتين"
     final now = DateTime.now();
     if (_lastBackPress == null ||
         now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
@@ -72,7 +85,6 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    // ضغط مرتين خلال ثانيتين → اخرج
     SystemNavigator.pop();
   }
 
@@ -80,8 +92,12 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthController>();
+    final favorites = context.watch<FavoritesController>();
     final index = _indexFromLocation(context);
     final isGuest = auth.isGuest;
+
+    // ─── زامن المراقبة ───
+    _syncFavoritesWatcher(auth.uid);
 
     final destinations = [
       _NavDest(
@@ -104,6 +120,7 @@ class _MainShellState extends State<MainShell> {
         label: l10n.favorites,
         path: RoutePaths.favorites,
         requiresLogin: true,
+        badgeCount: favorites.count,
       ),
       _NavDest(
         icon: Icons.settings_outlined,
@@ -128,15 +145,17 @@ class _MainShellState extends State<MainShell> {
           destinations: [
             for (final d in destinations)
               NavigationDestination(
-                icon: _maybeLocked(
+                icon: _buildIcon(
                   context,
                   Icon(d.icon),
                   locked: d.requiresLogin && isGuest,
+                  badgeCount: d.badgeCount,
                 ),
-                selectedIcon: _maybeLocked(
+                selectedIcon: _buildIcon(
                   context,
                   Icon(d.selectedIcon),
                   locked: d.requiresLogin && isGuest,
+                  badgeCount: d.badgeCount,
                 ),
                 label: d.label,
               ),
@@ -146,17 +165,30 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _maybeLocked(
+  Widget _buildIcon(
     BuildContext context,
     Widget icon, {
     required bool locked,
+    int badgeCount = 0,
   }) {
-    if (!locked) return icon;
-    return Badge(
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      smallSize: 10,
-      child: icon,
-    );
+    // Guest → نقطة صغيرة (قفل)
+    if (locked) {
+      return Badge(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        smallSize: 10,
+        child: icon,
+      );
+    }
+
+    // مسجّل + فيه مفضلات → badge بالرقم
+    if (badgeCount > 0) {
+      return Badge(
+        label: Text('$badgeCount'),
+        child: icon,
+      );
+    }
+
+    return icon;
   }
 }
 
@@ -167,6 +199,7 @@ class _NavDest {
     required this.label,
     required this.path,
     required this.requiresLogin,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -174,4 +207,5 @@ class _NavDest {
   final String label;
   final String path;
   final bool requiresLogin;
+  final int badgeCount;
 }
