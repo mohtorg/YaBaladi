@@ -42,8 +42,9 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
         : (isArabic ? cat.nameAr : cat.nameEn);
 
     final places = context.watch<PlacesController>();
-    final activeFilters = (places.minRating != null ? 1 : 0) +
-        (places.priceLevel != null ? 1 : 0);
+    // ✅ عدد الفلاتر النشطة يأتي من الـ Controller
+    // (يشمل التقييم + السعر + المميزات + المرافق + طرق الدفع)
+    final activeFilters = places.activeFilterCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -59,14 +60,6 @@ class _PlacesListScreenState extends State<PlacesListScreen> {
           },
         ),
         actions: [
-          // زر عرض التصنيف على الخريطة
-          IconButton(
-            icon: const Icon(Icons.map_outlined),
-            tooltip: l10n.viewOnMap,
-            onPressed: () => context.go(
-              RoutePaths.categoryMapPath(widget.categoryId),
-            ),
-          ),
           // زر الفلتر + Badge
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 8),
@@ -137,10 +130,31 @@ class _PlaceCard extends StatelessWidget {
   final Place place;
   final bool isArabic;
 
+  /// يعرض نطاق السعر بالجنيه المصري بناءً على priceLevel (1-4).
+  /// - 1: أقل من 100 ج.م
+  /// - 2: أقل من 500 ج.م
+  /// - 3: أقل من 1000 ج.م
+  /// - 4: أكثر من 1000 ج.م
+  String? get _priceLabel {
+    switch (place.priceLevel) {
+      case 1:
+        return '< 100 ج.م';
+      case 2:
+        return '< 500 ج.م';
+      case 3:
+        return '< 1000 ج.م';
+      case 4:
+        return '> 1000 ج.م';
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = isArabic ? place.nameAr : place.nameEn;
+    final priceLabel = _priceLabel;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -205,10 +219,10 @@ class _PlaceCard extends StatelessWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        if (place.priceLevel > 0) ...[
+                        if (priceLabel != null) ...[
                           const SizedBox(width: 8),
                           Text(
-                            '\$' * place.priceLevel,
+                            priceLabel,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.green.shade700,
                               fontWeight: FontWeight.w600,

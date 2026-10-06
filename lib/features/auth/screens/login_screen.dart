@@ -49,6 +49,19 @@ class _LoginScreenState extends State<LoginScreen> {
     // النجاح: authGuard هيعمل redirect تلقائي إلى /home
   }
 
+  Future<void> _signInWithGoogle() async {
+    final auth = context.read<AuthController>();
+    final result = await auth.signInWithGoogle();
+
+    if (!mounted) return;
+
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'فشل تسجيل الدخول')),
+      );
+    }
+  }
+
   void _continueAsGuest() {
     context.read<AuthController>().continueAsGuest();
     // authGuard هيعمل redirect تلقائي إلى /home
@@ -58,6 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthController>();
+    final theme = Theme.of(context);
 
     return AuthScaffold(
       title: l10n.loginTitle,
@@ -68,6 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ═══════════ حقول Email/Password ═══════════
             AuthTextField(
               controller: _emailCtrl,
               label: l10n.email,
@@ -116,25 +131,50 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: YaBaladiDesignTokens.space2),
 
+            // ═══════════ زر الدخول الرئيسي ═══════════
             AuthPrimaryButton(
               label: l10n.login,
               isLoading: auth.isLoading,
               onPressed: _submit,
             ),
-            const SizedBox(height: YaBaladiDesignTokens.space4),
+            const SizedBox(height: YaBaladiDesignTokens.space5),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(l10n.noAccountYet),
-                TextButton(
-                  onPressed: () => context.go(RoutePaths.register),
-                  child: Text(l10n.register),
+            // ═══════════ المهمة #2: بطاقة تسجيل واضحة ═══════════
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                  width: 1.2,
                 ),
-              ],
+                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.primary.withValues(alpha: 0.05),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.noAccountYet,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.go(RoutePaths.register),
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: Text(
+                      l10n.registerCta,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
-            const SizedBox(height: YaBaladiDesignTokens.space4),
+            const SizedBox(height: YaBaladiDesignTokens.space5),
 
             // ═══════════ فاصل "أو" ═══════════
             Row(
@@ -153,16 +193,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const SizedBox(height: YaBaladiDesignTokens.space4),
 
-            // ═══════════ زر "متابعة كزائر" ═══════════
+            // ═══════════ المهمة #3: زر Google ═══════════
+            OutlinedButton.icon(
+              onPressed: auth.isLoading ? null : _signInWithGoogle,
+              icon: const Icon(Icons.g_mobiledata, size: 28),
+              label: Text(l10n.continueWithGoogle),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(color: theme.colorScheme.outline),
+              ),
+            ),
+
+            const SizedBox(height: YaBaladiDesignTokens.space3),
+
+            // ═══════════ المهمة #4: زر Phone ═══════════
+            OutlinedButton.icon(
+              onPressed: auth.isLoading
+                  ? null
+                  : () => context.go(RoutePaths.phoneLogin),
+              icon: const Icon(Icons.phone_iphone, size: 22),
+              label: Text(l10n.continueWithPhone),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(color: theme.colorScheme.outline),
+              ),
+            ),
+
+            const SizedBox(height: YaBaladiDesignTokens.space4),
+
+            // ═══════════ المهمة #6: زر Guest ═══════════
             OutlinedButton.icon(
               onPressed: _continueAsGuest,
               icon: const Icon(Icons.person_outline),
               label: Text(l10n.continueAsGuest),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+                side: BorderSide(color: theme.colorScheme.outline),
               ),
             ),
 
@@ -172,9 +238,9 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Text(
                 l10n.guestNote,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
