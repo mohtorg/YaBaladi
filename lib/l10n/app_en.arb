@@ -147,20 +147,6 @@
   "recenter": "Recenter",
   "noCoordinates": "No coordinates available to show this place on the map",
   "continueWithGoogle": "Continue with Google",
-  "continueWithPhone": "Continue with Phone",
   "googleSignInFailed": "Google sign-in failed",
-  "invalidPhone": "Invalid phone number",
-  "otpInvalidLength": "Code must be 6 digits",
-  "otpRequired": "Enter verification code",
-  "otpSentTo": "Code sent to",
-  "otpSubtitle": "Enter the 6-digit code sent to your phone",
-  "otpTitle": "Verification Code",
-  "phoneLoginSubtitle": "Enter your phone number to receive a verification code",
-  "phoneLoginTitle": "Sign in with Phone",
-  "phoneNumber": "Phone Number",
-  "phoneNumberHint": "01xxxxxxxxx",
-  "registerCta": "Create New Account",
-  "resendCode": "Resend Code",
-  "sendCode": "Send Verification Code",
-  "verifyCode": "Verify"
+  "registerCta": "Create New Account"
 }

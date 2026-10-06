@@ -10,7 +10,6 @@ class RoutePaths {
   static const String login = '/login';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
-  static const String phoneLogin = '/phone-login'; // ← جديد
 
   // ─── تصنيف / أماكن ───
   static const String category = '/category/:id';

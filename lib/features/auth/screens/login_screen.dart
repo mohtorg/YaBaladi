@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: YaBaladiDesignTokens.space5),
 
-            // ═══════════ المهمة #2: بطاقة تسجيل واضحة ═══════════
+            // ═══════════ بطاقة تسجيل واضحة ═══════════
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 12,
@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const SizedBox(height: YaBaladiDesignTokens.space4),
 
-            // ═══════════ المهمة #3: زر Google ═══════════
+            // ═══════════ زر Google ═══════════
             OutlinedButton.icon(
               onPressed: auth.isLoading ? null : _signInWithGoogle,
               icon: const Icon(Icons.g_mobiledata, size: 28),
@@ -204,24 +204,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            const SizedBox(height: YaBaladiDesignTokens.space3),
-
-            // ═══════════ المهمة #4: زر Phone ═══════════
-            OutlinedButton.icon(
-              onPressed: auth.isLoading
-                  ? null
-                  : () => context.go(RoutePaths.phoneLogin),
-              icon: const Icon(Icons.phone_iphone, size: 22),
-              label: Text(l10n.continueWithPhone),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: BorderSide(color: theme.colorScheme.outline),
-              ),
-            ),
-
             const SizedBox(height: YaBaladiDesignTokens.space4),
 
-            // ═══════════ المهمة #6: زر Guest ═══════════
+            // ═══════════ زر Guest ═══════════
             OutlinedButton.icon(
               onPressed: _continueAsGuest,
               icon: const Icon(Icons.person_outline),

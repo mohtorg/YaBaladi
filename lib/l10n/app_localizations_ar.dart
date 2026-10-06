@@ -453,48 +453,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continueWithGoogle => 'المتابعة باستخدام Google';
 
   @override
-  String get continueWithPhone => 'المتابعة برقم الموبايل';
-
-  @override
-  String get phoneLoginTitle => 'تسجيل الدخول برقم الموبايل';
-
-  @override
-  String get phoneLoginSubtitle => 'أدخل رقم موبايلك لإرسال رمز التحقق';
-
-  @override
-  String get phoneNumber => 'رقم الموبايل';
-
-  @override
-  String get phoneNumberHint => '01xxxxxxxxx';
-
-  @override
-  String get sendCode => 'إرسال رمز التحقق';
-
-  @override
-  String get otpTitle => 'رمز التحقق';
-
-  @override
-  String get otpSubtitle => 'أدخل الرمز المكوّن من 6 أرقام المُرسل إلى هاتفك';
-
-  @override
-  String get otpSentTo => 'تم إرسال الرمز إلى';
-
-  @override
-  String get verifyCode => 'تحقق';
-
-  @override
-  String get resendCode => 'إعادة إرسال الرمز';
-
-  @override
-  String get invalidPhone => 'رقم الموبايل غير صالح';
-
-  @override
-  String get otpRequired => 'أدخل رمز التحقق';
-
-  @override
-  String get otpInvalidLength => 'الرمز يجب أن يكون 6 أرقام';
-
-  @override
   String get registerCta => 'إنشاء حساب جديد';
 
   @override
