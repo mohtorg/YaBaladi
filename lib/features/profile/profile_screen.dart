@@ -9,6 +9,11 @@ import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
 
+/// ⚠️ مؤقتًا: المحافظة الافتراضية.
+/// عند تفعيل GPS (الملاحظة #2)، هتتجاب ديناميكيًا من موقع المستخدم.
+const String _defaultGovernorateAr = 'بورسعيد';
+const String _defaultGovernorateEn = 'Port Said';
+
 /// شاشة حسابي:
 /// - Guest → بطاقة ترقية الحساب (تسجيل دخول / إنشاء حساب)
 /// - User → بيانات + إحصائيات + خروج
@@ -44,6 +49,9 @@ class ProfileScreen extends StatelessWidget {
     // ═══════════════════════════════════════════════════════════
     final displayName = auth.displayName ?? '—';
     final email = auth.email ?? '—';
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final governorate =
+        isArabic ? _defaultGovernorateAr : _defaultGovernorateEn;
 
     return Scaffold(
       appBar: YaAppBar(title: l10n.profile),
@@ -52,11 +60,28 @@ class ProfileScreen extends StatelessWidget {
           vertical: YaBaladiDesignTokens.space4,
         ),
         children: [
-          // ─── Header ───
+          // ─── العنوان الرئيسي: يا بلدي — [المحافظة] ───
+          Center(
+            child: Text(
+              isArabic
+                  ? 'يا بلدي — $governorate'
+                  : 'Ya Baladi — $governorate',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space4),
+
+          // ─── Header (Avatar + Welcome + Email) ───
           _ProfileHeader(
             name: displayName,
             email: email,
             initials: _initials(displayName),
+            isArabic: isArabic,
           ),
 
           const SizedBox(height: YaBaladiDesignTokens.space3),
@@ -69,7 +94,9 @@ class ProfileScreen extends StatelessWidget {
                 size: 18,
                 color: theme.colorScheme.primary,
               ),
-              label: Text(l10n.profileGovernorateUnknown),
+              label: Text(
+                isArabic ? governorate : governorate,
+              ),
             ),
           ),
 
@@ -144,7 +171,7 @@ class ProfileScreen extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GUEST UPGRADE CARD (الجديد — للمستخدمين في وضع الزائر)
+// GUEST UPGRADE CARD
 // ═══════════════════════════════════════════════════════════════
 
 class _GuestUpgradeCard extends StatelessWidget {
@@ -301,7 +328,7 @@ class _BenefitRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PROFILE HEADER
+// PROFILE HEADER (Avatar + Welcome + Email)
 // ═══════════════════════════════════════════════════════════════
 
 class _ProfileHeader extends StatelessWidget {
@@ -309,18 +336,26 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.email,
     required this.initials,
+    required this.isArabic,
   });
 
   final String name;
   final String email;
   final String initials;
+  final bool isArabic;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // "أهلاً بك يا سلمى" / "Welcome, Salma"
+    final greeting = isArabic
+        ? 'أهلاً بك يا $name'
+        : 'Welcome, $name';
+
     return Column(
       children: [
+        // ─── Avatar ───
         CircleAvatar(
           radius: 48,
           backgroundColor: theme.colorScheme.primaryContainer,
@@ -332,14 +367,24 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
         ),
+
         const SizedBox(height: YaBaladiDesignTokens.space3),
-        Text(
-          name,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+
+        // ─── Greeting (primary) ───
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            greeting,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
+
         const SizedBox(height: YaBaladiDesignTokens.space1),
+
+        // ─── Email (secondary) ───
         Text(
           email,
           style: theme.textTheme.bodyMedium?.copyWith(
