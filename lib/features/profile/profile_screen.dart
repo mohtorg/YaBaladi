@@ -10,10 +10,8 @@ import '../../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
 
 /// شاشة حسابي:
-/// - بيانات المستخدم (Avatar + Name + Email + Governorate)
-/// - زر تعديل الملف الشخصي
-/// - إحصائيات (مفضلة / تقييمات / أماكني / صوري)
-/// - تسجيل الخروج
+/// - Guest → بطاقة ترقية الحساب (تسجيل دخول / إنشاء حساب)
+/// - User → بيانات + إحصائيات + خروج
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -23,14 +21,27 @@ class ProfileScreen extends StatelessWidget {
     final auth = context.watch<AuthController>();
     final theme = Theme.of(context);
 
-    // === غير مسجل → دعوة لتسجيل الدخول ===
+    // ═══════════════════════════════════════════════════════════
+    // GUEST أو غير مسجل
+    // ═══════════════════════════════════════════════════════════
     if (!auth.isLoggedIn) {
       return Scaffold(
         appBar: YaAppBar(title: l10n.profile),
-        body: _LoginRequired(onLogin: () => context.go(RoutePaths.login)),
+        body: auth.isGuest
+            ? _GuestUpgradeCard(
+                onLogin: () => context.go(RoutePaths.login),
+                onRegister: () => context.go(RoutePaths.register),
+              )
+            : _LoginRequired(
+                onLogin: () => context.go(RoutePaths.login),
+                onRegister: () => context.go(RoutePaths.register),
+              ),
       );
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // مستخدم مسجّل
+    // ═══════════════════════════════════════════════════════════
     final displayName = auth.displayName ?? '—';
     final email = auth.email ?? '—';
 
@@ -41,7 +52,7 @@ class ProfileScreen extends StatelessWidget {
           vertical: YaBaladiDesignTokens.space4,
         ),
         children: [
-          // ─── Header: Avatar + Name + Email ───
+          // ─── Header ───
           _ProfileHeader(
             name: displayName,
             email: email,
@@ -82,7 +93,7 @@ class ProfileScreen extends StatelessWidget {
           const Divider(height: 1),
 
           // ─── Stats Grid ───
-          _StatsSection(),
+          const _StatsSection(),
           const Divider(height: 1),
 
           // ─── Logout ───
@@ -129,6 +140,163 @@ class ProfileScreen extends StatelessWidget {
     if (confirmed == true) {
       await auth.signOut();
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GUEST UPGRADE CARD (الجديد — للمستخدمين في وضع الزائر)
+// ═══════════════════════════════════════════════════════════════
+
+class _GuestUpgradeCard extends StatelessWidget {
+  const _GuestUpgradeCard({
+    required this.onLogin,
+    required this.onRegister,
+  });
+
+  final VoidCallback onLogin;
+  final VoidCallback onRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(YaBaladiDesignTokens.space5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+
+          // ─── Icon ───
+          Center(
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_outline,
+                size: 60,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+
+          // ─── Title ───
+          Text(
+            isArabic ? 'أنت تتصفّح كزائر' : "You're browsing as guest",
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space2),
+
+          // ─── Subtitle ───
+          Text(
+            isArabic
+                ? 'أنشئ حسابًا الآن لحفظ الأماكن المفضلة،\nإضافة تقييماتك، ومتابعة عروض يا بلدي.'
+                : 'Create an account to save favorites,\nadd reviews, and follow Ya Baladi offers.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+
+          // ─── Benefits Cards ───
+          _BenefitRow(
+            icon: Icons.favorite_border,
+            label: isArabic
+                ? 'احفظ مفضلتك في أي وقت'
+                : 'Save favorites anytime',
+          ),
+          const SizedBox(height: YaBaladiDesignTokens.space2),
+          _BenefitRow(
+            icon: Icons.star_border,
+            label: isArabic
+                ? 'شارك تقييماتك مع المجتمع'
+                : 'Share your reviews with community',
+          ),
+          const SizedBox(height: YaBaladiDesignTokens.space2),
+          _BenefitRow(
+            icon: Icons.local_offer_outlined,
+            label: isArabic
+                ? 'احصل على عروض حصرية'
+                : 'Get exclusive offers',
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+
+          // ─── Register Button (Primary) ───
+          FilledButton.icon(
+            onPressed: onRegister,
+            icon: const Icon(Icons.person_add_alt_1),
+            label: Text(l10n.registerCta),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space3),
+
+          // ─── Login Button (Secondary) ───
+          OutlinedButton.icon(
+            onPressed: onLogin,
+            icon: const Icon(Icons.login),
+            label: Text(l10n.login),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BenefitRow extends StatelessWidget {
+  const _BenefitRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -309,13 +477,17 @@ class _StatCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOGIN REQUIRED
+// LOGIN REQUIRED (للمستخدمين اللي ما فتحوش كزائر)
 // ═══════════════════════════════════════════════════════════════
 
 class _LoginRequired extends StatelessWidget {
-  const _LoginRequired({required this.onLogin});
+  const _LoginRequired({
+    required this.onLogin,
+    required this.onRegister,
+  });
 
   final VoidCallback onLogin;
+  final VoidCallback onRegister;
 
   @override
   Widget build(BuildContext context) {
@@ -342,9 +514,30 @@ class _LoginRequired extends StatelessWidget {
               ),
             ),
             const SizedBox(height: YaBaladiDesignTokens.space5),
-            FilledButton(
-              onPressed: onLogin,
-              child: Text(l10n.login),
+
+            // Login (Primary)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onLogin,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(l10n.login),
+              ),
+            ),
+            const SizedBox(height: YaBaladiDesignTokens.space3),
+
+            // Register (Secondary)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onRegister,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(l10n.registerCta),
+              ),
             ),
           ],
         ),
