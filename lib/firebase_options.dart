@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -52,6 +49,22 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // WEB
+  // ═══════════════════════════════════════════════════════════
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBjhczo21WOoM0sHHO_c_tsgguewqFbtrg',
+    appId: '1:231838490815:web:5a724a24ed775a5436e60a',
+    messagingSenderId: '231838490815',
+    projectId: 'ya-baladi',
+    authDomain: 'ya-baladi.firebaseapp.com',
+    storageBucket: 'ya-baladi.firebasestorage.app',
+    measurementId: 'G-3DNHMMQ7C2',
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // ANDROID
+  // ═══════════════════════════════════════════════════════════
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q',
     appId: '1:231838490815:android:2d5e39e5d244672236e60a',

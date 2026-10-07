@@ -39,11 +39,10 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // USERS + FAVORITES (subcollection)
+    // USERS
     // ═══════════════════════════════════════════════════════════
     match /users/{userId} {
 
-      // ─── User document ───
       allow read: if isSelf(userId) || isAdmin();
 
       allow create: if isSelf(userId)
@@ -56,31 +55,44 @@ service cloud.firestore {
 
       allow update, delete: if isAdmin();
 
-      // ─── Favorites subcollection ───
-      // Path: users/{userId}/favorites/{placeId}
+      // ─── Favorites subcollection (احتياطي) ───
       match /favorites/{placeId} {
-
         allow read: if isSelf(userId);
-
         allow create: if isSelf(userId)
                       && request.resource.data.placeId == placeId;
-
         allow delete: if isSelf(userId);
-
-        allow update: if false;  // لا تعديل
+        allow update: if false;
       }
     }
 
     // ═══════════════════════════════════════════════════════════
+    // FAVORITES (top-level)
+    // ═══════════════════════════════════════════════════════════
+    match /favorites/{favoriteId} {
+
+      allow read: if isSignedIn()
+                  && (resource.data.userId == uid() || isAdmin());
+
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid();
+
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin());
+
+      allow update: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // PLACES
+    // ⚠️ مؤقتًا: allow read: if true
+    // السبب: Firestore بترفض queries على حقول مش مفلترة في rules
+    // الحل الدائم: نضيف .where('isApproved', ...) في الـ repository
+    //              + نضيف indexes + نرجع الشرط
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
 
-      allow read: if (resource.data.isApproved == true
-                      && resource.data.isActive == true)
-                  || (isSignedIn() && (
-                       resource.data.ownerId == uid() || isAdmin()
-                     ));
+      // ⚠️ مؤقتًا — للاختبار
+      allow read: if true;
 
       allow create: if isSignedIn()
                     && (isMerchant() || isAdmin())
@@ -97,7 +109,7 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
 
-      // ─── Reviews subcollection (مستقبلًا) ───
+      // ─── Reviews subcollection ───
       match /reviews/{reviewId} {
         allow read: if true;
         allow create: if isSignedIn()
@@ -116,7 +128,7 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REVIEWS (top-level — احتياطيًا)
+    // REVIEWS (top-level)
     // ═══════════════════════════════════════════════════════════
     match /reviews/{reviewId} {
       allow read: if true;

@@ -224,7 +224,7 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
 enum _LocState { loading, loaded, denied }
 
 // ═══════════════════════════════════════════════════════════════
-// SMART AVATAR
+// SMART AVATAR (بدون CircleAvatar — يتفادى assertion)
 // ═══════════════════════════════════════════════════════════════
 
 class _SmartAvatar extends StatelessWidget {
@@ -243,40 +243,63 @@ class _SmartAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const radius = 20.0;
+    const size = 40.0;
+
+    final hasPhoto = !isGuest &&
+        photoUrl != null &&
+        photoUrl!.trim().isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
-      child: CircleAvatar(
-        radius: radius,
-        backgroundColor: theme.colorScheme.primaryContainer,
-        backgroundImage: (!isGuest &&
-                photoUrl != null &&
-                photoUrl!.isNotEmpty)
-            ? NetworkImage(photoUrl!)
-            : null,
-        onBackgroundImageError: (_, _) {},
-        child: (isGuest || photoUrl == null || photoUrl!.isEmpty)
-            ? _avatarChild(theme, isGuest)
-            : null,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: hasPhoto
+            ? ClipOval(
+                child: Image.network(
+                  photoUrl!,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      _fallbackAvatar(theme, isGuest, displayName),
+                  loadingBuilder: (_, child, progress) {
+                    if (progress == null) return child;
+                    return _fallbackAvatar(theme, isGuest, displayName);
+                  },
+                ),
+              )
+            : _fallbackAvatar(theme, isGuest, displayName),
       ),
     );
   }
 
-  Widget _avatarChild(ThemeData theme, bool isGuest) {
-    if (isGuest) {
-      return Icon(
-        Icons.person_outline,
-        size: 22,
-        color: theme.colorScheme.onPrimaryContainer,
-      );
-    }
-    return Text(
-      _initials(displayName),
-      style: theme.textTheme.titleMedium?.copyWith(
-        color: theme.colorScheme.onPrimaryContainer,
-        fontWeight: FontWeight.w700,
+  Widget _fallbackAvatar(
+    ThemeData theme,
+    bool isGuest,
+    String? displayName,
+  ) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        shape: BoxShape.circle,
       ),
+      alignment: Alignment.center,
+      child: isGuest
+          ? Icon(
+              Icons.person_outline,
+              size: 22,
+              color: theme.colorScheme.onPrimaryContainer,
+            )
+          : Text(
+              _initials(displayName),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
     );
   }
 

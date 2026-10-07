@@ -231,3 +231,23 @@ git log --oneline -3
 - حماية profile/favorites للزوار
 - Place Details Screen (G3.3)
 - Search يعرض التصنيفات + الأماكن
+
+## آخر جلسة — [اليوم]
+
+### تم إنجازه:
+- ✅ branding: "يا بلادي" → "يا بلدي" في كل المشروع
+- ✅ app_router: إضافة refreshListenable (حل مشكلة Login + Guest)
+- ✅ auth_scaffold: استخدام app_icon كشعار
+- ✅ i18n: sync 17 مفتاح بين ar و en
+- ✅ auth_controller: Google Sign-In + Phone OTP
+- ✅ phone_login_screen: شاشة جديدة (2-step OTP)
+- ✅ login_screen: أزرار Google + Phone + بطاقة تسجيل أوضح
+
+### في انتظار:
+- ⏳ Google Sign-In: محتاج SHA-1 في Firebase Console
+- ⏳ Phone Auth: محتاج تفعيل Phone Provider
+- ⏳ Reset password email: مؤجّل لـ G5 (قيد Firebase)
+
+### التالي:
+- 🎯 G4 — Security & Roles (Firestore Rules + Role System)
+- 📌 أول خطوة: merge fix/brand-name-arabic على main، بعدها فرع feat/g4-security-roles
