@@ -16,53 +16,38 @@ class PlacesRepository {
   // WATCHERS
   // ═══════════════════════════════════════════════════════════════
   //
-  // ملاحظة مهمة: كل الاستعلامات تحت تستخدم **حقل واحد فقط**
-  // في الفلترة على السيرفر، والباقي (isActive / ترتيب) على الـ client.
+  // ملاحظة: الفلترة على isApproved + isActive بتحصل على السيرفر.
+  // ده يتطلب composite indexes (موجودة في Firebase Console).
   //
-  // السبب: تفادي composite indexes في Firestore.
-  // Firestore بيتطلب index مركّب لأي query فيه أكثر من حقل + orderBy.
-  // الفلترة على الـ client أبطأ شوية، لكن مع بيانات قليلة (12 مكان حالياً)
-  // الفرق مش محسوس، ومفيش indexes محتاجة إدارة.
+  // Index 1: categoryId + isApproved + isActive + averageRating
+  // Index 2: isApproved + isActive + createdAt
   // ═══════════════════════════════════════════════════════════════
 
-  /// يعرض كل الأماكن المعتمدة (isApproved = true).
-  ///
-  /// الفلترة على `isActive` والترتيب بـ `createdAt` على الـ client.
+  /// يعرض كل الأماكن المعتمدة والنشطة، مرتبة بالأحدث.
   Stream<List<Place>> watchApproved({int limit = 50}) {
     return _ref
         .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
-        .map((s) {
-      final places = s.docs
-          .map((d) => Place.fromMap(d.id, d.data()))
-          .where((p) => p.isActive)
-          .toList()
-        ..sort((a, b) {
-          final da = a.createdAt ?? DateTime(2000);
-          final db = b.createdAt ?? DateTime(2000);
-          return db.compareTo(da);
-        });
-
-      return places.take(limit).toList();
-    });
+        .map((s) => s.docs
+            .map((d) => Place.fromMap(d.id, d.data()))
+            .toList());
   }
 
-  /// يعرض أماكن تصنيف معيّن.
-  ///
-  /// الفلترة على `isApproved`/`isActive` والترتيب بـ `averageRating` على الـ client.
+  /// يعرض أماكن تصنيف معيّن، مرتبة بالأعلى تقييمًا.
   Stream<List<Place>> watchByCategory(String categoryId, {int limit = 50}) {
     return _ref
         .where('categoryId', isEqualTo: categoryId)
+        .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .orderBy('averageRating', descending: true)
+        .limit(limit)
         .snapshots()
-        .map((s) {
-      final places = s.docs
-          .map((d) => Place.fromMap(d.id, d.data()))
-          .where((p) => p.isApproved && p.isActive)
-          .toList()
-        ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
-
-      return places.take(limit).toList();
-    });
+        .map((s) => s.docs
+            .map((d) => Place.fromMap(d.id, d.data()))
+            .toList());
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -104,33 +89,25 @@ class PlacesRepository {
   // ═══════════════════════════════════════════════════════════════
 
   /// بحث نصي في الأماكن — يفلتر محليًا (client-side).
-  ///
-  /// - [query]: النص (عربي أو إنجليزي)
-  /// - [categoryId]: لو ممرَّر → يفلتر على تصنيف معيّن
-  ///
-  /// يبحث في: nameAr, nameEn, description.
   Future<List<Place>> search({
     required String query,
     String? categoryId,
   }) async {
-    // لو categoryId ممرَّر → استخدمه (حقل واحد فقط، مفيش composite index)
-    // غير كده → جيب كل الأماكن
-    Query<Map<String, dynamic>> q = _ref;
+    Query<Map<String, dynamic>> q = _ref
+        .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true);
+
     if (categoryId != null && categoryId.isNotEmpty) {
       q = q.where('categoryId', isEqualTo: categoryId);
     }
 
     final snap = await q.get();
 
-    // فلترة isApproved/isActive على الـ client
     final all = snap.docs
         .map((d) => Place.fromMap(d.id, d.data()))
-        .where((p) => p.isApproved && p.isActive)
         .toList();
 
-    // فلترة النص
     final q2 = query.trim().toLowerCase();
-
     if (q2.isEmpty) return all;
 
     return all.where((p) {

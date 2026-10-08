@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -31,7 +33,6 @@ class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
     super.initState();
     _future = _repo.getById(widget.placeId);
 
-    // حمّل حالة المفضلة لو المستخدم مسجّل
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final uid = context.read<AuthController>().uid;
       if (uid != null) {
@@ -95,12 +96,10 @@ class _PlaceBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // ─── Header Image / Placeholder ───
         _HeaderImage(imageUrls: place.imageUrls),
-
         const SizedBox(height: YaBaladiDesignTokens.space4),
 
-        // ─── Name + Rating ───
+        // ─── Name + Favorite ───
         Row(
           children: [
             Expanded(
@@ -117,7 +116,6 @@ class _PlaceBody extends StatelessWidget {
         ),
 
         const SizedBox(height: 8),
-
         _RatingRow(
           rating: place.averageRating,
           count: place.reviewCount,
@@ -355,11 +353,13 @@ class _FavoriteButton extends StatelessWidget {
       return;
     }
 
+    // ✅ نلتقط messenger قبل await
+    final messenger = ScaffoldMessenger.of(context);
     final fav = context.read<FavoritesController>();
+
     try {
       final newState = await fav.toggle(uid, placeId);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
@@ -370,10 +370,11 @@ class _FavoriteButton extends StatelessWidget {
           ),
         );
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر تحديث المفضلة')),
-      );
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('تعذّر تحديث المفضلة')),
+        );
     }
   }
 }
@@ -395,13 +396,13 @@ class _ActionButtons extends StatelessWidget {
       children: [
         if (place.phone.isNotEmpty)
           FilledButton.icon(
-            onPressed: () => _launchCall(place.phone),
+            onPressed: () => _launchCall(context, place.phone),
             icon: const Icon(Icons.phone),
             label: const Text('اتصال'),
           ),
         if (place.whatsapp.isNotEmpty)
           FilledButton.icon(
-            onPressed: () => _launchWhatsApp(place.whatsapp),
+            onPressed: () => _launchWhatsApp(context, place.whatsapp),
             icon: const Icon(Icons.chat_bubble_outline),
             label: const Text('واتساب'),
             style: FilledButton.styleFrom(
@@ -415,7 +416,7 @@ class _ActionButtons extends StatelessWidget {
             label: const Text('عرض على الخريطة'),
           ),
           OutlinedButton.icon(
-            onPressed: () => _openInMaps(place),
+            onPressed: () => _openInMaps(context, place),
             icon: const Icon(Icons.directions_outlined),
             label: const Text('الاتجاهات'),
           ),
@@ -424,28 +425,113 @@ class _ActionButtons extends StatelessWidget {
     );
   }
 
-  Future<void> _launchCall(String phone) async {
+  // ═══════════════════════════════════════════════════════════════
+  // CALL
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _launchCall(BuildContext context, String phone) async {
+    // ✅ نلتقط messenger قبل أي await
+    final messenger = ScaffoldMessenger.of(context);
     final uri = Uri(scheme: 'tel', path: phone);
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        _showError(messenger, 'تعذّر فتح تطبيق الاتصال');
+      }
+    } catch (e) {
+      _showError(messenger, 'تعذّر الاتصال');
+    }
   }
 
-  Future<void> _launchWhatsApp(String phone) async {
+  // ═══════════════════════════════════════════════════════════════
+  // WHATSAPP
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _launchWhatsApp(BuildContext context, String phone) async {
+    // ✅ نلتقط messenger قبل أي await
+    final messenger = ScaffoldMessenger.of(context);
     final clean = phone.replaceAll(RegExp(r'\D'), '');
     final uri = Uri.parse('https://wa.me/$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showError(messenger, 'تعذّر فتح واتساب');
+      }
+    } catch (e) {
+      _showError(messenger, 'تعذّر فتح واتساب');
     }
   }
 
-  Future<void> _openInMaps(Place place) async {
+  // ═══════════════════════════════════════════════════════════════
+  // DIRECTIONS (Multi-platform: Android / iOS / Web)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _openInMaps(BuildContext context, Place place) async {
+    // ✅ نلتقط messenger قبل أي await
+    final messenger = ScaffoldMessenger.of(context);
+
     final lat = place.location!.latitude;
     final lng = place.location!.longitude;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final name = Uri.encodeComponent(place.nameAr);
+
+    final Uri uri;
+    final LaunchMode mode;
+
+    if (kIsWeb) {
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+      );
+      mode = LaunchMode.platformDefault;
+    } else {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          uri = Uri.parse('geo:$lat,$lng?q=$lat,$lng($name)');
+          mode = LaunchMode.externalApplication;
+          break;
+        case TargetPlatform.iOS:
+          uri = Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&q=$name');
+          mode = LaunchMode.externalApplication;
+          break;
+        default:
+          uri = Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+          );
+          mode = LaunchMode.platformDefault;
+      }
     }
+
+    try {
+      if (!await canLaunchUrl(uri)) {
+        final fallback = Uri.parse(
+          'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+        );
+        if (await canLaunchUrl(fallback)) {
+          await launchUrl(fallback, mode: LaunchMode.externalApplication);
+          return;
+        }
+        _showError(messenger, 'تعذّر فتح تطبيق الخرائط');
+        return;
+      }
+
+      await launchUrl(uri, mode: mode);
+    } catch (e) {
+      _showError(messenger, 'تعذّر فتح الخرائط');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ERROR HELPER (يستقبل ScaffoldMessengerState مباشرة)
+  // ═══════════════════════════════════════════════════════════════
+  void _showError(ScaffoldMessengerState messenger, String message) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 }
 

@@ -83,16 +83,18 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // PLACES
-    // ⚠️ مؤقتًا: allow read: if true
-    // السبب: Firestore بترفض queries على حقول مش مفلترة في rules
-    // الحل الدائم: نضيف .where('isApproved', ...) في الـ repository
-    //              + نضيف indexes + نرجع الشرط
+    // PLACES (Rules صارمة — متوافقة مع الـ queries)
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
 
-      // ⚠️ مؤقتًا — للاختبار
-      allow read: if true;
+      // قراءة:
+      // - الأماكن المعتمدة والنشطة: للجميع
+      // - الأماكن غير المعتمدة: للمالك أو الأدمن
+      allow read: if (resource.data.isApproved == true
+                      && resource.data.isActive == true)
+                  || (isSignedIn() && (
+                       resource.data.ownerId == uid() || isAdmin()
+                     ));
 
       allow create: if isSignedIn()
                     && (isMerchant() || isAdmin())

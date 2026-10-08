@@ -28,48 +28,68 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final auth = context.watch<AuthController>();
     final favorites = context.watch<FavoritesController>();
 
-    // ─── Guest → Empty state مع دعوة لتسجيل الدخول ───
-    if (auth.uid == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.favorites)),
-        body: _EmptyView(
-          icon: Icons.lock_outline,
-          title: 'تسجيل الدخول مطلوب',
-          subtitle: 'سجّل دخولك لعرض مفضلاتك',
-          showDiscover: false,
+    return Scaffold(
+      appBar: AppBar(
+        // ═══════════════════════════════════════════════
+        // زر الرجوع
+        // ═══════════════════════════════════════════════
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: l10n.home,
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(RoutePaths.home);
+            }
+          },
         ),
+        title: Text(
+          favorites.isEmpty
+              ? l10n.favorites
+              : '${l10n.favorites} (${favorites.count})',
+        ),
+      ),
+      body: _buildBody(context, auth, favorites),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    AuthController auth,
+    FavoritesController favorites,
+  ) {
+    // ─── Guest → Empty state ───
+    if (auth.uid == null) {
+      return const _EmptyView(
+        icon: Icons.lock_outline,
+        title: 'تسجيل الدخول مطلوب',
+        subtitle: 'سجّل دخولك لعرض مفضلاتك',
+        showDiscover: false,
       );
     }
 
-    // ─── مسجّل و مفيش مفضلة → Empty state ───
+    // ─── مسجّل و مفيش مفضلة ───
     if (favorites.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.favorites)),
-        body: const _EmptyView(),
-      );
+      return const _EmptyView();
     }
 
     // ─── عرض القائمة ───
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${l10n.favorites} (${favorites.count})'),
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: favorites.favorites.length,
-        separatorBuilder: (_, _) =>
-            const SizedBox(height: YaBaladiDesignTokens.space3),
-        itemBuilder: (_, i) {
-          final fav = favorites.favorites[i];
-          return _FavoriteCard(
-            favorite: fav,
-            placeFuture: _placesCache.putIfAbsent(
-              fav.placeId,
-              () => _placesRepo.getById(fav.placeId),
-            ),
-          );
-        },
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: favorites.favorites.length,
+      separatorBuilder: (_, _) =>
+          const SizedBox(height: YaBaladiDesignTokens.space3),
+      itemBuilder: (_, i) {
+        final fav = favorites.favorites[i];
+        return _FavoriteCard(
+          favorite: fav,
+          placeFuture: _placesCache.putIfAbsent(
+            fav.placeId,
+            () => _placesRepo.getById(fav.placeId),
+          ),
+        );
+      },
     );
   }
 }
@@ -99,7 +119,9 @@ class _FavoriteCard extends StatelessWidget {
           return const Card(
             child: SizedBox(
               height: 90,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           );
         }
