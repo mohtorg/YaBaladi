@@ -1,20 +1,27 @@
 // features/places/controllers/places_controller.dart
+//
+// [v2.0 — Unified] يدمج:
+//   - الفلاتر المتقدمة (rating + price + amenities + features + payments)
+//   - البحث النصي (مع TextNormalizer و debounce 350ms)
+//   - الترتيب (ratingDesc / reviewsDesc / nameAsc / newest)
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/search/utils/text_normalizer.dart';
 import '../../../models/place.dart';
 import '../../../repositories/places_repository.dart';
 
 enum PlacesStatus { idle, loading, loaded, error }
 
-enum PlaceSort {
-  ratingDesc,
-  reviewsDesc,
-  nameAsc,
-  newest,
-}
+enum PlaceSort { ratingDesc, reviewsDesc, nameAsc, newest }
+
+/// وضع الـ Controller:
+/// - all: كل الأماكن (Home)
+/// - category: تصنيف محدد
+/// - search: بحث نصي حر
+enum PlacesMode { all, category, search }
 
 class PlacesController extends ChangeNotifier {
   PlacesController({FirebaseFirestore? firestore})
@@ -39,6 +46,13 @@ class PlacesController extends ChangeNotifier {
   List<Place> _allPlaces = const [];
   String? _error;
   String? _activeCategoryId;
+  PlacesMode _mode = PlacesMode.all;
+
+  // ─── Query ───
+  String _query = '';
+  String _appliedQuery = '';
+  Timer? _queryDebounce;
+  static const Duration _debounceDuration = Duration(milliseconds: 350);
 
   // ─── Filters: Basic ───
   double? _minRating;
@@ -50,12 +64,20 @@ class PlacesController extends ChangeNotifier {
   final Set<String> _features = <String>{};
   final Set<String> _payments = <String>{};
 
-  // ─── Getters ───
+
+  // ═══════════════════════════════════════════════════════════════
+  // Getters
+  // ═══════════════════════════════════════════════════════════════
+
   bool get firebaseAvailable => _firebaseAvailable;
   PlacesStatus get status => _status;
   String? get error => _error;
   String? get activeCategoryId => _activeCategoryId;
   bool get isLoading => _status == PlacesStatus.loading;
+  PlacesMode get mode => _mode;
+
+  String get query => _query;
+  bool get hasQuery => _query.trim().isNotEmpty;
 
   double? get minRating => _minRating;
   int? get priceLevel => _priceLevel;
@@ -72,7 +94,6 @@ class PlacesController extends ChangeNotifier {
       _features.isNotEmpty ||
       _payments.isNotEmpty;
 
-  /// عدد الفلاتر النشطة (للبادج)
   int get activeFilterCount =>
       (_minRating != null ? 1 : 0) +
       (_priceLevel != null ? 1 : 0) +
@@ -80,36 +101,46 @@ class PlacesController extends ChangeNotifier {
       _features.length +
       _payments.length;
 
-  /// يعيد القائمة بعد تطبيق الفلاتر والترتيب
+  /// القائمة النهائية: بحث + فلاتر + ترتيب.
   List<Place> get places {
-    final filtered = _allPlaces.where(_matches).toList();
+    var result = _allPlaces;
+
+    if (_appliedQuery.isNotEmpty) {
+      result = result.where(_matchesQuery).toList();
+    }
+
+    result = result.where(_matchesFilters).toList();
+    result = List<Place>.from(result);
 
     switch (_sort) {
       case PlaceSort.ratingDesc:
-        filtered.sort((a, b) => b.averageRating.compareTo(a.averageRating));
+        result.sort((a, b) => b.averageRating.compareTo(a.averageRating));
       case PlaceSort.reviewsDesc:
-        filtered.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
+        result.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
       case PlaceSort.nameAsc:
-        filtered.sort((a, b) => a.nameAr.compareTo(b.nameAr));
+        result.sort((a, b) => a.nameAr.compareTo(b.nameAr));
       case PlaceSort.newest:
-        filtered.sort((a, b) {
+        result.sort((a, b) {
           final da = a.createdAt ?? DateTime(2000);
           final db = b.createdAt ?? DateTime(2000);
           return db.compareTo(da);
         });
     }
-    return List.unmodifiable(filtered);
+
+    return List.unmodifiable(result);
   }
 
-  /// فلتر واحد بيجمع كل الشروط
-  bool _matches(Place p) {
-    // Rating
-    if (_minRating != null && p.averageRating < _minRating!) return false;
+  bool _matchesQuery(Place p) {
+    return TextNormalizer.matchesAny(
+      [p.nameAr, p.nameEn, p.description, ...p.tags],
+      _appliedQuery,
+    );
+  }
 
-    // Price
+  bool _matchesFilters(Place p) {
+    if (_minRating != null && p.averageRating < _minRating!) return false;
     if (_priceLevel != null && p.priceLevel != _priceLevel) return false;
 
-    // Amenities (AND - لازم كل المحدد موجود)
     for (final a in _amenities) {
       switch (a) {
         case 'wifi':
@@ -123,7 +154,6 @@ class PlacesController extends ChangeNotifier {
       }
     }
 
-    // Features (AND)
     for (final f in _features) {
       switch (f) {
         case 'family':
@@ -139,7 +169,6 @@ class PlacesController extends ChangeNotifier {
       }
     }
 
-    // Payments (OR - أي طريقة من المحدد)
     if (_payments.isNotEmpty) {
       final hasMatch = _payments.any((m) => p.paymentMethods.contains(m));
       if (!hasMatch) return false;
@@ -148,19 +177,64 @@ class PlacesController extends ChangeNotifier {
     return true;
   }
 
+
   // ═══════════════════════════════════════════════════════════════
-  // WATCHERS
+  // Search API
+  // ═══════════════════════════════════════════════════════════════
+
+  void setQuery(String value) {
+    if (_query == value) return;
+    _query = value;
+    notifyListeners();
+
+    _queryDebounce?.cancel();
+    _queryDebounce = Timer(_debounceDuration, () {
+      _appliedQuery = value.trim();
+      notifyListeners();
+    });
+  }
+
+  void applyQueryNow() {
+    _queryDebounce?.cancel();
+    _appliedQuery = _query.trim();
+    notifyListeners();
+  }
+
+  void clearQuery() {
+    _queryDebounce?.cancel();
+    _query = '';
+    _appliedQuery = '';
+    notifyListeners();
+  }
+
+  void clearAll() {
+    _queryDebounce?.cancel();
+    _query = '';
+    _appliedQuery = '';
+    _minRating = null;
+    _priceLevel = null;
+    _sort = PlaceSort.ratingDesc;
+    _amenities.clear();
+    _features.clear();
+    _payments.clear();
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Watchers
   // ═══════════════════════════════════════════════════════════════
 
   void watchAll() {
     if (!_firebaseAvailable || _repo == null) return;
     _activeCategoryId = null;
+    _mode = PlacesMode.all;
     _start(_repo!.watchApproved());
   }
 
   void watchCategory(String categoryId) {
     if (!_firebaseAvailable || _repo == null) return;
     _activeCategoryId = categoryId;
+    _mode = PlacesMode.category;
     _start(_repo!.watchByCategory(categoryId));
   }
 
@@ -184,8 +258,9 @@ class PlacesController extends ChangeNotifier {
     );
   }
 
+
   // ═══════════════════════════════════════════════════════════════
-  // FILTERS: Setters
+  // Filter Setters
   // ═══════════════════════════════════════════════════════════════
 
   void setMinRating(double? value) {
@@ -236,6 +311,7 @@ class PlacesController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _queryDebounce?.cancel();
     _sub?.cancel();
     super.dispose();
   }
