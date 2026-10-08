@@ -51,19 +51,15 @@ flutter:
   # === Assets ===
   assets:
     - assets/icon/app_icon.png
+    - fonts/
 
   # === Fonts ===
+  # نستخدم Cairo Variable Font — ملف واحد يحتوي على كل الأوزان.
+  # (Flutter 3.x يدعم Variable Fonts تلقائيًا)
   fonts:
     - family: Cairo
       fonts:
-        - asset: assets/fonts/Cairo-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Cairo-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Cairo-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Cairo-Bold.ttf
-          weight: 700
+        - asset: fonts/Cairo-Variable.ttf
 
 flutter_launcher_icons:
   android: "ic_launcher"
