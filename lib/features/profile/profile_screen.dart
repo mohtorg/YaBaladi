@@ -3,16 +3,16 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/router/route_paths.dart';
+import '../../../features/favorites/controllers/favorites_controller.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../services/location_service.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
 
 /// شاشة حسابي:
-/// - Guest → بطاقة ترقية الحساب (تسجيل دخول / إنشاء حساب)
-/// - User → بيانات + إحصائيات + خروج
+/// - Guest → بطاقة ترقية الحساب + خروج من الوضع الزائر
+/// - User → بيانات + إحصائيات + بطاقات مستقبلية + خروج
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -32,6 +32,7 @@ class ProfileScreen extends StatelessWidget {
             ? _GuestUpgradeCard(
                 onLogin: () => context.go(RoutePaths.login),
                 onRegister: () => context.go(RoutePaths.register),
+                onExitGuest: () => _confirmExitGuest(context, auth),
               )
             : _LoginRequired(
                 onLogin: () => context.go(RoutePaths.login),
@@ -44,7 +45,6 @@ class ProfileScreen extends StatelessWidget {
     // مستخدم مسجّل
     // ═══════════════════════════════════════════════════════════
     final displayName = auth.displayName ?? '—';
-    final email = auth.email ?? '—';
 
     return Scaffold(
       appBar: YaAppBar(title: l10n.profile),
@@ -53,23 +53,26 @@ class ProfileScreen extends StatelessWidget {
           vertical: YaBaladiDesignTokens.space4,
         ),
         children: [
-          // ─── Governorate Header ───
-          const _GovernorateHeader(),
-
-          const SizedBox(height: YaBaladiDesignTokens.space4),
-
-          // ─── Profile Header ───
+          // ─── Profile Header (Avatar + Greeting) ───
           _ProfileHeader(
             name: displayName,
-            email: email,
             initials: _initials(displayName),
           ),
 
           const SizedBox(height: YaBaladiDesignTokens.space5),
           const Divider(height: 1),
 
-          // ─── Stats Grid ───
+          // ─── Stats Grid (مفضلة + تقييمات) ───
           const _StatsSection(),
+          const Divider(height: 1),
+
+          // ─── نقاط الولاء (قريبًا) ───
+          const _LoyaltyComingSoonCard(),
+
+          // ─── دعوة صديق (قريبًا) ───
+          const _ReferralComingSoonCard(),
+
+          const SizedBox(height: YaBaladiDesignTokens.space4),
           const Divider(height: 1),
 
           // ─── Logout ───
@@ -91,7 +94,7 @@ class ProfileScreen extends StatelessWidget {
   static String _initials(String input) {
     final trimmed = input.trim();
     if (trimmed.isEmpty || trimmed == '—') return '؟';
-    final parts = trimmed.split(RegExp(r'\s+'));
+    final parts = trimmed.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }
@@ -117,92 +120,26 @@ class ProfileScreen extends StatelessWidget {
       await auth.signOut();
     }
   }
-}
 
-// ═══════════════════════════════════════════════════════════════
-// GOVERNORATE HEADER (stateful — بتجلب الموقع تلقائيًا)
-// ═══════════════════════════════════════════════════════════════
-
-class _GovernorateHeader extends StatefulWidget {
-  const _GovernorateHeader();
-
-  @override
-  State<_GovernorateHeader> createState() => _GovernorateHeaderState();
-}
-
-class _GovernorateHeaderState extends State<_GovernorateHeader> {
-  LocationData? _location;
-  _LocationState _state = _LocationState.loading;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchLocation();
-  }
-
-  Future<void> _fetchLocation() async {
-    setState(() => _state = _LocationState.loading);
-
-    final loc = await LocationService.getCurrentLocation();
-    if (!mounted) return;
-
-    setState(() {
-      _location = loc;
-      _state = loc == null ? _LocationState.denied : _LocationState.loaded;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    final governorate = switch (_state) {
-      _LocationState.loading => isArabic ? 'جارٍ تحديد الموقع…' : 'Locating…',
-      _LocationState.denied => isArabic ? 'الموقع غير مفعّل' : 'Location off',
-      _LocationState.loaded => isArabic
-          ? (_location?.governorateAr ?? '')
-          : (_location?.governorateEn ?? ''),
-    };
-
-    return Column(
-      children: [
-        Text(
-          isArabic ? 'يا بلدي — $governorate' : 'Ya Baladi — $governorate',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: YaBaladiDesignTokens.space2),
-        if (_state == _LocationState.loading)
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else if (_state == _LocationState.denied)
-          TextButton.icon(
-            onPressed: _fetchLocation,
-            icon: const Icon(Icons.location_off_outlined, size: 18),
-            label: Text(isArabic ? 'تفعيل الموقع' : 'Enable location'),
-          )
-        else if (_location != null)
-          Chip(
-            avatar: Icon(
-              Icons.location_on_outlined,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
-            label: Text(governorate),
-          ),
-      ],
+  /// تأكيد الخروج من الوضع الزائر.
+  Future<void> _confirmExitGuest(
+    BuildContext context,
+    AuthController auth,
+  ) async {
+    final confirmed = await showYaConfirmDialog(
+      context: context,
+      title: 'خروج من الوضع الزائر',
+      message: 'هل تريد الخروج من وضع الزائر والعودة لصفحة تسجيل الدخول؟',
+      confirmLabel: 'خروج',
+      cancelLabel: 'إلغاء',
+      isDestructive: true,
     );
+
+    if (confirmed == true) {
+      await auth.signOut();
+    }
   }
 }
-
-enum _LocationState { loading, loaded, denied }
 
 // ═══════════════════════════════════════════════════════════════
 // GUEST UPGRADE CARD
@@ -212,10 +149,12 @@ class _GuestUpgradeCard extends StatelessWidget {
   const _GuestUpgradeCard({
     required this.onLogin,
     required this.onRegister,
+    required this.onExitGuest,
   });
 
   final VoidCallback onLogin;
   final VoidCallback onRegister;
+  final VoidCallback onExitGuest;
 
   @override
   Widget build(BuildContext context) {
@@ -306,6 +245,29 @@ class _GuestUpgradeCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
+
+          // ═══════════ زر الخروج من الوضع الزائر ═══════════
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+          const Divider(),
+          const SizedBox(height: YaBaladiDesignTokens.space2),
+          TextButton.icon(
+            onPressed: onExitGuest,
+            icon: Icon(
+              Icons.logout,
+              size: 18,
+              color: theme.colorScheme.error,
+            ),
+            label: Text(
+              isArabic ? 'الخروج من الوضع الزائر' : 'Exit guest mode',
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontSize: 14,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -348,12 +310,10 @@ class _BenefitRow extends StatelessWidget {
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.name,
-    required this.email,
     required this.initials,
   });
 
   final String name;
-  final String email;
   final String initials;
 
   @override
@@ -361,13 +321,12 @@ class _ProfileHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    final greeting =
-        isArabic ? 'أهلاً بك يا $name' : 'Welcome, $name';
+    final greeting = isArabic ? 'أهلاً بك يا $name' : 'Welcome, $name';
 
     return Column(
       children: [
         CircleAvatar(
-          radius: 48,
+          radius: 40,
           backgroundColor: theme.colorScheme.primaryContainer,
           child: Text(
             initials,
@@ -388,13 +347,6 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: YaBaladiDesignTokens.space1),
-        Text(
-          email,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
       ],
     );
   }
@@ -411,6 +363,7 @@ class _StatsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final favorites = context.watch<FavoritesController>();
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -439,7 +392,7 @@ class _StatsSection extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.favorite_border,
                   label: l10n.profileStatsFavorites,
-                  value: 0,
+                  value: favorites.count,
                 ),
               ),
               const SizedBox(width: YaBaladiDesignTokens.space3),
@@ -447,27 +400,7 @@ class _StatsSection extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.star_border,
                   label: l10n.profileStatsRatings,
-                  value: 0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space3),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.storefront_outlined,
-                  label: l10n.profileStatsPlaces,
-                  value: 0,
-                ),
-              ),
-              const SizedBox(width: YaBaladiDesignTokens.space3),
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.photo_outlined,
-                  label: l10n.profileStatsPhotos,
-                  value: 0,
+                  value: 0, // TODO: Reviews System
                 ),
               ),
             ],
@@ -495,7 +428,7 @@ class _StatCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(YaBaladiDesignTokens.space3),
+        padding: const EdgeInsets.all(YaBaladiDesignTokens.space4),
         child: Column(
           children: [
             Icon(icon, color: theme.colorScheme.primary, size: 28),
@@ -513,6 +446,278 @@ class _StatCard extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOYALTY COMING SOON CARD
+// ═══════════════════════════════════════════════════════════════
+
+class _LoyaltyComingSoonCard extends StatelessWidget {
+  const _LoyaltyComingSoonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ─── Header ───
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.emoji_events_outlined,
+                    color: theme.colorScheme.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isArabic ? 'نقاط الولاء' : 'Loyalty Points',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isArabic ? 'قريبًا' : 'Coming soon',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.lock_outline,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // ─── Subtitle ───
+            Text(
+              isArabic
+                  ? '🎁 كيف ستكسب نقاطًا من تفاعلك؟'
+                  : '🎁 How to earn points from your activity?',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ─── Points Rules ───
+            _LoyaltyRuleRow(
+              icon: Icons.favorite_border,
+              label: isArabic ? 'إضافة مفضلة' : 'Add favorite',
+              points: '+10',
+            ),
+            _LoyaltyRuleRow(
+              icon: Icons.star_border,
+              label: isArabic ? 'كتابة تقييم' : 'Write review',
+              points: '+50',
+            ),
+            _LoyaltyRuleRow(
+              icon: Icons.person_add_outlined,
+              label: isArabic ? 'دعوة صديق' : 'Invite friend',
+              points: '+100',
+            ),
+            _LoyaltyRuleRow(
+              icon: Icons.calendar_today_outlined,
+              label: isArabic ? 'تسجيل دخول يومي' : 'Daily check-in',
+              points: '+5',
+              isLast: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoyaltyRuleRow extends StatelessWidget {
+  const _LoyaltyRuleRow({
+    required this.icon,
+    required this.label,
+    required this.points,
+    this.isLast = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String points;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          Text(
+            points,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REFERRAL COMING SOON CARD
+// ═══════════════════════════════════════════════════════════════
+
+class _ReferralComingSoonCard extends StatelessWidget {
+  const _ReferralComingSoonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.group_add_outlined,
+                color: theme.colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        isArabic ? 'دعوة صديق' : 'Invite a friend',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isArabic ? 'قريبًا' : 'Soon',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isArabic
+                        ? 'شارك التطبيق مع أصدقائك'
+                        : 'Share the app with your friends',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.lock_outline,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),

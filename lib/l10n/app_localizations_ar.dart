@@ -337,15 +337,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get profileStatsRatings => 'تقييمات';
 
   @override
-  String get profileStatsPlaces => 'أماكني';
-
-  @override
-  String get profileStatsPhotos => 'صوري';
-
-  @override
-  String get profileGovernorateUnknown => 'غير محدد';
-
-  @override
   String get favoritesEmptyTitle => 'لا توجد أماكن في المفضلة';
 
   @override
@@ -353,9 +344,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get discoverPlaces => 'اكتشف الأماكن';
-
-  @override
-  String get searchComingSoon => 'البحث قادم قريبًا';
 
   @override
   String get settingsAppearance => 'المظهر';
@@ -397,6 +385,44 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noSearchResults => 'لا توجد نتائج مطابقة';
+
+  @override
+  String get searchRecent => 'عمليات بحث حديثة';
+
+  @override
+  String get searchClearAll => 'مسح الكل';
+
+  @override
+  String get searchQuickCategories => 'تصنيفات سريعة';
+
+  @override
+  String get searchTrending => 'الأكثر بحثًا';
+
+  @override
+  String searchResultsCount(int count) {
+    return 'نتائج: $count';
+  }
+
+  @override
+  String get searchNoResults => 'لا توجد نتائج لـ';
+
+  @override
+  String get searchTips => 'جرّب:';
+
+  @override
+  String get searchTip1 => 'مراجعة الإملاء';
+
+  @override
+  String get searchTip2 => 'كلمة بحث أقصر';
+
+  @override
+  String get searchTip3 => 'تصنيف مختلف';
+
+  @override
+  String get searchTryCategory => 'أو جرّب تصنيف:';
+
+  @override
+  String get searchFilters => 'الفلاتر';
 
   @override
   String get filters => 'الفلاتر';

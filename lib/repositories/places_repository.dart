@@ -1,5 +1,6 @@
 // repositories/places_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/place.dart';
 
 class PlacesRepository {
@@ -14,13 +15,6 @@ class PlacesRepository {
 
   // ═══════════════════════════════════════════════════════════════
   // WATCHERS
-  // ═══════════════════════════════════════════════════════════════
-  //
-  // ملاحظة: الفلترة على isApproved + isActive بتحصل على السيرفر.
-  // ده يتطلب composite indexes (موجودة في Firebase Console).
-  //
-  // Index 1: categoryId + isApproved + isActive + averageRating
-  // Index 2: isApproved + isActive + createdAt
   // ═══════════════════════════════════════════════════════════════
 
   /// يعرض كل الأماكن المعتمدة والنشطة، مرتبة بالأحدث.
@@ -59,6 +53,61 @@ class PlacesRepository {
     return doc.exists ? Place.fromMap(doc.id, doc.data()!) : null;
   }
 
+  /// جلب مجموعة أماكن بمعرّفاتها (Favorites / Multi-select).
+  /// يعمل chunking (10 عناصر لكل query) بسبب حد `whereIn`.
+  Future<List<Place>> fetchByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final result = <Place>[];
+    for (var i = 0; i < ids.length; i += 10) {
+      final chunk = ids.sublist(i, (i + 10).clamp(0, ids.length));
+      final snap = await _ref
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      result.addAll(
+        snap.docs.map((d) => Place.fromMap(d.id, d.data())),
+      );
+    }
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // TRENDING (الأكثر بحثًا / تفاعلًا)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// يعرض الأماكن الأكثر تفاعلًا (Top [limit]).
+  ///
+  /// الترتيب: `reviewCount` تنازليًا (يعبّر عن الشعبية).
+  /// الفلترة على isApproved + isActive.
+  Future<List<Place>> getTrending({int limit = 5}) async {
+    try {
+      final snap = await _ref
+          .where('isApproved', isEqualTo: true)
+          .where('isActive', isEqualTo: true)
+          .orderBy('reviewCount', descending: true)
+          .limit(limit)
+          .get();
+
+      return snap.docs
+          .map((d) => Place.fromMap(d.id, d.data()))
+          .toList();
+    } catch (e) {
+      // fallback: نرجع الأماكن بأعلى تقييم
+      try {
+        final snap = await _ref
+            .where('isApproved', isEqualTo: true)
+            .where('isActive', isEqualTo: true)
+            .orderBy('averageRating', descending: true)
+            .limit(limit)
+            .get();
+        return snap.docs
+            .map((d) => Place.fromMap(d.id, d.data()))
+            .toList();
+      } catch (_) {
+        return const [];
+      }
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // CRUD
   // ═══════════════════════════════════════════════════════════════
@@ -92,6 +141,7 @@ class PlacesRepository {
   Future<List<Place>> search({
     required String query,
     String? categoryId,
+    int limit = 100,
   }) async {
     Query<Map<String, dynamic>> q = _ref
         .where('isApproved', isEqualTo: true)
@@ -100,6 +150,8 @@ class PlacesRepository {
     if (categoryId != null && categoryId.isNotEmpty) {
       q = q.where('categoryId', isEqualTo: categoryId);
     }
+
+    q = q.limit(limit);
 
     final snap = await q.get();
 

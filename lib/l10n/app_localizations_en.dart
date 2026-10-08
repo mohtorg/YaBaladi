@@ -34,13 +34,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notifications => 'Notifications';
 
   @override
-  String get login => 'Login';
+  String get login => 'Sign In';
 
   @override
-  String get register => 'Register';
+  String get register => 'Create Account';
 
   @override
-  String get logout => 'Logout';
+  String get logout => 'Sign Out';
 
   @override
   String get email => 'Email';
@@ -242,10 +242,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteAccountButton => 'Delete my account';
 
   @override
-  String get logoutConfirmTitle => 'Logout';
+  String get logoutConfirmTitle => 'Sign Out';
 
   @override
-  String get logoutConfirmMessage => 'Do you want to logout?';
+  String get logoutConfirmMessage => 'Do you want to sign out?';
 
   @override
   String get confirm => 'Confirm';
@@ -339,15 +339,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileStatsRatings => 'Ratings';
 
   @override
-  String get profileStatsPlaces => 'My Places';
-
-  @override
-  String get profileStatsPhotos => 'My Photos';
-
-  @override
-  String get profileGovernorateUnknown => 'Not set';
-
-  @override
   String get favoritesEmptyTitle => 'No favorites yet';
 
   @override
@@ -356,9 +347,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get discoverPlaces => 'Discover Places';
-
-  @override
-  String get searchComingSoon => 'Search coming soon';
 
   @override
   String get settingsAppearance => 'Appearance';
@@ -400,6 +388,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noSearchResults => 'No matching results';
+
+  @override
+  String get searchRecent => 'Recent searches';
+
+  @override
+  String get searchClearAll => 'Clear all';
+
+  @override
+  String get searchQuickCategories => 'Quick categories';
+
+  @override
+  String get searchTrending => 'Trending now';
+
+  @override
+  String searchResultsCount(int count) {
+    return 'Results: $count';
+  }
+
+  @override
+  String get searchNoResults => 'No results for';
+
+  @override
+  String get searchTips => 'Try:';
+
+  @override
+  String get searchTip1 => 'Check the spelling';
+
+  @override
+  String get searchTip2 => 'Use a shorter word';
+
+  @override
+  String get searchTip3 => 'Try another category';
+
+  @override
+  String get searchTryCategory => 'Or try a category:';
+
+  @override
+  String get searchFilters => 'Filters';
 
   @override
   String get filters => 'Filters';

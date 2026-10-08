@@ -752,24 +752,6 @@ abstract class AppLocalizations {
   /// **'تقييمات'**
   String get profileStatsRatings;
 
-  /// No description provided for @profileStatsPlaces.
-  ///
-  /// In ar, this message translates to:
-  /// **'أماكني'**
-  String get profileStatsPlaces;
-
-  /// No description provided for @profileStatsPhotos.
-  ///
-  /// In ar, this message translates to:
-  /// **'صوري'**
-  String get profileStatsPhotos;
-
-  /// No description provided for @profileGovernorateUnknown.
-  ///
-  /// In ar, this message translates to:
-  /// **'غير محدد'**
-  String get profileGovernorateUnknown;
-
   /// No description provided for @favoritesEmptyTitle.
   ///
   /// In ar, this message translates to:
@@ -787,12 +769,6 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اكتشف الأماكن'**
   String get discoverPlaces;
-
-  /// No description provided for @searchComingSoon.
-  ///
-  /// In ar, this message translates to:
-  /// **'البحث قادم قريبًا'**
-  String get searchComingSoon;
 
   /// No description provided for @settingsAppearance.
   ///
@@ -871,6 +847,78 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا توجد نتائج مطابقة'**
   String get noSearchResults;
+
+  /// No description provided for @searchRecent.
+  ///
+  /// In ar, this message translates to:
+  /// **'عمليات بحث حديثة'**
+  String get searchRecent;
+
+  /// No description provided for @searchClearAll.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسح الكل'**
+  String get searchClearAll;
+
+  /// No description provided for @searchQuickCategories.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصنيفات سريعة'**
+  String get searchQuickCategories;
+
+  /// No description provided for @searchTrending.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأكثر بحثًا'**
+  String get searchTrending;
+
+  /// No description provided for @searchResultsCount.
+  ///
+  /// In ar, this message translates to:
+  /// **'نتائج: {count}'**
+  String searchResultsCount(int count);
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد نتائج لـ'**
+  String get searchNoResults;
+
+  /// No description provided for @searchTips.
+  ///
+  /// In ar, this message translates to:
+  /// **'جرّب:'**
+  String get searchTips;
+
+  /// No description provided for @searchTip1.
+  ///
+  /// In ar, this message translates to:
+  /// **'مراجعة الإملاء'**
+  String get searchTip1;
+
+  /// No description provided for @searchTip2.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة بحث أقصر'**
+  String get searchTip2;
+
+  /// No description provided for @searchTip3.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصنيف مختلف'**
+  String get searchTip3;
+
+  /// No description provided for @searchTryCategory.
+  ///
+  /// In ar, this message translates to:
+  /// **'أو جرّب تصنيف:'**
+  String get searchTryCategory;
+
+  /// No description provided for @searchFilters.
+  ///
+  /// In ar, this message translates to:
+  /// **'الفلاتر'**
+  String get searchFilters;
 
   /// No description provided for @filters.
   ///

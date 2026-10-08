@@ -13,8 +13,9 @@ const Set<String> _authOnlyRoutes = {
 
 /// Guard مركزي:
 ///
-/// - مش مسجل ومش زائر → Login
-/// - مسجل أو زائر + على شاشة Auth → Home
+/// - **غير مسجل** ومش زائر → Login
+/// - **مسجل حقيقي** على شاشة Auth → Home
+/// - **زائر** يقدر يدخل شاشات Auth (عشان يسجّل)
 /// - غير كده → مسموح
 String? authGuard({
   required AuthController auth,
@@ -22,18 +23,44 @@ String? authGuard({
 }) {
   final location = state.matchedLocation;
 
-  final hasAccess = auth.isLoggedIn || auth.isGuest;
+  // ─── هل المستخدم مسجّل دخول حقيقي؟ ───
+  final isLoggedIn = auth.isLoggedIn;
+
+  // ─── هل المستخدم زائر؟ ───
+  final isGuest = auth.isGuest;
+
+  // ─── هل عنده access للتنقل العام؟ ───
+  // (مسجّل أو زائر → يقدر يتصفح التطبيق)
+  final hasBrowsingAccess = isLoggedIn || isGuest;
+
+  // ─── هل على شاشة Auth؟ ───
   final isAuthRoute = _authOnlyRoutes.contains(location);
 
-  // لو مسجل/زائر وبيحاول يدخل شاشة Login → Home
-  if (hasAccess && isAuthRoute) {
+  // ═══════════════════════════════════════════════════════════
+  // القاعدة 1: مسجّل حقيقي على شاشة Auth → Home
+  // ═══════════════════════════════════════════════════════════
+  // (لو مسجّل، مش محتاج يشوف Login/Register تاني)
+  if (isLoggedIn && isAuthRoute) {
     return RoutePaths.home;
   }
 
-  // لو مش مسجل ومش زائر → Login
-  if (!hasAccess && !isAuthRoute) {
+  // ═══════════════════════════════════════════════════════════
+  // القاعدة 2: زائر على شاشة Auth → مسموح
+  // ═══════════════════════════════════════════════════════════
+  // (الزائر عايز يسجّل → نسمح له)
+  if (isGuest && isAuthRoute) {
+    return null; // مفيش redirect
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // القاعدة 3: غير مسجل ومش زائر → Login
+  // ═══════════════════════════════════════════════════════════
+  if (!hasBrowsingAccess && !isAuthRoute) {
     return '${RoutePaths.login}?from=$location';
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // غير كده → مسموح
+  // ═══════════════════════════════════════════════════════════
   return null;
 }

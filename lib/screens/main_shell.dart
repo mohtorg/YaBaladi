@@ -7,7 +7,6 @@ import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../features/favorites/controllers/favorites_controller.dart';
 import '../l10n/app_localizations.dart';
-import '../widgets/login_required_dialog.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key, required this.child});
@@ -50,17 +49,46 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  /// عند الضغط على Bottom Nav
+  ///
+  /// ملاحظة: دلوقتي بنسمح للزائر يدخل "حسابي" عادي،
+  /// والـ ProfileScreen بتعرض "_GuestUpgradeCard" مع زر
+  /// "الخروج من الوضع الزائر".
+  ///
+  /// الـ guard مفعّل فقط على "المفضلة" (تحتاج تسجيل دخول حقيقي).
   Future<void> _onTap(BuildContext context, _NavDest dest) async {
     final auth = context.read<AuthController>();
 
-    if (dest.requiresLogin && auth.isGuest) {
-      await showLoginRequiredDialog(context, featureName: dest.label);
+    // ═══════════════════════════════════════════════════════════
+    // الـ guard القديم (dialog) — شال من "حسابي"
+    // ═══════════════════════════════════════════════════════════
+    //
+    // if (dest.requiresLogin && auth.isGuest) {
+    //   await showLoginRequiredDialog(context, featureName: dest.label);
+    //   return;
+    // }
+    //
+    // ═══════════════════════════════════════════════════════════
+
+    // ─── محفوظ فقط للمفضلة ───
+    if (dest.lockForGuest && auth.isGuest) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('سجّل دخولك لعرض مفضلاتك'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       return;
     }
 
     if (context.mounted) context.go(dest.path);
   }
 
+  /// منطق زر الرجوع:
+  /// - لو مش في Home → ارجع للـ Home
+  /// - لو في Home → "اضغط مرة أخرى للخروج"
   void _handleBack(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
@@ -105,21 +133,21 @@ class _MainShellState extends State<MainShell> {
         selectedIcon: Icons.home,
         label: l10n.home,
         path: RoutePaths.home,
-        requiresLogin: false,
+        lockForGuest: false,
       ),
       _NavDest(
         icon: Icons.person_outline,
         selectedIcon: Icons.person,
         label: l10n.profile,
         path: RoutePaths.profile,
-        requiresLogin: true,
+        lockForGuest: false, // ← الزائر مسموح له
       ),
       _NavDest(
         icon: Icons.favorite_border,
         selectedIcon: Icons.favorite,
         label: l10n.favorites,
         path: RoutePaths.favorites,
-        requiresLogin: true,
+        lockForGuest: true, // ← المفضلة فقط
         badgeCount: favorites.count,
       ),
       _NavDest(
@@ -127,7 +155,7 @@ class _MainShellState extends State<MainShell> {
         selectedIcon: Icons.settings,
         label: l10n.settings,
         path: RoutePaths.settings,
-        requiresLogin: false,
+        lockForGuest: false,
       ),
     ];
 
@@ -148,13 +176,13 @@ class _MainShellState extends State<MainShell> {
                 icon: _buildIcon(
                   context,
                   Icon(d.icon),
-                  locked: d.requiresLogin && isGuest,
+                  locked: d.lockForGuest && isGuest,
                   badgeCount: d.badgeCount,
                 ),
                 selectedIcon: _buildIcon(
                   context,
                   Icon(d.selectedIcon),
-                  locked: d.requiresLogin && isGuest,
+                  locked: d.lockForGuest && isGuest,
                   badgeCount: d.badgeCount,
                 ),
                 label: d.label,
@@ -171,7 +199,7 @@ class _MainShellState extends State<MainShell> {
     required bool locked,
     int badgeCount = 0,
   }) {
-    // Guest → نقطة صغيرة (قفل)
+    // Guest → نقطة صغيرة على المفضلة
     if (locked) {
       return Badge(
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -198,7 +226,7 @@ class _NavDest {
     required this.selectedIcon,
     required this.label,
     required this.path,
-    required this.requiresLogin,
+    required this.lockForGuest,
     this.badgeCount = 0,
   });
 
@@ -206,6 +234,6 @@ class _NavDest {
   final IconData selectedIcon;
   final String label;
   final String path;
-  final bool requiresLogin;
+  final bool lockForGuest;
   final int badgeCount;
 }
