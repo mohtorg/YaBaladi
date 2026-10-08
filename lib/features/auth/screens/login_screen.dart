@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -176,35 +177,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const SizedBox(height: YaBaladiDesignTokens.space5),
 
-            // ═══════════ فاصل "أو" ═══════════
-            Row(
-              children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    l10n.or,
-                    style: Theme.of(context).textTheme.bodySmall,
+            // ═══════════════════════════════════════════════════
+            // Google Sign-In — يظهر على Android/iOS فقط
+            // ⚠️ معطّل على الويب بسبب deprecation في google_sign_in
+            // ═══════════════════════════════════════════════════
+            if (!kIsWeb) ...[
+              // ─── فاصل "أو" ───
+              Row(
+                children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      l10n.or,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ),
-                ),
-                const Expanded(child: Divider()),
-              ],
-            ),
-
-            const SizedBox(height: YaBaladiDesignTokens.space4),
-
-            // ═══════════ زر Google ═══════════
-            OutlinedButton.icon(
-              onPressed: auth.isLoading ? null : _signInWithGoogle,
-              icon: const Icon(Icons.g_mobiledata, size: 28),
-              label: Text(l10n.continueWithGoogle),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: BorderSide(color: theme.colorScheme.outline),
+                  const Expanded(child: Divider()),
+                ],
               ),
-            ),
 
-            const SizedBox(height: YaBaladiDesignTokens.space4),
+              const SizedBox(height: YaBaladiDesignTokens.space4),
+
+              // ─── زر Google ───
+              OutlinedButton.icon(
+                onPressed: auth.isLoading ? null : _signInWithGoogle,
+                icon: const Icon(Icons.g_mobiledata, size: 28),
+                label: Text(l10n.continueWithGoogle),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: theme.colorScheme.outline),
+                ),
+              ),
+
+              const SizedBox(height: YaBaladiDesignTokens.space4),
+            ],
 
             // ═══════════ زر Guest ═══════════
             OutlinedButton.icon(

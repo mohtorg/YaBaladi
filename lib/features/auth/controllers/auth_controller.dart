@@ -2,8 +2,14 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, debugPrint, ChangeNotifier;
 import 'package:google_sign_in/google_sign_in.dart';
+
+/// Web Client ID من Firebase Console
+/// (Authentication → Sign-in method → Google → Web SDK configuration)
+const String _webGoogleClientId =
+    '231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com';
 
 /// نتيجة عملية Auth (نجاح/فشل مع رسالة خطأ)
 class AuthResult {
@@ -74,7 +80,15 @@ class AuthController extends ChangeNotifier {
     try {
       _auth = _injectedAuth ?? FirebaseAuth.instance;
       _firestore = _injectedFirestore ?? FirebaseFirestore.instance;
-      _googleSignIn = _injectedGoogleSignIn ?? GoogleSignIn();
+
+      // ─── Google Sign-In ───
+      // على الويب: لازم clientId
+      // على الموبايل: مش محتاج (بياخده من google-services.json)
+      _googleSignIn = _injectedGoogleSignIn ??
+          GoogleSignIn(
+            clientId: kIsWeb ? _webGoogleClientId : null,
+          );
+
       _firebaseAvailable = true;
       _userSub = _auth!.authStateChanges().listen(_onAuthStateChanged);
     } catch (e) {
@@ -178,6 +192,7 @@ class AuthController extends ChangeNotifier {
       final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
 
       if (googleUser == null) {
+        // المستخدم قفل النافذة
         return const AuthResult.failure('تم إلغاء تسجيل الدخول');
       }
 
@@ -304,6 +319,15 @@ class AuthController extends ChangeNotifier {
         return 'الحساب موجود بطريقة تسجيل مختلفة';
       case 'operation-not-allowed':
         return 'طريقة التسجيل غير مفعّلة في Firebase';
+      // ─── Google / Web-specific ───
+      case 'popup-closed-by-user':
+        return 'تم إغلاق نافذة Google قبل الإكمال';
+      case 'popup-blocked':
+        return 'المتصفح منع النافذة — اسمح بالنوافذ المنبثقة';
+      case 'cancelled-popup-request':
+        return 'تم إلغاء الطلب';
+      case 'unauthorized-domain':
+        return 'النطاق غير مصرح في Firebase';
       default:
         return e.message ?? 'حدث خطأ أثناء المصادقة';
     }
