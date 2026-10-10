@@ -14,10 +14,12 @@ class PlacesRepository {
       _firestore.collection(collection);
 
   // ═══════════════════════════════════════════════════════════════
-  // WATCHERS
+  // WATCHERS (legacy — stream-based, kept for compatibility)
   // ═══════════════════════════════════════════════════════════════
 
-  /// يعرض كل الأماكن المعتمدة والنشطة، مرتبة بالأحدث.
+  /// [legacy] يعرض كل الأماكن المعتمدة والنشطة، مرتبة بالأحدث.
+  /// ملاحظة: يستخدم `.snapshots()` — لا يعمل في FlutLab Web.
+  /// استخدم `loadAll()` بدلاً منه.
   Stream<List<Place>> watchApproved({int limit = 50}) {
     return _ref
         .where('isApproved', isEqualTo: true)
@@ -25,12 +27,10 @@ class PlacesRepository {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => Place.fromMap(d.id, d.data()))
-            .toList());
+        .map((s) => s.docs.map((d) => Place.fromMap(d.id, d.data())).toList());
   }
 
-  /// يعرض أماكن تصنيف معيّن، مرتبة بالأعلى تقييمًا.
+  /// [legacy] يعرض أماكن تصنيف معيّن، مرتبة بالأعلى تقييمًا.
   Stream<List<Place>> watchByCategory(String categoryId, {int limit = 50}) {
     return _ref
         .where('categoryId', isEqualTo: categoryId)
@@ -39,9 +39,42 @@ class PlacesRepository {
         .orderBy('averageRating', descending: true)
         .limit(limit)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => Place.fromMap(d.id, d.data()))
-            .toList());
+        .map((s) => s.docs.map((d) => Place.fromMap(d.id, d.data())).toList());
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // LOAD (One-shot — يعمل في كل البيئات)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// يحمّل كل الأماكن المعتمدة والنشطة بـ `.get()` واحد.
+  ///
+  /// - يستخدم `.get()` بدل `.snapshots()` — يعمل في كل البيئات
+  ///   (FlutLab Web, Mobile, Desktop)
+  /// - لا يحتاج Composite Index
+  /// - النتائج تُخزّن في الـ Controller للفلترة client-side
+  Future<List<Place>> loadAll({int limit = 500}) async {
+    final snap = await _ref
+        .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .limit(limit)
+        .get();
+
+    return snap.docs.map((d) => Place.fromMap(d.id, d.data())).toList();
+  }
+
+  /// يحمّل أماكن تصنيف معين بـ `.get()` واحد.
+  Future<List<Place>> loadByCategory(
+    String categoryId, {
+    int limit = 500,
+  }) async {
+    final snap = await _ref
+        .where('categoryId', isEqualTo: categoryId)
+        .where('isApproved', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .limit(limit)
+        .get();
+
+    return snap.docs.map((d) => Place.fromMap(d.id, d.data())).toList();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -60,9 +93,7 @@ class PlacesRepository {
     final result = <Place>[];
     for (var i = 0; i < ids.length; i += 10) {
       final chunk = ids.sublist(i, (i + 10).clamp(0, ids.length));
-      final snap = await _ref
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
+      final snap = await _ref.where(FieldPath.documentId, whereIn: chunk).get();
       result.addAll(
         snap.docs.map((d) => Place.fromMap(d.id, d.data())),
       );
@@ -76,35 +107,26 @@ class PlacesRepository {
 
   /// يعرض الأماكن الأكثر تفاعلًا (Top [limit]).
   ///
-  /// الترتيب: `reviewCount` تنازليًا (يعبّر عن الشعبية).
-  /// الفلترة على isApproved + isActive.
+  /// ملاحظة: يستخدم `.get()` — يعمل في كل البيئات.
+  /// الترتيب client-side بدلاً من Firestore orderBy (لتجنب Index).
   Future<List<Place>> getTrending({int limit = 5}) async {
     try {
+      // نحمّل الأماكن المعتمدة فقط (بدون orderBy — لتجنب Index)
       final snap = await _ref
           .where('isApproved', isEqualTo: true)
           .where('isActive', isEqualTo: true)
-          .orderBy('reviewCount', descending: true)
-          .limit(limit)
+          .limit(200)
           .get();
 
-      return snap.docs
-          .map((d) => Place.fromMap(d.id, d.data()))
-          .toList();
+      final places =
+          snap.docs.map((d) => Place.fromMap(d.id, d.data())).toList();
+
+      // الترتيب client-side: reviewCount DESC
+      places.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
+
+      return places.take(limit).toList();
     } catch (e) {
-      // fallback: نرجع الأماكن بأعلى تقييم
-      try {
-        final snap = await _ref
-            .where('isApproved', isEqualTo: true)
-            .where('isActive', isEqualTo: true)
-            .orderBy('averageRating', descending: true)
-            .limit(limit)
-            .get();
-        return snap.docs
-            .map((d) => Place.fromMap(d.id, d.data()))
-            .toList();
-      } catch (_) {
-        return const [];
-      }
+      return const [];
     }
   }
 
@@ -117,8 +139,7 @@ class PlacesRepository {
     return doc.id;
   }
 
-  Future<void> update(Place place) =>
-      _ref.doc(place.id).update(place.toMap());
+  Future<void> update(Place place) => _ref.doc(place.id).update(place.toMap());
 
   Future<void> delete(String id) => _ref.doc(id).delete();
 
@@ -134,10 +155,11 @@ class PlacesRepository {
       });
 
   // ═══════════════════════════════════════════════════════════════
-  // SEARCH
+  // SEARCH (legacy — client-side، سيُلغى)
   // ═══════════════════════════════════════════════════════════════
 
   /// بحث نصي في الأماكن — يفلتر محليًا (client-side).
+  /// [legacy] استخدم PlacesController.loadAll() + places getter بدلاً منه.
   Future<List<Place>> search({
     required String query,
     String? categoryId,
@@ -155,9 +177,7 @@ class PlacesRepository {
 
     final snap = await q.get();
 
-    final all = snap.docs
-        .map((d) => Place.fromMap(d.id, d.data()))
-        .toList();
+    final all = snap.docs.map((d) => Place.fromMap(d.id, d.data())).toList();
 
     final q2 = query.trim().toLowerCase();
     if (q2.isEmpty) return all;

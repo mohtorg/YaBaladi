@@ -99,7 +99,6 @@ class SettingsScreen extends StatelessWidget {
           if (auth.isLoggedIn) ...[
             const SizedBox(height: YaBaladiDesignTokens.space4),
             _SectionHeader(title: l10n.settingsDangerSection),
-
             _SettingTile(
               icon: Icons.delete_forever,
               title: l10n.deleteAccountLabel,
@@ -121,6 +120,9 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _confirmClearCache(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
+    // ✅ Capture messenger BEFORE any await
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showYaConfirmDialog(
       context: context,
       title: l10n.clearCacheLabel,
@@ -136,17 +138,17 @@ class SettingsScreen extends StatelessWidget {
       await FirebaseFirestore.instance.terminate();
       await FirebaseFirestore.instance.enableNetwork();
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
           SnackBar(content: Text(l10n.clearCacheSuccess)),
         );
-      }
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
           const SnackBar(content: Text('حدث خطأ أثناء المسح')),
         );
-      }
     }
   }
 
@@ -164,10 +166,13 @@ class SettingsScreen extends StatelessWidget {
     );
 
     if (confirmed != true) return;
+
+    // ✅ فحص mounted بعد الـ await الأول
     if (!context.mounted) return;
 
     // الحوار الثاني: تحذير إضافي
     await showYaConfirmDialog(
+      // ignore: use_build_context_synchronously
       context: context,
       title: l10n.deleteAccountLabel,
       message: l10n.deleteAccountConfirm,
@@ -303,9 +308,8 @@ class _SettingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = isDestructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurface;
+    final color =
+        isDestructive ? theme.colorScheme.error : theme.colorScheme.onSurface;
 
     return ListTile(
       leading: Icon(

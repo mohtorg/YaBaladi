@@ -139,8 +139,8 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                             angle: _waveAnim.value,
                             child: child,
                           ),
-                          child: const Text('👋',
-                              style: TextStyle(fontSize: 18)),
+                          child:
+                              const Text('👋', style: TextStyle(fontSize: 18)),
                         ),
                       ],
                     ),
@@ -148,15 +148,13 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                     if (_state == _LocState.denied)
                       TextButton.icon(
                         onPressed: () => _fetchLocation(forceRefresh: true),
-                        icon: const Icon(Icons.location_off_outlined,
-                            size: 14),
+                        icon: const Icon(Icons.location_off_outlined, size: 14),
                         label: const Text(
                           'تفعيل الموقع',
                           style: TextStyle(fontSize: 12),
                         ),
                         style: TextButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
                           minimumSize: const Size(0, 20),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
@@ -191,8 +189,8 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: theme.colorScheme.outlineVariant
-                      .withValues(alpha: 0.5),
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
               ),
               child: Row(
@@ -245,9 +243,8 @@ class _SmartAvatar extends StatelessWidget {
     final theme = Theme.of(context);
     const size = 40.0;
 
-    final hasPhoto = !isGuest &&
-        photoUrl != null &&
-        photoUrl!.trim().isNotEmpty;
+    final hasPhoto =
+        !isGuest && photoUrl != null && photoUrl!.trim().isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
@@ -261,7 +258,7 @@ class _SmartAvatar extends StatelessWidget {
                   width: size,
                   height: size,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
+                  errorBuilder: (_, __, ___) =>
                       _fallbackAvatar(theme, isGuest, displayName),
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;

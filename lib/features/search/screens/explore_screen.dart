@@ -1,22 +1,16 @@
 // lib/features/search/screens/explore_screen.dart
 //
-// [v1.0] الشاشة الموحدة للبحث والاستكشاف.
+// [v1.2.1] الشاشة الموحدة للبحث والاستكشاف — Simple Revolution
 //
-// تحل محل:
-//   - lib/screens/search_screen.dart
-//   - lib/features/places/screens/places_list_screen.dart
+// التحديثات عن v1.2:
+//   - إصلاح ?action → if (action != null) action! (توافق Dart 3.8.1)
 //
-// تدعم وضعين:
-//   1. بحث حر (بدون categoryId)
-//   2. تصنيف محدد (مع categoryId)
-//
-// الميزات:
-//   - شريط بحث مع debounce (350ms — عبر PlacesController)
-//   - زر الفلاتر مع Badge (يستخدم showPlacesFilterSheet)
-//   - Recent Searches (SharedPreferences)
-//   - Quick Categories (chips ديناميكية)
-//   - Trending (Top 5 من PlacesRepository)
-//   - 4 حالات: Idle / Loading / Results / No Results
+// التحديثات عن v1.1:
+//   - إصلاح (_, _) → (_, __) لتوافق Dart 3.8.1
+//   - Empty State في وضع البحث يعرض Recent + Trending فقط
+//   - الفلاتر تظهر فقط عند وجود query أو في وضع تصنيف
+//   - حذف Quick Categories (موجودة في Home)
+//   - حذف Categories من No Results
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -28,7 +22,6 @@ import '../../../features/categories/controllers/categories_controller.dart';
 import '../../../features/places/controllers/places_controller.dart';
 import '../../../features/places/widgets/places_filter_sheet.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../models/category.dart';
 import '../../../models/place.dart';
 import '../../../repositories/places_repository.dart';
 import '../../../services/search_history_service.dart';
@@ -74,14 +67,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// يجهّز PlacesController حسب الوضع (بحث / تصنيف).
   void _setupController() {
     final controller = context.read<PlacesController>();
-    // نبدأ نظيف — الفلاتر لا تُورَّث من شاشة سابقة
     controller.clearAll();
 
     final catId = widget.categoryId;
     if (catId != null && catId.isNotEmpty) {
-      controller.watchCategory(catId);
+      controller.loadCategory(catId);
     } else {
-      controller.watchAll();
+      controller.load();
     }
   }
 
@@ -94,6 +86,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _trending = trending;
       _initLoaded = true;
     });
+  }
+
+  Future<void> _handleRefresh() async {
+    await context.read<PlacesController>().refresh();
+    final trending = await _repo.getTrending(limit: 5);
+    if (!mounted) return;
+    setState(() => _trending = trending);
   }
 
   @override
@@ -132,10 +131,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _applyRecent(String q) {
     _searchController.text = q;
-    _searchController.selection =
-        TextSelection.collapsed(offset: q.length);
+    _searchController.selection = TextSelection.collapsed(offset: q.length);
     context.read<PlacesController>().applyQueryNow();
-    setState(() {}); // لتحديث حقل البحث
+    setState(() {});
     _focusNode.requestFocus();
   }
 
@@ -149,10 +147,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     await SearchHistoryService.clearAll();
     if (!mounted) return;
     setState(() => _recent = const []);
-  }
-
-  void _openCategory(String categoryId) {
-    context.go(RoutePaths.categoryPath(categoryId));
   }
 
   void _openFilterSheet(PlacesController controller) {
@@ -178,6 +172,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     final catId = widget.categoryId;
     final isCategoryMode = catId != null && catId.isNotEmpty;
+    final hasQuery = controller.hasQuery;
 
     // عنوان الشاشة
     String title = l10n.search;
@@ -199,10 +194,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
         title: Text(title),
         actions: [
-          _FilterButton(
-            count: controller.activeFilterCount,
-            onPressed: () => _openFilterSheet(controller),
-          ),
+          // الفلتر يظهر فقط عند:
+          //   - وضع تصنيف → دايمًا
+          //   - وضع بحث → فقط لما فيه query نشط
+          if (isCategoryMode || hasQuery)
+            _FilterButton(
+              count: controller.activeFilterCount,
+              onPressed: () => _openFilterSheet(controller),
+            ),
         ],
       ),
       body: Column(
@@ -216,7 +215,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
             onClear: _clearQuery,
           ),
           Expanded(
-            child: _buildBody(context, controller, l10n, isCategoryMode),
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: _buildBody(
+                context,
+                controller,
+                l10n,
+                isCategoryMode,
+                hasQuery,
+              ),
+            ),
           ),
         ],
       ),
@@ -232,7 +240,45 @@ class _ExploreScreenState extends State<ExploreScreen> {
     PlacesController controller,
     AppLocalizations l10n,
     bool isCategoryMode,
+    bool hasQuery,
   ) {
+    // ═══ وضع البحث الحر (بدون categoryId) ═══
+    if (!isCategoryMode) {
+      // 1. لا query → Empty State (Recent + Trending)
+      if (!hasQuery) {
+        return _EmptyStateView(
+          recent: _recent,
+          trending: _trending,
+          loading: !_initLoaded,
+          onRecentTap: _applyRecent,
+          onRecentRemove: _removeRecent,
+          onClearAll: _clearAllRecent,
+        );
+      }
+
+      // 2. فيه query + تحميل → مؤشر
+      if (controller.status == PlacesStatus.loading &&
+          controller.places.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      // 3. فيه query + نتائج → قائمة
+      if (controller.places.isNotEmpty) {
+        return _ResultsList(
+          places: controller.places,
+          query: controller.query,
+        );
+      }
+
+      // 4. فيه query + لا نتائج → No Results
+      return _NoResultsView(
+        query: controller.query,
+        hasFilters: controller.hasActiveFilters,
+        onClearFilters: controller.clearFilters,
+      );
+    }
+
+    // ═══ وضع التصنيف (categoryId موجود) ═══
     // 1. تحميل
     if (controller.status == PlacesStatus.loading &&
         controller.places.isEmpty) {
@@ -246,54 +292,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
         onRetry: () {
           final catId = widget.categoryId;
           if (catId != null && catId.isNotEmpty) {
-            controller.watchCategory(catId);
+            controller.loadCategory(catId);
           } else {
-            controller.watchAll();
+            controller.load();
           }
         },
       );
     }
 
-    // 3. لا يوجد شيء للعرض (لا بحث ولا تصنيف)
-    if (!isCategoryMode &&
-        !controller.hasQuery &&
-        controller.places.isEmpty &&
-        controller.status == PlacesStatus.loaded) {
-      // وضع فارغ تماماً — لكن في مكان للعرض (recent/trending)
-      // سنمرّ للـ Empty State أدناه.
-    }
-
-    // 4. Empty State (لا query ولا category، أو category فاضي)
-    if (!controller.hasQuery && controller.places.isEmpty) {
-      return _EmptyStateView(
-        recent: _recent,
-        trending: _trending,
-        loading: !_initLoaded,
-        onRecentTap: _applyRecent,
-        onRecentRemove: _removeRecent,
-        onClearAll: _clearAllRecent,
-        onCategoryTap: _openCategory,
-      );
-    }
-
-    // 5. لا نتائج (مع query موجود)
+    // 3. لا نتائج
     if (controller.places.isEmpty) {
       return _NoResultsView(
         query: controller.query,
         hasFilters: controller.hasActiveFilters,
         onClearFilters: controller.clearFilters,
-        onCategoryTap: _openCategory,
       );
     }
 
-    // 6. نتائج
+    // 4. نتائج
     return _ResultsList(
       places: controller.places,
       query: controller.query,
     );
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // Search Bar
@@ -367,9 +389,7 @@ class _FilterButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: 8),
       child: IconButton(
-        icon: count > 0
-            ? Badge(label: Text('$count'), child: icon)
-            : icon,
+        icon: count > 0 ? Badge(label: Text('$count'), child: icon) : icon,
         tooltip: 'الفلاتر',
         onPressed: onPressed,
       ),
@@ -378,7 +398,7 @@ class _FilterButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Empty State (Recent + Trending + Quick Categories)
+// Empty State (Recent + Trending فقط)
 // ═══════════════════════════════════════════════════════════════
 
 class _EmptyStateView extends StatelessWidget {
@@ -389,7 +409,6 @@ class _EmptyStateView extends StatelessWidget {
     required this.onRecentTap,
     required this.onRecentRemove,
     required this.onClearAll,
-    required this.onCategoryTap,
   });
 
   final List<String> recent;
@@ -398,7 +417,6 @@ class _EmptyStateView extends StatelessWidget {
   final ValueChanged<String> onRecentTap;
   final ValueChanged<String> onRecentRemove;
   final VoidCallback onClearAll;
-  final ValueChanged<String> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -407,11 +425,12 @@ class _EmptyStateView extends StatelessWidget {
     }
 
     final l10n = AppLocalizations.of(context);
-    final categories = context.watch<CategoriesController>().categories;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
+        // ─── Recent Searches ───
         if (recent.isNotEmpty) ...[
           _SectionHeader(
             icon: Icons.history,
@@ -441,27 +460,8 @@ class _EmptyStateView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (categories.isNotEmpty) ...[
-          _SectionHeader(
-            icon: Icons.category_outlined,
-            title: l10n.searchQuickCategories,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final cat in categories.take(8))
-                  _CategoryChip(
-                    category: cat,
-                    onTap: () => onCategoryTap(cat.id),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+
+        // ─── Trending ───
         if (trending.isNotEmpty) ...[
           _SectionHeader(
             icon: Icons.local_fire_department_outlined,
@@ -470,7 +470,9 @@ class _EmptyStateView extends StatelessWidget {
           for (final place in trending) _TrendingTile(place: place),
           const SizedBox(height: 16),
         ],
-        if (recent.isEmpty && categories.isEmpty && trending.isEmpty)
+
+        // ─── Fallback: لا recent ولا trending ───
+        if (recent.isEmpty && trending.isEmpty)
           Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -496,7 +498,6 @@ class _EmptyStateView extends StatelessWidget {
     );
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // Section Header
@@ -531,33 +532,9 @@ class _SectionHeader extends StatelessWidget {
               ),
             ),
           ),
-          ?action,
+          if (action != null) action!,
         ],
       ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Category Chip
-// ═══════════════════════════════════════════════════════════════
-
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({required this.category, required this.onTap});
-
-  final Category category;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final isArabic = l10n.localeName == 'ar';
-    final label = isArabic ? category.nameAr : category.nameEn;
-
-    return ActionChip(
-      avatar: Icon(category.icon, size: 18),
-      label: Text(label),
-      onPressed: onTap,
     );
   }
 }
@@ -630,25 +607,27 @@ class _ResultsList extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Text(
-            query.isNotEmpty
-                ? l10n.searchResultsCount(places.length)
-                : '${places.length} مكان',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Text(
+              query.isNotEmpty
+                  ? l10n.searchResultsCount(places.length)
+                  : '${places.length} مكان',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          sliver: SliverList.separated(
             itemCount: places.length,
-            separatorBuilder: (_, _) =>
+            separatorBuilder: (_, __) =>
                 const SizedBox(height: YaBaladiDesignTokens.space3),
             itemBuilder: (_, i) => _ResultCard(place: places[i]),
           ),
@@ -775,7 +754,7 @@ class _ResultCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// No Results
+// No Results (بدون Categories)
 // ═══════════════════════════════════════════════════════════════
 
 class _NoResultsView extends StatelessWidget {
@@ -783,56 +762,53 @@ class _NoResultsView extends StatelessWidget {
     required this.query,
     required this.hasFilters,
     required this.onClearFilters,
-    required this.onCategoryTap,
   });
 
   final String query;
   final bool hasFilters;
   final VoidCallback onClearFilters;
-  final ValueChanged<String> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final categories = context.watch<CategoriesController>().categories;
 
-    // إذا كانت الفلاتر نشطة — رسالة مختلفة
+    // الفلاتر نشطة → رسالة مختلفة
     if (hasFilters) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.filter_alt_off,
-                size: 72,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'لا توجد نتائج بهذه الفلاتر',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: onClearFilters,
-                child: const Text('مسح الفلاتر'),
-              ),
-            ],
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 60),
+          Icon(
+            Icons.filter_alt_off,
+            size: 72,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-        ),
+          const SizedBox(height: 16),
+          Text(
+            'لا توجد نتائج بهذه الفلاتر',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: OutlinedButton(
+              onPressed: onClearFilters,
+              child: const Text('مسح الفلاتر'),
+            ),
+          ),
+        ],
       );
     }
 
-    // لا query + لا فلاتر — لا نتائج عام
+    // لا نتائج عام — بدون categories
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),
       children: [
-        const SizedBox(height: 24),
+        const SizedBox(height: 60),
         Icon(
           Icons.search_off,
           size: 72,
@@ -840,7 +816,9 @@ class _NoResultsView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          '${l10n.searchNoResults} "$query"',
+          query.isNotEmpty
+              ? '${l10n.searchNoResults} "$query"'
+              : 'لا توجد نتائج',
           textAlign: TextAlign.center,
           style: theme.textTheme.titleMedium
               ?.copyWith(fontWeight: FontWeight.w600),
@@ -858,30 +836,6 @@ class _NoResultsView extends StatelessWidget {
         _TipLine(text: l10n.searchTip1),
         _TipLine(text: l10n.searchTip2),
         _TipLine(text: l10n.searchTip3),
-        if (categories.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Text(
-            l10n.searchTryCategory,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final cat in categories.take(6))
-                _CategoryChip(
-                  category: cat,
-                  onTap: () => onCategoryTap(cat.id),
-                ),
-            ],
-          ),
-        ],
       ],
     );
   }
@@ -920,27 +874,26 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: const Text('إعادة المحاولة'),
-            ),
-          ],
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 80),
+        Icon(
+          Icons.error_outline,
+          size: 64,
+          color: Theme.of(context).colorScheme.error,
         ),
-      ),
+        const SizedBox(height: 12),
+        Text(message, textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        Center(
+          child: OutlinedButton(
+            onPressed: onRetry,
+            child: const Text('إعادة المحاولة'),
+          ),
+        ),
+      ],
     );
   }
 }

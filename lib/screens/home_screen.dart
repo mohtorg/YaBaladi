@@ -35,9 +35,20 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<PlacesController>().watchAll();
+      context.read<PlacesController>().load();
       _loadLocation();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // لو الـ Controller في وضع مختلف (category / search)
+    // → نعيد التحميل بـ load() عشان Home يعرض كل الأماكن
+    final controller = context.read<PlacesController>();
+    if (controller.mode != PlacesMode.all) {
+      controller.load();
+    }
   }
 
   Future<void> _loadLocation() async {
@@ -52,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final places = context.read<PlacesController>();
 
     await categories.reload();
-    places.watchAll();
+    await places.refresh();
     await LocationService.clearCache();
     await _loadLocation();
   }
@@ -106,8 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
-              if (auth.isGuest)
-                const SliverToBoxAdapter(child: _GuestBanner()),
+              if (auth.isGuest) const SliverToBoxAdapter(child: _GuestBanner()),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           ),
@@ -119,8 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Place> _nearestPlaces(List<Place> all, {int limit = 5}) {
     final loc = _userLocation;
     if (loc == null) {
-      final sorted = [...all]
-        ..sort((a, b) {
+      final sorted = [...all]..sort((a, b) {
           final da = a.createdAt ?? DateTime(2000);
           final db = b.createdAt ?? DateTime(2000);
           return db.compareTo(da);
@@ -290,7 +299,7 @@ class _HorizontalSection extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: places.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (_, i) => _PlaceMiniCard(place: places[i]),
             ),
           ),
@@ -333,7 +342,7 @@ class _PlaceMiniCard extends StatelessWidget {
                     ? Image.network(
                         place.imageUrls.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _placeholder(theme),
+                        errorBuilder: (_, __, ___) => _placeholder(theme),
                       )
                     : _placeholder(theme),
               ),

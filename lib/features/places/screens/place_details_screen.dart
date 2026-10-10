@@ -215,7 +215,7 @@ class _HeaderImage extends StatelessWidget {
           itemBuilder: (_, i) => Image.network(
             imageUrls[i],
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
+            errorBuilder: (_, __, ___) => Container(
               color: theme.colorScheme.surfaceContainerHighest,
               child: const Center(child: Icon(Icons.broken_image_outlined)),
             ),

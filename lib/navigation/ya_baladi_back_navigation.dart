@@ -37,12 +37,18 @@ class YaBaladiBackNavigation extends StatelessWidget {
           return;
         }
 
-        final shouldDiscard = await _confirmDiscard();
-        if (!context.mounted || !shouldDiscard) {
-          return;
-        }
+        // ✅ نحفظ الـ NavigatorState قبل أي await
+        final navigator = Navigator.of(context);
 
-        Navigator.of(context).pop(result);
+        final shouldDiscard = await _confirmDiscard();
+
+        // ✅ فحص mounted بعد الـ await
+        // ignore: use_build_context_synchronously
+        if (!context.mounted) return;
+        if (!shouldDiscard) return;
+        if (!shouldDiscard) return;
+
+        navigator.pop(result);
       },
       child: child,
     );

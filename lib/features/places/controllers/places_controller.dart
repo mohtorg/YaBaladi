@@ -1,9 +1,9 @@
 // features/places/controllers/places_controller.dart
 //
-// [v2.0 — Unified] يدمج:
-//   - الفلاتر المتقدمة (rating + price + amenities + features + payments)
-//   - البحث النصي (مع TextNormalizer و debounce 350ms)
-//   - الترتيب (ratingDesc / reviewsDesc / nameAsc / newest)
+// [v2.1 — Simple Revolution] يستخدم `.get()` بدل `.snapshots()`
+//   - يعمل في كل البيئات (FlutLab Web, Mobile, Desktop)
+//   - لا يحتاج Composite Indexes
+//   - البحث + الفلاتر + الترتيب كلهم client-side
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -39,7 +39,6 @@ class PlacesController extends ChangeNotifier {
 
   final FirebaseFirestore? _injectedFirestore;
   PlacesRepository? _repo;
-  StreamSubscription<List<Place>>? _sub;
 
   bool _firebaseAvailable = false;
   PlacesStatus _status = PlacesStatus.idle;
@@ -63,7 +62,6 @@ class PlacesController extends ChangeNotifier {
   final Set<String> _amenities = <String>{};
   final Set<String> _features = <String>{};
   final Set<String> _payments = <String>{};
-
 
   // ═══════════════════════════════════════════════════════════════
   // Getters
@@ -101,7 +99,7 @@ class PlacesController extends ChangeNotifier {
       _features.length +
       _payments.length;
 
-  /// القائمة النهائية: بحث + فلاتر + ترتيب.
+  /// القائمة النهائية: بحث + فلاتر + ترتيب — كلهم client-side.
   List<Place> get places {
     var result = _allPlaces;
 
@@ -177,7 +175,6 @@ class PlacesController extends ChangeNotifier {
     return true;
   }
 
-
   // ═══════════════════════════════════════════════════════════════
   // Search API
   // ═══════════════════════════════════════════════════════════════
@@ -221,43 +218,69 @@ class PlacesController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Watchers
+  // LOAD (One-shot — بديل _start)
   // ═══════════════════════════════════════════════════════════════
 
-  void watchAll() {
+  /// يحمّل كل الأماكن مرة واحدة (بدون stream).
+  Future<void> load() async {
     if (!_firebaseAvailable || _repo == null) return;
     _activeCategoryId = null;
     _mode = PlacesMode.all;
-    _start(_repo!.watchApproved());
+    await _doLoad(() => _repo!.loadAll());
   }
 
-  void watchCategory(String categoryId) {
+  /// يحمّل أماكن تصنيف معين مرة واحدة.
+  Future<void> loadCategory(String categoryId) async {
     if (!_firebaseAvailable || _repo == null) return;
     _activeCategoryId = categoryId;
     _mode = PlacesMode.category;
-    _start(_repo!.watchByCategory(categoryId));
+    await _doLoad(() => _repo!.loadByCategory(categoryId));
   }
 
-  void _start(Stream<List<Place>> stream) {
+  /// إعادة التحميل حسب الوضع الحالي.
+  Future<void> refresh() async {
+    switch (_mode) {
+      case PlacesMode.all:
+        await load();
+      case PlacesMode.category:
+        if (_activeCategoryId != null) {
+          await loadCategory(_activeCategoryId!);
+        } else {
+          await load();
+        }
+      case PlacesMode.search:
+        await load();
+    }
+  }
+
+  Future<void> _doLoad(Future<List<Place>> Function() fetcher) async {
     _status = PlacesStatus.loading;
     _error = null;
     notifyListeners();
 
-    _sub?.cancel();
-    _sub = stream.listen(
-      (list) {
-        _allPlaces = list;
-        _status = PlacesStatus.loaded;
-        notifyListeners();
-      },
-      onError: (Object e) {
-        _error = e.toString();
-        _status = PlacesStatus.error;
-        notifyListeners();
-      },
-    );
+    try {
+      _allPlaces = await fetcher();
+      _status = PlacesStatus.loaded;
+    } catch (e) {
+      _error = e.toString();
+      _status = PlacesStatus.error;
+      debugPrint('PlacesController._doLoad error: $e');
+    }
+    notifyListeners();
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // Backward Compatibility
+  // (watchAll/watchCategory → load/loadCategory)
+  // ═══════════════════════════════════════════════════════════════
+
+  void watchAll() {
+    load(); // fire-and-forget
+  }
+
+  void watchCategory(String categoryId) {
+    loadCategory(categoryId); // fire-and-forget
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // Filter Setters
@@ -312,7 +335,6 @@ class PlacesController extends ChangeNotifier {
   @override
   void dispose() {
     _queryDebounce?.cancel();
-    _sub?.cancel();
     super.dispose();
   }
 }
