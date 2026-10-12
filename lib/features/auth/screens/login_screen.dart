@@ -63,9 +63,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// ✅ يدخل الوضع الزائر وينتقل فوراً إلى Home
   void _continueAsGuest() {
-    context.read<AuthController>().continueAsGuest();
-    // authGuard هيعمل redirect تلقائي إلى /home
+    final auth = context.read<AuthController>();
+    auth.continueAsGuest();
+
+    // ✅ ننتقل صراحةً بدل الاعتماد على redirect التلقائي
+    // (GoRouter لا يعيد التقييم تلقائياً عند تغيّر isGuest
+    //  لأن الموقع الحالي /login نفسه في _authOnlyRoutes)
+    if (mounted) {
+      context.go(RoutePaths.home);
+    }
   }
 
   @override
