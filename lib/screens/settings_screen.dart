@@ -18,8 +18,7 @@ import '../widgets/ya_app_bar.dart';
 /// - القانوني والسياسات (4 بنود)
 /// - منطقة الخطر (حذف الحساب)
 ///
-/// ملاحظة: بيانات المستخدم موجودة في ProfileScreen.
-/// لا يوجد تكرار.
+/// v1.1 [2026-10-13]: deleteAccount now checks result.isSuccess.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -120,7 +119,6 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _confirmClearCache(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
-    // ✅ Capture messenger BEFORE any await
     final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showYaConfirmDialog(
@@ -154,8 +152,10 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = context.read<AuthController>();
 
-    // الحوار الأول: تأكيد عام
+    // ── 1) تأكيد أول
     final confirmed = await showYaConfirmDialog(
       context: context,
       title: l10n.deleteAccountLabel,
@@ -166,13 +166,11 @@ class SettingsScreen extends StatelessWidget {
     );
 
     if (confirmed != true) return;
-
-    // ✅ فحص mounted بعد الـ await الأول
+    // ignore: use_build_context_synchronously
     if (!context.mounted) return;
 
-    // الحوار الثاني: تحذير إضافي
-    await showYaConfirmDialog(
-      // ignore: use_build_context_synchronously
+    // ── 2) تأكيد ثانٍ (تحذير نهائي)
+    final doubleConfirmed = await showYaConfirmDialog(
       context: context,
       title: l10n.deleteAccountLabel,
       message: l10n.deleteAccountConfirm,
@@ -180,7 +178,30 @@ class SettingsScreen extends StatelessWidget {
       cancelLabel: l10n.cancel,
       isDestructive: true,
     );
-    // TODO(G4): call authService.deleteAccount() when wired
+
+    if (doubleConfirmed != true) return;
+
+    // ── 3) التنفيذ — نفحص النتيجة الفعلية
+    final result = await auth.deleteAccount();
+
+    if (!result.isSuccess) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'حدث خطأ أثناء حذف الحساب'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      return;
+    }
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('تم حذف الحساب بنجاح')),
+      );
   }
 }
 

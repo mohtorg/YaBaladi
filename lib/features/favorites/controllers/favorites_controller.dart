@@ -5,6 +5,12 @@ import 'package:flutter/foundation.dart';
 import '../../../models/favorite.dart';
 import '../../../repositories/favorites_repository.dart';
 
+/// v1.1 — [2026-10-13] State consistency fixes:
+///   - Stream emit now flips previously-true entries that leave the list
+///   - startWatching resets state on user switch (prevents cross-user leak)
+///   - load() respects in-flight toggles
+///   - clear() also resets `_favorites`
+///
 /// يدير حالة المفضلة محليًا (cache) + يزامن مع Firestore.
 class FavoritesController extends ChangeNotifier {
   FavoritesController({FavoritesRepository? repo})
@@ -44,16 +50,32 @@ class FavoritesController extends ChangeNotifier {
   void startWatching(String userId) {
     if (_watchingUid == userId) return;
 
-    _watchingUid = userId;
     _sub?.cancel();
+    _sub = null;
+
+    // FIX: reset state on user switch — stale data must not leak between users
+    _watchingUid = userId;
+    _favorites = const [];
+    _state.clear();
+    _busy.clear();
 
     _sub = _repo.watchByUser(userId).listen(
       (list) {
-        _favorites = list;
-        // زامن الـ state المحلي
-        for (final f in list) {
-          _state[f.placeId] = true;
+        final currentIds = <String>{for (final f in list) f.placeId};
+
+        // FIX: flip previously-true entries that are no longer in the list
+        for (final placeId in _state.keys.toList()) {
+          if (_state[placeId] == true && !currentIds.contains(placeId)) {
+            _state[placeId] = false;
+          }
         }
+
+        // mark all favorites as true
+        for (final id in currentIds) {
+          _state[id] = true;
+        }
+
+        _favorites = list;
         notifyListeners();
       },
       onError: (Object e) {
@@ -80,6 +102,8 @@ class FavoritesController extends ChangeNotifier {
   /// يتحقق إذا كان المكان في المفضلة (لأول مرة).
   Future<void> load(String userId, String placeId) async {
     if (_state.containsKey(placeId)) return;
+    // FIX: skip if a toggle is in-flight — server value would be stale
+    if (_busy.contains(placeId)) return;
     try {
       final fav = await _repo.isFavorite(userId, placeId);
       _state[placeId] = fav;
@@ -109,12 +133,14 @@ class FavoritesController extends ChangeNotifier {
   void clear() {
     _state.clear();
     _busy.clear();
+    _favorites = const []; // FIX: also reset the list
     notifyListeners();
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _sub = null; // FIX: nullify for hygiene
     super.dispose();
   }
 }
