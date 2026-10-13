@@ -1,16 +1,18 @@
 // lib/features/search/screens/explore_screen.dart
 //
-// [v1.2.1] الشاشة الموحدة للبحث والاستكشاف — Simple Revolution
+// [v1.2.4 — Reactive SearchBar Fix]
+//   - FIX: _SearchBar.build يلفّ TextField داخل ValueListenableBuilder
+//          لضمان تحديث suffixIcon (زر X) فورياً عند الكتابة/المسح
+//          بمعزل عن دورة rebuild الأب.
 //
-// التحديثات عن v1.2:
-//   - إصلاح ?action → if (action != null) action! (توافق Dart 3.8.1)
+// [v1.2.3 — Analyzer Fix]
+//   - FIX: _setupController يستدعي clearAll(notify: false)
 //
-// التحديثات عن v1.1:
-//   - إصلاح (_, _) → (_, __) لتوافق Dart 3.8.1
-//   - Empty State في وضع البحث يعرض Recent + Trending فقط
-//   - الفلاتر تظهر فقط عند وجود query أو في وضع تصنيف
-//   - حذف Quick Categories (موجودة في Home)
-//   - حذف Categories من No Results
+// [v1.2.2 — Instant Search Fix]
+//   - FIX: _applyRecent يستخدم setQuery(q) مباشرة
+//
+// [v1.2.1] إصلاح ?action → if (action != null) action!
+// [v1.2] إصلاح (_, _) → (_, __)
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -65,9 +67,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   /// يجهّز PlacesController حسب الوضع (بحث / تصنيف).
+  ///
+  /// v1.2.3: نمرر notify: false لـ clearAll() لمنع notifyListeners
+  /// أثناء دورة build الأولى.
   void _setupController() {
     final controller = context.read<PlacesController>();
-    controller.clearAll();
+    controller.clearAll(notify: false);
 
     final catId = widget.categoryId;
     if (catId != null && catId.isNotEmpty) {
@@ -107,11 +112,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   // ═══════════════════════════════════════════════════════════════
 
   void _onQueryChanged(String value) {
+    // v1.2.2: البحث فوري — لا debounce
     context.read<PlacesController>().setQuery(value);
   }
 
   void _onSubmitted(String value) {
-    context.read<PlacesController>().applyQueryNow();
+    // v1.2.2: no-op للبحث (فوري بالفعل) — فقط احفظ في السجل
     if (value.trim().isNotEmpty) {
       _saveToHistory(value.trim());
     }
@@ -130,9 +136,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _applyRecent(String q) {
+    // v1.2.2 — FIX: نُحدّث PlacesController عبر setQuery
     _searchController.text = q;
     _searchController.selection = TextSelection.collapsed(offset: q.length);
-    context.read<PlacesController>().applyQueryNow();
+    context.read<PlacesController>().setQuery(q);
+    _saveToHistory(q);
     setState(() {});
     _focusNode.requestFocus();
   }
@@ -194,9 +202,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
         title: Text(title),
         actions: [
-          // الفلتر يظهر فقط عند:
-          //   - وضع تصنيف → دايمًا
-          //   - وضع بحث → فقط لما فيه query نشط
           if (isCategoryMode || hasQuery)
             _FilterButton(
               count: controller.activeFilterCount,
@@ -244,7 +249,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   ) {
     // ═══ وضع البحث الحر (بدون categoryId) ═══
     if (!isCategoryMode) {
-      // 1. لا query → Empty State (Recent + Trending)
       if (!hasQuery) {
         return _EmptyStateView(
           recent: _recent,
@@ -256,13 +260,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
         );
       }
 
-      // 2. فيه query + تحميل → مؤشر
       if (controller.status == PlacesStatus.loading &&
           controller.places.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
 
-      // 3. فيه query + نتائج → قائمة
       if (controller.places.isNotEmpty) {
         return _ResultsList(
           places: controller.places,
@@ -270,7 +272,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         );
       }
 
-      // 4. فيه query + لا نتائج → No Results
       return _NoResultsView(
         query: controller.query,
         hasFilters: controller.hasActiveFilters,
@@ -279,13 +280,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     // ═══ وضع التصنيف (categoryId موجود) ═══
-    // 1. تحميل
     if (controller.status == PlacesStatus.loading &&
         controller.places.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 2. خطأ
     if (controller.status == PlacesStatus.error) {
       return _ErrorView(
         message: controller.error ?? 'حدث خطأ',
@@ -300,7 +299,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
     }
 
-    // 3. لا نتائج
     if (controller.places.isEmpty) {
       return _NoResultsView(
         query: controller.query,
@@ -309,7 +307,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
     }
 
-    // 4. نتائج
     return _ResultsList(
       places: controller.places,
       query: controller.query,
@@ -318,7 +315,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Search Bar
+// Search Bar  — [v1.2.4] Reactive via ValueListenableBuilder
 // ═══════════════════════════════════════════════════════════════
 
 class _SearchBar extends StatelessWidget {
@@ -342,32 +339,37 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        onChanged: onChanged,
-        onSubmitted: onSubmitted,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: hintText,
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: controller.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: onClear,
-                  tooltip: 'مسح',
-                )
-              : null,
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-        ),
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) {
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            onChanged: onChanged,
+            onSubmitted: onSubmitted,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: hintText,
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: value.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: onClear,
+                      tooltip: 'مسح',
+                    )
+                  : null,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -430,7 +432,6 @@ class _EmptyStateView extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        // ─── Recent Searches ───
         if (recent.isNotEmpty) ...[
           _SectionHeader(
             icon: Icons.history,
@@ -460,8 +461,6 @@ class _EmptyStateView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-
-        // ─── Trending ───
         if (trending.isNotEmpty) ...[
           _SectionHeader(
             icon: Icons.local_fire_department_outlined,
@@ -470,8 +469,6 @@ class _EmptyStateView extends StatelessWidget {
           for (final place in trending) _TrendingTile(place: place),
           const SizedBox(height: 16),
         ],
-
-        // ─── Fallback: لا recent ولا trending ───
         if (recent.isEmpty && trending.isEmpty)
           Padding(
             padding: const EdgeInsets.all(32),
@@ -646,7 +643,6 @@ class _ResultCard extends StatelessWidget {
 
   final Place place;
 
-  /// نطاق السعر (priceLevel 1-4).
   String? get _priceLabel {
     switch (place.priceLevel) {
       case 1:
@@ -754,7 +750,7 @@ class _ResultCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// No Results (بدون Categories)
+// No Results
 // ═══════════════════════════════════════════════════════════════
 
 class _NoResultsView extends StatelessWidget {
@@ -773,7 +769,6 @@ class _NoResultsView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    // الفلاتر نشطة → رسالة مختلفة
     if (hasFilters) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -803,7 +798,6 @@ class _NoResultsView extends StatelessWidget {
       );
     }
 
-    // لا نتائج عام — بدون categories
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),

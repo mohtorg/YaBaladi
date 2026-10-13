@@ -1,5 +1,21 @@
 // features/places/controllers/places_controller.dart
 //
+// [v2.4 — Single Notification Fix]
+//   - FIX: clearAll() أصبحت تقبل `notify` parameter
+//          (يُستخدَم `notify: false` قبل loadCategory/load لمنع
+//          "notifyListeners during build" — إشعاران متزامنان)
+//   - الملف مُراجَع بالكامل ضد Flutter 3.32 / Dart 3.8.1
+//
+// [v2.3 — No Flash of Stale Content]
+//   - FIX: عند تغيير الوضع/الفئة، تُمسح _allPlaces فوراً قبل الانتظار
+//   - Pull-to-refresh داخل نفس الفئة لا يمسح (سلوك صحيح)
+//   - _doLoad() تقبل clearBeforeLoad للتحكم الدقيق
+//
+// [v2.2 — Instant Search Fix]
+//   - حذف الـ debounce بالكامل (client-side filtering فوري)
+//   - تبسيط Search API: setQuery / clearQuery فقط
+//   - applyQueryNow() مُبقاة كـ no-op للتوافق الخلفي
+//
 // [v2.1 — Simple Revolution] يستخدم `.get()` بدل `.snapshots()`
 //   - يعمل في كل البيئات (FlutLab Web, Mobile, Desktop)
 //   - لا يحتاج Composite Indexes
@@ -47,11 +63,8 @@ class PlacesController extends ChangeNotifier {
   String? _activeCategoryId;
   PlacesMode _mode = PlacesMode.all;
 
-  // ─── Query ───
+  // ─── Query (v2.2: فوري، بلا debounce) ───
   String _query = '';
-  String _appliedQuery = '';
-  Timer? _queryDebounce;
-  static const Duration _debounceDuration = Duration(milliseconds: 350);
 
   // ─── Filters: Basic ───
   double? _minRating;
@@ -99,17 +112,21 @@ class PlacesController extends ChangeNotifier {
       _features.length +
       _payments.length;
 
-  /// القائمة النهائية: بحث + فلاتر + ترتيب — كلهم client-side.
+  /// القائمة النهائية: بحث + فلاتر + ترتيب — كلهم client-side وفوريين.
   List<Place> get places {
     var result = _allPlaces;
 
-    if (_appliedQuery.isNotEmpty) {
-      result = result.where(_matchesQuery).toList();
+    // فلتر البحث — يُطبَّق فوراً بناءً على _query مباشرة (v2.2)
+    final q = _query.trim();
+    if (q.isNotEmpty) {
+      result = result.where((p) => _matchesQueryFor(p, q)).toList();
     }
 
+    // فلتر السمات
     result = result.where(_matchesFilters).toList();
     result = List<Place>.from(result);
 
+    // الترتيب
     switch (_sort) {
       case PlaceSort.ratingDesc:
         result.sort((a, b) => b.averageRating.compareTo(a.averageRating));
@@ -128,10 +145,10 @@ class PlacesController extends ChangeNotifier {
     return List.unmodifiable(result);
   }
 
-  bool _matchesQuery(Place p) {
+  bool _matchesQueryFor(Place p, String q) {
     return TextNormalizer.matchesAny(
       [p.nameAr, p.nameEn, p.description, ...p.tags],
-      _appliedQuery,
+      q,
     );
   }
 
@@ -176,84 +193,126 @@ class PlacesController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Search API
+  // Search API (v2.2 — فوري، بلا debounce)
   // ═══════════════════════════════════════════════════════════════
 
+  /// يُحدّث نص البحث فوراً (بدون debounce).
   void setQuery(String value) {
     if (_query == value) return;
     _query = value;
     notifyListeners();
-
-    _queryDebounce?.cancel();
-    _queryDebounce = Timer(_debounceDuration, () {
-      _appliedQuery = value.trim();
-      notifyListeners();
-    });
   }
 
+  /// [v2.2] no-op — البحث فوري الآن. مُبقاة للتوافق الخلفي فقط.
   void applyQueryNow() {
-    _queryDebounce?.cancel();
-    _appliedQuery = _query.trim();
-    notifyListeners();
+    // لا شيء — setQuery يقوم بكل العمل فوراً.
   }
 
+  /// يمسح نص البحث فقط (يبقي الفلاتر والفئة).
   void clearQuery() {
-    _queryDebounce?.cancel();
+    if (_query.isEmpty) return;
     _query = '';
-    _appliedQuery = '';
     notifyListeners();
   }
 
-  void clearAll() {
-    _queryDebounce?.cancel();
+  /// يمسح كل شيء: البحث + الفلاتر + الترتيب (لا يمسح الفئة).
+  ///
+  /// [v2.4] `notify` parameter:
+  ///   - `true` (افتراضي): يُشعِر المستمعين — للاستخدام العادي.
+  ///   - `false`: صامت — للاستخدام قبل `loadCategory()`/`load()` مباشرة
+  ///     لتجنّب "notifyListeners during build" (إشعاران متزامنان).
+  void clearAll({bool notify = true}) {
     _query = '';
-    _appliedQuery = '';
     _minRating = null;
     _priceLevel = null;
     _sort = PlaceSort.ratingDesc;
     _amenities.clear();
     _features.clear();
     _payments.clear();
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // LOAD (One-shot — بديل _start)
+  // LOAD (One-shot)
   // ═══════════════════════════════════════════════════════════════
 
-  /// يحمّل كل الأماكن مرة واحدة (بدون stream).
+  /// يحمّل كل الأماكن مرة واحدة.
+  /// [v2.3]: يمسح _allPlaces فوراً لو كنّا في وضع مختلف (تصنيف سابق).
   Future<void> load() async {
     if (!_firebaseAvailable || _repo == null) return;
+
+    // نمسح فقط لو كنّا في وضع مختلف (يسمح بـ pull-to-refresh بدون وميض)
+    final isModeChange = _mode != PlacesMode.all || _activeCategoryId != null;
+
     _activeCategoryId = null;
     _mode = PlacesMode.all;
-    await _doLoad(() => _repo!.loadAll());
+
+    await _doLoad(
+      () => _repo!.loadAll(),
+      clearBeforeLoad: isModeChange,
+    );
   }
 
-  /// يحمّل أماكن تصنيف معين مرة واحدة.
+  /// يحمّل أماكن تصنيف معين.
+  /// [v2.3]: يمسح _allPlaces فوراً لو الفئة مختلفة (يسمح بـ pull-to-refresh
+  /// داخل نفس الفئة بدون وميض).
   Future<void> loadCategory(String categoryId) async {
     if (!_firebaseAvailable || _repo == null) return;
+
+    // نمسح فقط لو الفئة مختلفة
+    final isCategoryChange = _activeCategoryId != categoryId;
+
     _activeCategoryId = categoryId;
     _mode = PlacesMode.category;
-    await _doLoad(() => _repo!.loadByCategory(categoryId));
+
+    await _doLoad(
+      () => _repo!.loadByCategory(categoryId),
+      clearBeforeLoad: isCategoryChange,
+    );
   }
 
   /// إعادة التحميل حسب الوضع الحالي.
+  /// [v2.3]: pull-to-refresh لا يمسح القائمة الحالية (تجربة أفضل).
   Future<void> refresh() async {
     switch (_mode) {
       case PlacesMode.all:
-        await load();
+        await _doLoad(
+          () => _repo!.loadAll(),
+          clearBeforeLoad: false,
+        );
       case PlacesMode.category:
         if (_activeCategoryId != null) {
-          await loadCategory(_activeCategoryId!);
+          await _doLoad(
+            () => _repo!.loadByCategory(_activeCategoryId!),
+            clearBeforeLoad: false,
+          );
         } else {
-          await load();
+          await _doLoad(
+            () => _repo!.loadAll(),
+            clearBeforeLoad: false,
+          );
         }
       case PlacesMode.search:
-        await load();
+        await _doLoad(
+          () => _repo!.loadAll(),
+          clearBeforeLoad: false,
+        );
     }
   }
 
-  Future<void> _doLoad(Future<List<Place>> Function() fetcher) async {
+  /// [v2.3] يقبل clearBeforeLoad لمسح _allPlaces فوراً قبل الانتظار.
+  ///
+  /// - `clearBeforeLoad: true` → يُستخدَم عند **تغيير الوضع/الفئة**
+  ///   (يمنع ظهور المحتوى القديم لحظة ثم اختفائه)
+  /// - `clearBeforeLoad: false` → يُستخدَم عند **pull-to-refresh**
+  ///   (يبقي القائمة الحالية معروضة أثناء التحديث)
+  Future<void> _doLoad(
+    Future<List<Place>> Function() fetcher, {
+    bool clearBeforeLoad = false,
+  }) async {
+    if (clearBeforeLoad) {
+      _allPlaces = const []; // ← امسح فوراً قبل الانتظار
+    }
     _status = PlacesStatus.loading;
     _error = null;
     notifyListeners();
@@ -271,7 +330,6 @@ class PlacesController extends ChangeNotifier {
 
   // ═══════════════════════════════════════════════════════════════
   // Backward Compatibility
-  // (watchAll/watchCategory → load/loadCategory)
   // ═══════════════════════════════════════════════════════════════
 
   void watchAll() {
@@ -334,7 +392,7 @@ class PlacesController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _queryDebounce?.cancel();
+    // [v2.4] لا يوجد timers لإلغائها — البحث فوري
     super.dispose();
   }
 }

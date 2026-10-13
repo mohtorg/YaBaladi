@@ -6,6 +6,11 @@ import '../services/location_service.dart';
 import '../theme/design_tokens.dart';
 
 /// Header ترحيبي نظيف للشاشة الرئيسية.
+///
+/// [v1.1 — PostFrame Deferral Fix]
+///   - FIX: _fetchLocation() تُستدعى الآن من addPostFrameCallback
+///          بدل initState مباشرة → setState لم يعد يُنفَّذ أثناء build.
+///          يمنع "setState() called during build" المتكرر في Run log.
 class WelcomeHeader extends StatefulWidget {
   const WelcomeHeader({
     super.key,
@@ -48,7 +53,11 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
     );
 
-    _fetchLocation();
+    // [v1.1] تأجيل الاستدعاء لما بعد الإطار الأول — يمنع setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fetchLocation();
+    });
   }
 
   @override
@@ -58,7 +67,10 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
   }
 
   Future<void> _fetchLocation({bool forceRefresh = false}) async {
-    setState(() => _state = _LocState.loading);
+    // [v1.1] setState الآن آمن (خارج initState، خارج build)
+    if (mounted && _state != _LocState.loading) {
+      setState(() => _state = _LocState.loading);
+    }
 
     if (forceRefresh) {
       await LocationService.clearCache();

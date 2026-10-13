@@ -20,6 +20,13 @@ import '../widgets/welcome_header.dart';
 /// - الأقرب إليك
 /// - الأعلى تقييمًا
 /// - Guest Banner
+///
+/// [v2.7 — Deferred Reload Fix]
+///   - FIX: didChangeDependencies يؤجّل load() بـ addPostFrameCallback
+///          لتفادي notifyListeners during build عند العودة من ExploreScreen.
+///
+/// [v2.6 — Route Guard]
+///   - FIX: تجاهُل إعادة التحميل إذا لم يكن Home الشاشة العلوية.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -43,11 +50,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // لو الـ Controller في وضع مختلف (category / search)
-    // → نعيد التحميل بـ load() عشان Home يعرض كل الأماكن
+    // [v2.6] Route Guard: تجاهُل إن لم نكن الشاشة العلوية
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+
     final controller = context.read<PlacesController>();
     if (controller.mode != PlacesMode.all) {
-      controller.load();
+      // [v2.7] Deferred: أجّل load() لما بعد الإطار
+      // لأن didChangeDependencies يعمل داخل build phase،
+      // و load() تستدعي notifyListeners() synchronously.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        controller.load();
+      });
     }
   }
 
@@ -58,7 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    // Capture controllers BEFORE any await (avoid BuildContext across gaps)
     final categories = context.read<CategoriesController>();
     final places = context.read<PlacesController>();
 

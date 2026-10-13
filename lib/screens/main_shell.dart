@@ -8,10 +8,17 @@ import '../features/auth/controllers/auth_controller.dart';
 import '../features/favorites/controllers/favorites_controller.dart';
 import '../l10n/app_localizations.dart';
 
+/// [v1.2 — StatefulShellRoute + Favorites Race Fix]
+///   - REFACTOR: يستقبل StatefulNavigationShell بدل Widget child.
+///     التنقل بين التبويبات يحفظ الحالة (لا rebuild للشاشات السابقة).
+///   - FIX: _syncFavoritesWatcher محمي بمولّد طلبات (_favoritesSyncGeneration)
+///          لمنع race condition عند login/logout متتاليين.
+///   - NavigationBar يستخدم navigationShell.currentIndex و goBranch().
 class MainShell extends StatefulWidget {
-  const MainShell({super.key, required this.child});
+  const MainShell({super.key, required this.navigationShell});
 
-  final Widget child;
+  /// [v1.2] StatefulNavigationShell — يحفظ حالة كل تبويب.
+  final StatefulNavigationShell navigationShell;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -20,29 +27,25 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   DateTime? _lastBackPress;
   String? _lastSyncedUid;
-
-  int _indexFromLocation(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-    final paths = [
-      RoutePaths.home,
-      RoutePaths.profile,
-      RoutePaths.favorites,
-      RoutePaths.settings,
-    ];
-    final idx = paths.indexWhere((p) => p == location);
-    return idx < 0 ? 0 : idx;
-  }
+  int _favoritesSyncGeneration = 0;
 
   /// زامن الـ FavoritesController مع حالة المصادقة.
+  ///
+  /// [v1.1] محمي بمولّد طلبات — آخر طلب فقط يُنفَّذ.
   void _syncFavoritesWatcher(String? uid) {
     if (_lastSyncedUid == uid) return;
     _lastSyncedUid = uid;
 
+    final myGen = ++_favoritesSyncGeneration;
     final fav = context.read<FavoritesController>();
+    final capturedUid = uid;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (uid != null) {
-        fav.startWatching(uid);
+      if (myGen != _favoritesSyncGeneration) return;
+
+      if (capturedUid != null) {
+        fav.startWatching(capturedUid);
       } else {
         fav.stopWatching();
       }
@@ -51,26 +54,12 @@ class _MainShellState extends State<MainShell> {
 
   /// عند الضغط على Bottom Nav
   ///
-  /// ملاحظة: دلوقتي بنسمح للزائر يدخل "حسابي" عادي،
-  /// والـ ProfileScreen بتعرض "_GuestUpgradeCard" مع زر
-  /// "الخروج من الوضع الزائر".
-  ///
-  /// الـ guard مفعّل فقط على "المفضلة" (تحتاج تسجيل دخول حقيقي).
-  Future<void> _onTap(BuildContext context, _NavDest dest) async {
+  /// [v1.2] يستخدم navigationShell.goBranch() بدل context.go()
+  ///   - إذا نفس التبويب → reset إلى الـ root (initialLocation: true)
+  ///   - إذا تبويب آخر → التبديل مع حفظ الحالة
+  void _onTap(BuildContext context, _NavDest dest, int index) {
     final auth = context.read<AuthController>();
 
-    // ═══════════════════════════════════════════════════════════
-    // الـ guard القديم (dialog) — شال من "حسابي"
-    // ═══════════════════════════════════════════════════════════
-    //
-    // if (dest.requiresLogin && auth.isGuest) {
-    //   await showLoginRequiredDialog(context, featureName: dest.label);
-    //   return;
-    // }
-    //
-    // ═══════════════════════════════════════════════════════════
-
-    // ─── محفوظ فقط للمفضلة ───
     if (dest.lockForGuest && auth.isGuest) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -83,17 +72,20 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    if (context.mounted) context.go(dest.path);
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
   }
 
   /// منطق زر الرجوع:
-  /// - لو مش في Home → ارجع للـ Home
-  /// - لو في Home → "اضغط مرة أخرى للخروج"
+  /// - إذا لم نكن في Home branch على الـ root → ارجع للـ Home root
+  /// - إذا كنا في Home root → "اضغط مرة أخرى للخروج"
   void _handleBack(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
     if (location != RoutePaths.home) {
-      context.go(RoutePaths.home);
+      widget.navigationShell.goBranch(0, initialLocation: true);
       return;
     }
 
@@ -121,10 +113,9 @@ class _MainShellState extends State<MainShell> {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthController>();
     final favorites = context.watch<FavoritesController>();
-    final index = _indexFromLocation(context);
     final isGuest = auth.isGuest;
+    final currentIndex = widget.navigationShell.currentIndex;
 
-    // ─── زامن المراقبة ───
     _syncFavoritesWatcher(auth.uid);
 
     final destinations = [
@@ -132,29 +123,25 @@ class _MainShellState extends State<MainShell> {
         icon: Icons.home_outlined,
         selectedIcon: Icons.home,
         label: l10n.home,
-        path: RoutePaths.home,
         lockForGuest: false,
       ),
       _NavDest(
         icon: Icons.person_outline,
         selectedIcon: Icons.person,
         label: l10n.profile,
-        path: RoutePaths.profile,
-        lockForGuest: false, // ← الزائر مسموح له
+        lockForGuest: false,
       ),
       _NavDest(
         icon: Icons.favorite_border,
         selectedIcon: Icons.favorite,
         label: l10n.favorites,
-        path: RoutePaths.favorites,
-        lockForGuest: true, // ← المفضلة فقط
+        lockForGuest: true,
         badgeCount: favorites.count,
       ),
       _NavDest(
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
         label: l10n.settings,
-        path: RoutePaths.settings,
         lockForGuest: false,
       ),
     ];
@@ -166,10 +153,10 @@ class _MainShellState extends State<MainShell> {
         _handleBack(context);
       },
       child: Scaffold(
-        body: widget.child,
+        body: widget.navigationShell,
         bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: (i) => _onTap(context, destinations[i]),
+          selectedIndex: currentIndex,
+          onDestinationSelected: (i) => _onTap(context, destinations[i], i),
           destinations: [
             for (final d in destinations)
               NavigationDestination(
@@ -199,7 +186,6 @@ class _MainShellState extends State<MainShell> {
     required bool locked,
     int badgeCount = 0,
   }) {
-    // Guest → نقطة صغيرة على المفضلة
     if (locked) {
       return Badge(
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -208,7 +194,6 @@ class _MainShellState extends State<MainShell> {
       );
     }
 
-    // مسجّل + فيه مفضلات → badge بالرقم
     if (badgeCount > 0) {
       return Badge(
         label: Text('$badgeCount'),
@@ -225,7 +210,6 @@ class _NavDest {
     required this.icon,
     required this.selectedIcon,
     required this.label,
-    required this.path,
     required this.lockForGuest,
     this.badgeCount = 0,
   });
@@ -233,7 +217,6 @@ class _NavDest {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-  final String path;
   final bool lockForGuest;
   final int badgeCount;
 }
