@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'core/location/browsing_location_controller.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
@@ -62,6 +63,10 @@ class YaBaladiApp extends StatelessWidget {
         ChangeNotifierProvider<FavoritesController>(
           create: (_) => FavoritesController(),
         ),
+        // [v1.1 — 2026-10-14] — G4.2-c
+        ChangeNotifierProvider<BrowsingLocationController>(
+          create: (_) => BrowsingLocationController(),
+        ),
       ],
       child: const _AppRoot(),
     );
@@ -99,7 +104,6 @@ class _AppRootState extends State<_AppRoot> {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
-
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -108,11 +112,9 @@ class _AppRootState extends State<_AppRoot> {
       ],
       supportedLocales: const [Locale('ar'), Locale('en')],
       locale: locale.locale,
-
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: theme.themeMode,
-
       routerConfig: _router!,
     );
   }

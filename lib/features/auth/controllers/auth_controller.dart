@@ -6,32 +6,44 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, debugPrint, ChangeNotifier;
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/auth/permissions.dart';
+import '../../../core/auth/role.dart';
+
 /// Web Client ID من Firebase Console
-/// (Authentication → Sign-in method → Google → Web SDK configuration)
 const String _webGoogleClientId =
     '231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com';
 
-/// نتيجة عملية Auth (نجاح/فشل مع رسالة خطأ)
+/// نتيجة عملية Auth (نجاح/فشل/إلغاء مع رسالة خطأ)
 class AuthResult {
   const AuthResult.success()
       : error = null,
-        isSuccess = true;
-  const AuthResult.failure(this.error) : isSuccess = false;
+        isSuccess = true,
+        isCancelled = false;
+  const AuthResult.failure(this.error)
+      : isSuccess = false,
+        isCancelled = false;
+  const AuthResult.cancelled()
+      : error = null,
+        isSuccess = false,
+        isCancelled = true;
 
   final String? error;
   final bool isSuccess;
+  final bool isCancelled;
 }
 
-/// v1.4 — [2026-10-13] — requires-recent-login handling
-///   - Added: deleteAccount() — Firestore data first, then Auth user
-///   - Added: requires-recent-login mapping in _mapAuthError
-///   - FIX: deleteAccount() forces _user=null + notifyListeners on success
-///   - FIX: signOut() forces _user=null as safety net
-///   - FIX: dispose() nullifies _userSub
-///   - NEW: pre-check lastSignInTime before delete — fail fast with clear msg
-///   - NEW: explicit try/catch around currentUser.delete() with logging
+/// v1.7 — [2026-10-14] — G4.1-c: Role-aware auth
+///   - NEW: currentRole getter (UserRole)
+///   - NEW: hasPermission(Permission) method
+///   - NEW: isAdmin / isMerchant convenience getters
+///   - NEW: _loadUserRole() — يقرأ users/{uid}.role من Firestore
+///   - NEW: resetRole() — يستدعيه signOut / deleteAccount
+///   - CHANGE: _onAuthStateChanged يستدعي _loadUserRole تلقائياً
 ///
-/// يغلّف Firebase Auth + Firestore user profile
+/// v1.6 — [2026-10-14] — D4 full: re-auth حسب مزود الحساب
+/// v1.5.1 — [2026-10-14] — D4 fix: nullable GoogleSignIn
+/// v1.5 — [2026-10-14] — D4: Real re-authentication before delete
+/// v1.4 — [2026-10-13] — requires-recent-login handling
 class AuthController extends ChangeNotifier {
   AuthController({
     FirebaseAuth? auth,
@@ -58,6 +70,11 @@ class AuthController extends ChangeNotifier {
   bool _firebaseAvailable = false;
   bool _isGuest = false;
 
+  /// [v1.7] الدور الحالي للمستخدم.
+  /// الافتراضي: visitor (زائر) عند عدم تسجيل الدخول.
+  /// يُحدَّث تلقائياً من Firestore بعد المصادقة.
+  UserRole _userRole = UserRole.visitor;
+
   // ============================================================
   // GETTERS
   // ============================================================
@@ -73,6 +90,27 @@ class AuthController extends ChangeNotifier {
   String? get email => _user?.email;
   String? get displayName => _user?.displayName;
   String? get photoUrl => _user?.photoURL;
+
+  // ─── [v1.7] Role & Permissions ───
+
+  /// الدور الحالي. visitor عند عدم تسجيل الدخول.
+  UserRole get currentRole {
+    if (_user == null) return UserRole.visitor;
+    return _userRole;
+  }
+
+  /// هل هو مسؤول كامل؟
+  bool get isAdmin => currentRole == UserRole.admin;
+
+  /// هل هو تاجر؟
+  bool get isMerchant => currentRole == UserRole.merchant;
+
+  /// هل يملك صلاحية محددة؟
+  bool hasPermission(Permission permission) =>
+      roleHasPermission(currentRole, permission);
+
+  /// كل الصلاحيات الفعلية للمستخدم الحالي.
+  Set<Permission> get permissions => defaultPermissionsFor(currentRole);
 
   // ============================================================
   // INIT
@@ -100,8 +138,40 @@ class AuthController extends ChangeNotifier {
   void _onAuthStateChanged(User? user) {
     _user = user;
     if (user != null) _isGuest = false;
+
+    // [v1.7] أعِد تعيين الدور عند تغيّر الحالة
+    if (user == null) {
+      _userRole = UserRole.visitor;
+    } else {
+      // مؤقتاً member حتى نقرأ من Firestore
+      _userRole = UserRole.member;
+      _loadUserRole(user.uid);
+    }
+
     _isInitialized = true;
     notifyListeners();
+  }
+
+  /// [v1.7] يقرأ الدور من users/{uid}.role ويُحدِّث _userRole.
+  Future<void> _loadUserRole(String userId) async {
+    if (_firestore == null) return;
+    try {
+      final doc = await _firestore!.collection('users').doc(userId).get();
+      final roleCode = doc.data()?['role'] as String?;
+      final newRole = roleFromCode(roleCode);
+      if (newRole != _userRole && _user?.uid == userId) {
+        _userRole = newRole;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('AuthController._loadUserRole failed: $e');
+      // نُبقي _userRole = member (الافتراضي الآمن)
+    }
+  }
+
+  /// [v1.7] يُصفِّر الدور — يُستخدَم قبل signOut / deleteAccount.
+  void _resetRole() {
+    _userRole = UserRole.visitor;
   }
 
   // ============================================================
@@ -191,7 +261,7 @@ class AuthController extends ChangeNotifier {
       final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
 
       if (googleUser == null) {
-        return const AuthResult.failure('تم إلغاء تسجيل الدخول');
+        return const AuthResult.cancelled();
       }
 
       final GoogleSignInAuthentication googleAuth =
@@ -236,6 +306,7 @@ class AuthController extends ChangeNotifier {
     if (_auth == null) {
       _user = null;
       _isGuest = false;
+      _resetRole();
       notifyListeners();
       return;
     }
@@ -249,29 +320,87 @@ class AuthController extends ChangeNotifier {
     } finally {
       _user = null;
       _isGuest = false;
+      _resetRole();
       _setLoading(false);
       notifyListeners();
     }
   }
 
   // ============================================================
-  // DELETE ACCOUNT
+  // DELETE ACCOUNT (D4)
   // ============================================================
 
-  /// عمر تسجيل الدخول المسموح به قبل الحذف.
-  /// Firebase Web يفرض نافذة recent-login. نستخدم 4 دقائق كهامش أمان.
-  static const Duration _maxSignInAge = Duration(minutes: 4);
+  /// [v1.5] إعادة التحقق من الهوية عبر Google popup.
+  Future<AuthResult> _reauthenticateWithGoogle() async {
+    if (_auth == null || _googleSignIn == null) {
+      return const AuthResult.failure('Firebase غير متاح');
+    }
 
-  /// يحذف حساب المستخدم نهائياً:
-  ///   1) pre-check: عمر تسجيل الدخول
-  ///   2) Firestore data (favorites + user doc)
-  ///   3) Google sign-out
-  ///   4) Firebase Auth delete + signOut
-  ///   5) force local state
-  ///
-  /// **مهم:** Firestore قبل Auth مقصود — بعد حذف Auth
-  /// لا يمكن الكتابة في Firestore (Security Rules سترفض).
-  Future<AuthResult> deleteAccount() async {
+    final currentUser = _user;
+    if (currentUser == null) {
+      return const AuthResult.failure('لا يوجد مستخدم مسجّل');
+    }
+
+    final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
+
+    if (googleUser == null) {
+      return const AuthResult.cancelled();
+    }
+
+    if (googleUser.email != currentUser.email) {
+      debugPrint(
+        'reauthenticate: account mismatch '
+        '(${googleUser.email} vs ${currentUser.email})',
+      );
+      try {
+        await _googleSignIn?.signOut();
+      } catch (_) {}
+      return const AuthResult.failure(
+        'يجب استخدام نفس حساب Google المسجّل حالياً',
+      );
+    }
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    await currentUser.reauthenticateWithCredential(credential);
+    return const AuthResult.success();
+  }
+
+  /// [v1.5.1] Re-auth عبر Email/Password.
+  Future<AuthResult> _reauthenticateWithPassword(String password) async {
+    final currentUser = _user;
+    if (currentUser == null) {
+      return const AuthResult.failure('لا يوجد مستخدم مسجّل');
+    }
+
+    final email = currentUser.email;
+    if (email == null || email.isEmpty) {
+      return const AuthResult.failure('البريد الإلكتروني غير متوفر');
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      await currentUser.reauthenticateWithCredential(credential);
+      return const AuthResult.success();
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_mapAuthError(e));
+    } catch (e) {
+      debugPrint('reauthenticate (password) error: $e');
+      return const AuthResult.failure('فشل التحقق من كلمة المرور');
+    }
+  }
+
+  /// [v1.5.1] حذف الحساب مع re-auth إلزامي.
+  Future<AuthResult> deleteAccount({String? password}) async {
     if (_auth == null || _firestore == null) {
       return const AuthResult.failure('Firebase غير متاح');
     }
@@ -281,28 +410,38 @@ class AuthController extends ChangeNotifier {
       return const AuthResult.failure('لا يوجد مستخدم مسجّل');
     }
 
-    // ── 0) pre-check: عمر تسجيل الدخول ──
-    // يمنع محاولة delete() ستفشل حتماً بسبب requires-recent-login.
-    final lastSignIn = currentUser.metadata.lastSignInTime;
-    if (lastSignIn != null) {
-      final age = DateTime.now().difference(lastSignIn);
-      if (age > _maxSignInAge) {
-        debugPrint(
-          'deleteAccount: sign-in age ${age.inMinutes}m > '
-          '${_maxSignInAge.inMinutes}m → requires-recent-login',
-        );
-        return const AuthResult.failure(
-          'لأسباب أمنية، يجب تسجيل الدخول مرة أخرى قبل الحذف.\n'
-          'اخرج من الحساب ثم ادخل مجدداً وأعد المحاولة.',
-        );
-      }
-    }
-
     _setLoading(true);
     try {
-      final uid = currentUser.uid;
+      // ── 1) اختيار نوع re-auth حسب المزود ──
+      AuthResult reauthResult;
 
-      // ── 1) حذف مفضلة المستخدم (subcollection) ──
+      if (hasGoogleProvider) {
+        reauthResult = await _reauthenticateWithGoogle();
+      } else if (hasPasswordProvider) {
+        if (password == null || password.isEmpty) {
+          return const AuthResult.failure(
+            'كلمة المرور مطلوبة لتأكيد الحذف',
+          );
+        }
+        reauthResult = await _reauthenticateWithPassword(password);
+      } else {
+        return const AuthResult.failure(
+          'طريقة تسجيل الدخول الحالية غير مدعومة للحذف.\n'
+          'يرجى التواصل مع الدعم.',
+        );
+      }
+
+      if (reauthResult.isCancelled) {
+        return const AuthResult.cancelled();
+      }
+      if (!reauthResult.isSuccess) {
+        return AuthResult.failure(
+          reauthResult.error ?? 'فشل التحقق من الهوية',
+        );
+      }
+
+      // ── 2) حذف مفضلة المستخدم ──
+      final uid = currentUser.uid;
       try {
         final favsSnap = await _firestore!
             .collection('users')
@@ -321,19 +460,19 @@ class AuthController extends ChangeNotifier {
         debugPrint('deleteAccount: favorites cleanup failed ($e)');
       }
 
-      // ── 2) حذف وثيقة المستخدم ──
+      // ── 3) حذف وثيقة المستخدم ──
       try {
         await _firestore!.collection('users').doc(uid).delete();
       } catch (e) {
         debugPrint('deleteAccount: user doc cleanup failed ($e)');
       }
 
-      // ── 3) Google sign-out ──
+      // ── 4) Google sign-out ──
       try {
         await _googleSignIn?.signOut();
       } catch (_) {}
 
-      // ── 4) حذف حساب Firebase Auth ──
+      // ── 5) حذف حساب Firebase Auth ──
       try {
         await currentUser.delete();
       } on FirebaseAuthException catch (e) {
@@ -344,7 +483,7 @@ class AuthController extends ChangeNotifier {
         return AuthResult.failure(_mapAuthError(e));
       }
 
-      // ── 5) signOut + force state ──
+      // ── 6) signOut + force state ──
       try {
         await _auth!.signOut();
       } catch (e) {
@@ -353,6 +492,7 @@ class AuthController extends ChangeNotifier {
 
       _user = null;
       _isGuest = false;
+      _resetRole();
       notifyListeners();
 
       return const AuthResult.success();
@@ -363,6 +503,18 @@ class AuthController extends ChangeNotifier {
       _setLoading(false);
     }
   }
+
+  // ============================================================
+  // PROVIDER DETECTION (D4)
+  // ============================================================
+
+  /// هل الحساب مسجَّل عبر Google؟
+  bool get hasGoogleProvider =>
+      _user?.providerData.any((p) => p.providerId == 'google.com') ?? false;
+
+  /// هل الحساب مسجَّل عبر Email/Password؟
+  bool get hasPasswordProvider =>
+      _user?.providerData.any((p) => p.providerId == 'password') ?? false;
 
   // ============================================================
   // GUEST MODE

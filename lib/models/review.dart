@@ -1,4 +1,14 @@
 // models/review.dart
+//
+// [v1.1 — 2026-10-14] — Foundation for QR-verified reviews (G6)
+//   - NEW: isVerified (bool) — تُعيّن من Admin/Cloud Function فقط
+//   - NEW: visitId (String?) — مرجع لـ visits/{id} عند التحقق عبر QR
+//   - NEW: verifiedAt (DateTime?) — متى تم التحقق
+//   - الافتراضيات الآن: isVerified=false, visitId=null, verifiedAt=null
+//   - سيتفعّل في G6 مع QR Scanner + Verified Visits
+//
+// [v1.0 — 2026-10-08]
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Review {
@@ -12,6 +22,17 @@ class Review {
   final List<String> imageUrls;
   final DateTime? createdAt;
 
+  // ─── [v1.1] QR Verification foundation ───
+  /// true فقط عندما تُتحقق الزيارة عبر QR (G6).
+  /// لا يمكن للمستخدم تعيينها — فقط Admin أو Cloud Function.
+  final bool isVerified;
+
+  /// مرجع لـ visits/{id} الذي أكّد الزيارة عبر QR.
+  final String? visitId;
+
+  /// وقت التحقق من الزيارة (يُعيَّن server-side).
+  final DateTime? verifiedAt;
+
   const Review({
     required this.id,
     required this.placeId,
@@ -22,6 +43,9 @@ class Review {
     this.comment = '',
     this.imageUrls = const [],
     this.createdAt,
+    this.isVerified = false,
+    this.visitId,
+    this.verifiedAt,
   });
 
   factory Review.fromMap(String id, Map<String, dynamic> map) {
@@ -35,6 +59,9 @@ class Review {
       comment: (map['comment'] as String?) ?? '',
       imageUrls: List<String>.from(map['imageUrls'] ?? const []),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      isVerified: (map['isVerified'] as bool?) ?? false,
+      visitId: map['visitId'] as String?,
+      verifiedAt: (map['verifiedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -49,6 +76,9 @@ class Review {
         'createdAt': createdAt != null
             ? Timestamp.fromDate(createdAt!)
             : FieldValue.serverTimestamp(),
+        'isVerified': isVerified,
+        if (visitId != null) 'visitId': visitId,
+        if (verifiedAt != null) 'verifiedAt': Timestamp.fromDate(verifiedAt!),
       };
 
   Review copyWith({
@@ -61,6 +91,9 @@ class Review {
     String? comment,
     List<String>? imageUrls,
     DateTime? createdAt,
+    bool? isVerified,
+    String? visitId,
+    DateTime? verifiedAt,
   }) =>
       Review(
         id: id ?? this.id,
@@ -72,8 +105,12 @@ class Review {
         comment: comment ?? this.comment,
         imageUrls: imageUrls ?? this.imageUrls,
         createdAt: createdAt ?? this.createdAt,
+        isVerified: isVerified ?? this.isVerified,
+        visitId: visitId ?? this.visitId,
+        verifiedAt: verifiedAt ?? this.verifiedAt,
       );
 
   @override
-  String toString() => 'Review($id, place=$placeId, rating=$rating)';
+  String toString() =>
+      'Review($id, place=$placeId, rating=$rating, verified=$isVerified)';
 }

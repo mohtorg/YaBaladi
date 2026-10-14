@@ -9,6 +9,7 @@ import '../../features/favorites/favorites_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
 import '../../features/places/screens/place_map_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/reviews/screens/my_reviews_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../features/search/screens/explore_screen.dart';
@@ -19,28 +20,17 @@ import 'route_paths.dart';
 
 /// إنشاء GoRouter مع AuthController مُمرَّر
 ///
-/// [v2.0 — StatefulShellRoute Migration]
-///   - تم التحويل من ShellRoute البسيط إلى StatefulShellRoute.indexedStack
-///     لحفظ حالة التبويبات ومنع إعادة إنشاء HomeScreen/WelcomeHeader في كل تنقل.
-///   - /category/:id و /place/:id أصبحت routes فرعية لـ / (branch 0).
-///   - URLs لم تتغيّر (نفس RoutePaths.categoryPath/placePath).
+/// [v2.2 — 2026-10-14] — Favorites drill-down from Profile
+///   - NEW: /profile/favorites (نفس FavoritesScreen — لكن back يرجع لـ Profile)
+///
+/// [v2.1 — 2026-10-14] — R4: My Reviews route
 GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
     initialLocation: RoutePaths.home,
     debugLogDiagnostics: true,
-
-    // ✅ يخلي GoRouter يعيد تقييم redirect
-    // كل ما AuthController ينبّه (login / signup / guest / signout).
     refreshListenable: auth,
-
-    redirect: (context, state) {
-      return authGuard(auth: auth, state: state);
-    },
-
+    redirect: (context, state) => authGuard(auth: auth, state: state),
     routes: [
-      // ═══════════════════════════════════════════════════════════
-      // Stateful Shell (Bottom Nav) — 4 branches
-      // ═══════════════════════════════════════════════════════════
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
@@ -49,13 +39,12 @@ GoRouter createAppRouter(AuthController auth) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.home, // '/'
+                path: RoutePaths.home,
                 name: RouteNames.home,
                 builder: (context, state) => const HomeScreen(),
                 routes: [
-                  // /category/:id — تحت branch 0 (Home)
                   GoRoute(
-                    path: 'category/:id', // → '/category/:id'
+                    path: 'category/:id',
                     name: RouteNames.category,
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
@@ -63,7 +52,7 @@ GoRouter createAppRouter(AuthController auth) {
                     },
                     routes: [
                       GoRoute(
-                        path: 'map', // → '/category/:id/map'
+                        path: 'map',
                         name: RouteNames.categoryMap,
                         builder: (context, state) {
                           final id = state.pathParameters['id'] ?? '';
@@ -72,9 +61,8 @@ GoRouter createAppRouter(AuthController auth) {
                       ),
                     ],
                   ),
-                  // /place/:id — تحت branch 0 (Home)
                   GoRoute(
-                    path: 'place/:id', // → '/place/:id'
+                    path: 'place/:id',
                     name: RouteNames.place,
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
@@ -82,7 +70,7 @@ GoRouter createAppRouter(AuthController auth) {
                     },
                     routes: [
                       GoRoute(
-                        path: 'map', // → '/place/:id/map'
+                        path: 'map',
                         name: RouteNames.placeMap,
                         builder: (context, state) {
                           final id = state.pathParameters['id'] ?? '';
@@ -96,18 +84,31 @@ GoRouter createAppRouter(AuthController auth) {
             ],
           ),
 
-          // ─── Branch 1: Profile ───
+          // ─── Branch 1: Profile + My Reviews + Favorites (drill-down) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RoutePaths.profile,
                 name: RouteNames.profile,
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'my-reviews',
+                    name: RouteNames.myReviews,
+                    builder: (context, state) => const MyReviewsScreen(),
+                  ),
+                  // [v2.2] Favorites drill-down — نفس الشاشة، لكن back يرجع لـ Profile
+                  GoRoute(
+                    path: 'favorites',
+                    name: RouteNames.profileFavorites,
+                    builder: (context, state) => const FavoritesScreen(),
+                  ),
+                ],
               ),
             ],
           ),
 
-          // ─── Branch 2: Favorites ───
+          // ─── Branch 2: Favorites (bottom nav tab) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -130,10 +131,6 @@ GoRouter createAppRouter(AuthController auth) {
           ),
         ],
       ),
-
-      // ═══════════════════════════════════════════════════════════
-      // Auth routes — خارج الـ Shell (بدون Bottom Nav)
-      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.login,
         name: RouteNames.login,
@@ -149,20 +146,15 @@ GoRouter createAppRouter(AuthController auth) {
         name: RouteNames.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-
-      // ─── البحث الحر — خارج الـ Shell ───
       GoRoute(
         path: RoutePaths.search,
         name: RouteNames.search,
         builder: (context, state) => const ExploreScreen(),
       ),
     ],
-
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('خطأ 404')),
-      body: Center(
-        child: Text('الصفحة غير موجودة: ${state.uri}'),
-      ),
+      body: Center(child: Text('الصفحة غير موجودة: ${state.uri}')),
     ),
   );
 }

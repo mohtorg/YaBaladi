@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -53,17 +50,16 @@ class DefaultFirebaseOptions {
   // WEB
   // ═══════════════════════════════════════════════════════════
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBjhczo21WOoM0sHHO_c_tsgguewqFbtrg',
-    appId: '1:231838490815:web:5a724a24ed775a5436e60a',
+    apiKey: 'AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q',
+    appId: '1:231838490815:web:ivkqvuc58t65p2riietbiqcecdhb27se',
     messagingSenderId: '231838490815',
     projectId: 'ya-baladi',
     authDomain: 'ya-baladi.firebaseapp.com',
     storageBucket: 'ya-baladi.firebasestorage.app',
-    measurementId: 'G-3DNHMMQ7C2',
   );
 
   // ═══════════════════════════════════════════════════════════
-  // ANDROID
+  // ANDROID — com.egypt.yabaladi_rebuild
   // ═══════════════════════════════════════════════════════════
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q',
@@ -71,5 +67,17 @@ class DefaultFirebaseOptions {
     messagingSenderId: '231838490815',
     projectId: 'ya-baladi',
     storageBucket: 'ya-baladi.firebasestorage.app',
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // iOS
+  // ═══════════════════════════════════════════════════════════
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q',
+    appId: '1:231838490815:ios:n3t3qiv2sm3de8diuttgtqrmr0ksrjui',
+    messagingSenderId: '231838490815',
+    projectId: 'ya-baladi',
+    storageBucket: 'ya-baladi.firebasestorage.app',
+    iosBundleId: 'com.example.yaBaladi',
   );
 }

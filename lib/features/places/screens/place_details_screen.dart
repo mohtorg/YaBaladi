@@ -8,6 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../features/favorites/controllers/favorites_controller.dart';
+import '../../../features/reviews/controllers/reviews_controller.dart';
+import '../../../features/reviews/widgets/add_review_sheet.dart';
+import '../../../features/reviews/widgets/reviews_section.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/place.dart';
 import '../../../repositories/places_repository.dart';
@@ -15,6 +18,17 @@ import '../../../theme/design_tokens.dart';
 import '../../../widgets/login_required_dialog.dart';
 
 /// شاشة تفاصيل المكان.
+///
+/// [v2.1 — _ReviewsBlock StatefulWidget]
+///   - FIX: تحويل _ReviewsBlock إلى StatefulWidget
+///   - FIX: استخدام `mounted` من State بدل `context.mounted`
+///          (Analyzer لا يقبل context.mounted على parameter)
+///
+/// [v2.0 — F2.4: Reviews integration]
+///   - NEW: ChangeNotifierProvider<ReviewsController> حول الشاشة
+///   - NEW: استدعاء load(placeId) في initState
+///   - NEW: استبدال "المراجعات قادمة قريبًا" بـ <ReviewsSection>
+///   - NEW: _handleAddReview — guest + already-reviewed + sheet
 class PlaceDetailsScreen extends StatefulWidget {
   const PlaceDetailsScreen({super.key, required this.placeId});
 
@@ -27,53 +41,68 @@ class PlaceDetailsScreen extends StatefulWidget {
 class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
   final _repo = PlacesRepository();
   late Future<Place?> _future;
+  late final ReviewsController _reviewsCtrl;
 
   @override
   void initState() {
     super.initState();
     _future = _repo.getById(widget.placeId);
+    _reviewsCtrl = ReviewsController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
       final uid = context.read<AuthController>().uid;
       if (uid != null) {
         context.read<FavoritesController>().load(uid, widget.placeId);
       }
+
+      _reviewsCtrl.load(widget.placeId);
     });
+  }
+
+  @override
+  void dispose() {
+    _reviewsCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.appName),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(RoutePaths.home);
+    return ChangeNotifierProvider<ReviewsController>.value(
+      value: _reviewsCtrl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.appName),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(RoutePaths.home);
+              }
+            },
+          ),
+        ),
+        body: FutureBuilder<Place?>(
+          future: _future,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
+            if (snap.hasError) {
+              return _ErrorView(message: snap.error.toString());
+            }
+            final place = snap.data;
+            if (place == null) {
+              return const _EmptyView();
+            }
+            return _PlaceBody(place: place);
           },
         ),
-      ),
-      body: FutureBuilder<Place?>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return _ErrorView(message: snap.error.toString());
-          }
-          final place = snap.data;
-          if (place == null) {
-            return const _EmptyView();
-          }
-          return _PlaceBody(place: place);
-        },
       ),
     );
   }
@@ -159,19 +188,88 @@ class _PlaceBody extends StatelessWidget {
 
         const SizedBox(height: YaBaladiDesignTokens.space4),
 
-        // ─── Reviews teaser ───
+        // ─── Reviews ───
         const Divider(),
-        const SizedBox(height: YaBaladiDesignTokens.space2),
-        Center(
-          child: Text(
-            'المراجعات قادمة قريبًا',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ),
+        const SizedBox(height: YaBaladiDesignTokens.space3),
+        _ReviewsBlock(place: place),
+
         const SizedBox(height: YaBaladiDesignTokens.space6),
       ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REVIEWS BLOCK  (v2.1 — StatefulWidget)
+// ═══════════════════════════════════════════════════════════════
+
+class _ReviewsBlock extends StatefulWidget {
+  const _ReviewsBlock({required this.place});
+
+  final Place place;
+
+  @override
+  State<_ReviewsBlock> createState() => _ReviewsBlockState();
+}
+
+class _ReviewsBlockState extends State<_ReviewsBlock> {
+  Future<void> _handleAddReview() async {
+    final auth = context.read<AuthController>();
+    final ctrl = context.read<ReviewsController>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    // ── Guest guard ──
+    if (auth.uid == null) {
+      await showLoginRequiredDialog(context, featureName: 'المراجعات');
+      return;
+    }
+
+    if (!mounted) return;
+
+    // ── Already reviewed guard ──
+    if (ctrl.hasReviewed(auth.uid!)) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('لديك مراجعة على هذا المكان بالفعل'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      return;
+    }
+
+    // ── Open sheet ──
+    final submitted = await AddReviewSheet.show(
+      context,
+      controller: ctrl,
+      placeId: widget.place.id,
+      userId: auth.uid!,
+      userName: auth.displayName ?? 'مستخدم',
+      userPhotoUrl: auth.photoUrl ?? '',
+    );
+
+    if (!mounted) return;
+
+    if (submitted == true) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('شكراً على مشاركة تجربتك!'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+
+    return ReviewsSection(
+      currentUserId: auth.uid,
+      onAddReview: _handleAddReview,
     );
   }
 }
@@ -347,15 +445,13 @@ class _FavoriteButton extends StatelessWidget {
   Future<void> _toggle(BuildContext context) async {
     final auth = context.read<AuthController>();
     final uid = auth.uid;
+    final messenger = ScaffoldMessenger.of(context);
+    final fav = context.read<FavoritesController>();
 
     if (uid == null) {
       await showLoginRequiredDialog(context, featureName: 'المفضلة');
       return;
     }
-
-    // ✅ نلتقط messenger قبل await
-    final messenger = ScaffoldMessenger.of(context);
-    final fav = context.read<FavoritesController>();
 
     try {
       final newState = await fav.toggle(uid, placeId);
@@ -425,11 +521,7 @@ class _ActionButtons extends StatelessWidget {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // CALL
-  // ═══════════════════════════════════════════════════════════════
   Future<void> _launchCall(BuildContext context, String phone) async {
-    // ✅ نلتقط messenger قبل أي await
     final messenger = ScaffoldMessenger.of(context);
     final uri = Uri(scheme: 'tel', path: phone);
 
@@ -444,11 +536,7 @@ class _ActionButtons extends StatelessWidget {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // WHATSAPP
-  // ═══════════════════════════════════════════════════════════════
   Future<void> _launchWhatsApp(BuildContext context, String phone) async {
-    // ✅ نلتقط messenger قبل أي await
     final messenger = ScaffoldMessenger.of(context);
     final clean = phone.replaceAll(RegExp(r'\D'), '');
     final uri = Uri.parse('https://wa.me/$clean');
@@ -464,11 +552,7 @@ class _ActionButtons extends StatelessWidget {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // DIRECTIONS (Multi-platform: Android / iOS / Web)
-  // ═══════════════════════════════════════════════════════════════
   Future<void> _openInMaps(BuildContext context, Place place) async {
-    // ✅ نلتقط messenger قبل أي await
     final messenger = ScaffoldMessenger.of(context);
 
     final lat = place.location!.latitude;
@@ -520,9 +604,6 @@ class _ActionButtons extends StatelessWidget {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // ERROR HELPER (يستقبل ScaffoldMessengerState مباشرة)
-  // ═══════════════════════════════════════════════════════════════
   void _showError(ScaffoldMessengerState messenger, String message) {
     messenger
       ..hideCurrentSnackBar()

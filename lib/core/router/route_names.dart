@@ -17,4 +17,8 @@ class RouteNames {
   // ─── الخرائط ───
   static const String placeMap = 'placeMap';
   static const String categoryMap = 'categoryMap';
+
+  // [v1.2 — 2026-10-14] مسارات فرعية
+  static const String myReviews = 'myReviews';
+  static const String profileFavorites = 'profileFavorites';
 }

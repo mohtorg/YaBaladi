@@ -1,11 +1,29 @@
 rules_version = '2';
 
+// ═══════════════════════════════════════════════════════════════
+// YaBaladi Firestore Security Rules
+// [v2.1 — 2026-10-14]
+//   - FIX: 'text' → 'comment' in reviews validation (model uses 'comment')
+//   - NEW: isVerified/visitId/verifiedAt protected (G6 QR foundation)
+//     * user عادي: لا يمكن تعيين isVerified=true أو visitId/verifiedAt
+//     * update: isVerified غير قابل للترقية من user عادي
+//   - يُنفَّذ QR Verification في G6 عبر Cloud Function (Admin SDK)
+//
+// [v2.0 — 2026-10-14]
+//   - NEW: visit_requests rules (was missing)
+//   - HARDEN: users update — email locked to auth token
+//
+// [v1.1 — 2026-10-13]
+//   - allow delete: self in /users (fixes deleteAccount permission-denied)
+// ═══════════════════════════════════════════════════════════════
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ═══════════════════════════════════════════════════════════
     // HELPERS
     // ═══════════════════════════════════════════════════════════
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -38,6 +56,38 @@ service cloud.firestore {
       return isSignedIn() && uid() == userId;
     }
 
+    function isString(field, minLen, maxLen) {
+      return field is string
+          && field.size() >= minLen
+          && field.size() <= maxLen;
+    }
+
+    function isValidRating(rating) {
+      return rating is number && rating >= 1 && rating <= 5;
+    }
+
+    function authEmail() {
+      return request.auth.token.email;
+    }
+
+    // [v2.1] — QR Verification guards (للاستخدام في reviews)
+    // user عادي لا يستطيع تعيين isVerified=true أو visitId/verifiedAt
+    function noQrFieldsOnCreate() {
+      return (
+        !('isVerified' in request.resource.data)
+        || request.resource.data.isVerified == false
+      )
+      && !('visitId' in request.resource.data)
+      && !('verifiedAt' in request.resource.data);
+    }
+
+    // update: منع ترقية isVerified من false → true
+    function noQrUpgrade() {
+      return !('isVerified' in request.resource.data)
+             || request.resource.data.isVerified
+                == resource.data.isVerified;
+    }
+
     // ═══════════════════════════════════════════════════════════
     // USERS
     // ═══════════════════════════════════════════════════════════
@@ -47,15 +97,28 @@ service cloud.firestore {
 
       allow create: if isSelf(userId)
                     && request.resource.data.role == 'user'
-                    && request.resource.data.status == 'active';
+                    && request.resource.data.uid == userId
+                    && (
+                      !('status' in request.resource.data)
+                      || request.resource.data.status == 'active'
+                    );
 
       allow update: if isSelf(userId)
                     && request.resource.data.role == resource.data.role
-                    && request.resource.data.status == resource.data.status;
+                    && request.resource.data.uid == resource.data.uid
+                    && (
+                      !('email' in request.resource.data)
+                      || request.resource.data.email == authEmail()
+                    )
+                    && (
+                      !('status' in request.resource.data)
+                      || !('status' in resource.data)
+                      || request.resource.data.status == resource.data.status
+                    );
 
-      allow update, delete: if isAdmin();
+      allow delete: if isSelf(userId) || isAdmin();
 
-      // ─── Favorites subcollection (احتياطي) ───
+      // ─── Favorites subcollection ───
       match /favorites/{placeId} {
         allow read: if isSelf(userId);
         allow create: if isSelf(userId)
@@ -83,13 +146,10 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // PLACES (Rules صارمة — متوافقة مع الـ queries)
+    // PLACES
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
 
-      // قراءة:
-      // - الأماكن المعتمدة والنشطة: للجميع
-      // - الأماكن غير المعتمدة: للمالك أو الأدمن
       allow read: if (resource.data.isApproved == true
                       && resource.data.isActive == true)
                   || (isSignedIn() && (
@@ -99,25 +159,40 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && (isMerchant() || isAdmin())
                     && request.resource.data.ownerId == uid()
-                    && request.resource.data.isApproved == false;
+                    && request.resource.data.isApproved == false
+                    && request.resource.data.isActive == true
+                    && isString(request.resource.data.nameAr, 2, 100)
+                    && isString(request.resource.data.nameEn, 2, 100);
 
       allow update: if isSignedIn()
                     && (
                       (resource.data.ownerId == uid()
                        && request.resource.data.isApproved
-                          == resource.data.isApproved)
+                          == resource.data.isApproved
+                       && request.resource.data.ownerId
+                          == resource.data.ownerId)
                       || isAdmin()
                     );
 
       allow delete: if isAdmin();
 
       // ─── Reviews subcollection ───
+      // [v2.1] 'text' → 'comment' + QR guards
       match /reviews/{reviewId} {
         allow read: if true;
+
         allow create: if isSignedIn()
-                      && request.resource.data.userId == uid();
-        allow update, delete: if isSignedIn()
-                              && (resource.data.userId == uid() || isAdmin());
+                      && request.resource.data.userId == uid()
+                      && isValidRating(request.resource.data.rating)
+                      && isString(request.resource.data.comment, 1, 1000)
+                      && noQrFieldsOnCreate();
+
+        allow update: if isSignedIn()
+                      && (resource.data.userId == uid() || isAdmin())
+                      && noQrUpgrade();
+
+        allow delete: if isSignedIn()
+                      && (resource.data.userId == uid() || isAdmin());
       }
     }
 
@@ -130,18 +205,28 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REVIEWS (top-level)
+    // REVIEWS (top-level) — المستخدم من قبل ReviewsController
+    // [v2.1] 'text' → 'comment' + QR guards
     // ═══════════════════════════════════════════════════════════
     match /reviews/{reviewId} {
       allow read: if true;
+
       allow create: if isSignedIn()
-                    && request.resource.data.userId == uid();
-      allow update, delete: if isSignedIn()
-                            && (resource.data.userId == uid() || isAdmin());
+                    && request.resource.data.userId == uid()
+                    && isValidRating(request.resource.data.rating)
+                    && isString(request.resource.data.comment, 1, 1000)
+                    && noQrFieldsOnCreate();
+
+      allow update: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin())
+                    && noQrUpgrade();
+
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin());
     }
 
     // ═══════════════════════════════════════════════════════════
-    // MERCHANTS (Phase 2)
+    // MERCHANTS
     // ═══════════════════════════════════════════════════════════
     match /merchants/{merchantId} {
       allow read: if isSignedIn()
@@ -150,7 +235,33 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // DEFAULT: رفض
+    // VISIT REQUESTS
+    // ═══════════════════════════════════════════════════════════
+    match /visit_requests/{requestId} {
+
+      allow read: if isSignedIn()
+                  && (resource.data.userId == uid() || isAdmin());
+
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && request.resource.data.status == 'pending';
+
+      allow update: if isAdmin()
+                    || (isSignedIn()
+                        && resource.data.userId == uid()
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'cancelled');
+
+      allow delete: if isSignedIn()
+                    && (
+                      (resource.data.userId == uid()
+                       && resource.data.status == 'pending')
+                      || isAdmin()
+                    );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DEFAULT: DENY ALL
     // ═══════════════════════════════════════════════════════════
     match /{document=**} {
       allow read, write: if false;

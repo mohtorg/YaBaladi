@@ -11,6 +11,10 @@ class RoutePaths {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
 
+  // [v1.2 — 2026-10-14] مسارات فرعية تحت profile (drill-down)
+  static const String myReviews = '/profile/my-reviews';
+  static const String profileFavorites = '/profile/favorites';
+
   // ─── تصنيف / أماكن ───
   static const String category = '/category/:id';
   static String categoryPath(String id) => '/category/$id';

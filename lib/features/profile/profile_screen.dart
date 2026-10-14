@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/auth/role.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/favorites/controllers/favorites_controller.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../repositories/reviews_repository.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
@@ -13,6 +15,12 @@ import '../auth/controllers/auth_controller.dart';
 /// شاشة حسابي:
 /// - Guest → بطاقة ترقية الحساب + خروج من الوضع الزائر
 /// - User → بيانات + إحصائيات + بطاقات مستقبلية + خروج
+///
+/// [v1.4 — 2026-10-14] — G4.1-d: Role Badge
+///   - NEW: _RoleBadge يظهر تحت الاسم للأدوار المرتفعة فقط
+///   - NEW: import core/auth/role.dart
+///
+/// [v1.3 — 2026-10-14] — Favorites drill-down
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -58,6 +66,10 @@ class ProfileScreen extends StatelessWidget {
             name: displayName,
             initials: _initials(displayName),
           ),
+
+          // [v1.4 — G4.1-d] Role Badge — يظهر للأدوار المرتفعة فقط
+          const SizedBox(height: 8),
+          _RoleBadge(role: auth.currentRole),
 
           const SizedBox(height: YaBaladiDesignTokens.space5),
           const Divider(height: 1),
@@ -142,6 +154,55 @@ class ProfileScreen extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ROLE BADGE  [v1.4 — G4.1-d]
+// ═══════════════════════════════════════════════════════════════
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.role});
+
+  final UserRole role;
+
+  @override
+  Widget build(BuildContext context) {
+    // عضو عادي أو زائر — لا شارة
+    if (role == UserRole.member || role == UserRole.visitor) {
+      return const SizedBox.shrink();
+    }
+
+    final (Color color, IconData icon) = switch (role) {
+      UserRole.merchant => (Colors.blue, Icons.storefront),
+      UserRole.team => (Colors.teal, Icons.groups),
+      UserRole.moderator => (Colors.orange, Icons.verified_user),
+      UserRole.manager => (Colors.purple, Icons.admin_panel_settings),
+      UserRole.admin => (Colors.red, Icons.shield),
+      _ => (Colors.grey, Icons.person),
+    };
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Chip(
+          avatar: Icon(icon, size: 16, color: color),
+          label: Text(
+            role.labelAr,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          backgroundColor: color.withValues(alpha: 0.1),
+          side: BorderSide(color: color.withValues(alpha: 0.3)),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // GUEST UPGRADE CARD
 // ═══════════════════════════════════════════════════════════════
 
@@ -205,9 +266,8 @@ class _GuestUpgradeCard extends StatelessWidget {
           const SizedBox(height: YaBaladiDesignTokens.space5),
           _BenefitRow(
             icon: Icons.favorite_border,
-            label: isArabic
-                ? 'احفظ مفضلتك في أي وقت'
-                : 'Save favorites anytime',
+            label:
+                isArabic ? 'احفظ مفضلتك في أي وقت' : 'Save favorites anytime',
           ),
           const SizedBox(height: YaBaladiDesignTokens.space2),
           _BenefitRow(
@@ -219,9 +279,7 @@ class _GuestUpgradeCard extends StatelessWidget {
           const SizedBox(height: YaBaladiDesignTokens.space2),
           _BenefitRow(
             icon: Icons.local_offer_outlined,
-            label: isArabic
-                ? 'احصل على عروض حصرية'
-                : 'Get exclusive offers',
+            label: isArabic ? 'احصل على عروض حصرية' : 'Get exclusive offers',
           ),
           const SizedBox(height: YaBaladiDesignTokens.space5),
           FilledButton.icon(
@@ -356,8 +414,30 @@ class _ProfileHeader extends StatelessWidget {
 // STATS SECTION
 // ═══════════════════════════════════════════════════════════════
 
-class _StatsSection extends StatelessWidget {
+class _StatsSection extends StatefulWidget {
   const _StatsSection();
+
+  @override
+  State<_StatsSection> createState() => _StatsSectionState();
+}
+
+class _StatsSectionState extends State<_StatsSection> {
+  final _reviewsRepo = ReviewsRepository();
+  Future<int>? _reviewsCountFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final uid = context.read<AuthController>().uid;
+      if (uid != null) {
+        setState(() {
+          _reviewsCountFuture = _reviewsRepo.getCountByUser(uid);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,14 +473,22 @@ class _StatsSection extends StatelessWidget {
                   icon: Icons.favorite_border,
                   label: l10n.profileStatsFavorites,
                   value: favorites.count,
+                  onTap: () => context.go(RoutePaths.profileFavorites),
                 ),
               ),
               const SizedBox(width: YaBaladiDesignTokens.space3),
               Expanded(
-                child: _StatCard(
-                  icon: Icons.star_border,
-                  label: l10n.profileStatsRatings,
-                  value: 0, // TODO: Reviews System
+                child: FutureBuilder<int>(
+                  future: _reviewsCountFuture,
+                  builder: (context, snap) {
+                    final count = snap.data ?? 0;
+                    return _StatCard(
+                      icon: Icons.star_border,
+                      label: l10n.profileStatsRatings,
+                      value: count,
+                      onTap: () => context.go(RoutePaths.myReviews),
+                    );
+                  },
                 ),
               ),
             ],
@@ -416,38 +504,44 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final int value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(YaBaladiDesignTokens.space4),
-        child: Column(
-          children: [
-            Icon(icon, color: theme.colorScheme.primary, size: 28),
-            const SizedBox(height: YaBaladiDesignTokens.space2),
-            Text(
-              '$value',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(YaBaladiDesignTokens.space4),
+          child: Column(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary, size: 28),
+              const SizedBox(height: YaBaladiDesignTokens.space2),
+              Text(
+                '$value',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: YaBaladiDesignTokens.space1),
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: YaBaladiDesignTokens.space1),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -481,7 +575,6 @@ class _LoyaltyComingSoonCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── Header ───
             Row(
               children: [
                 Container(
@@ -514,8 +607,8 @@ class _LoyaltyComingSoonCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.15),
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -537,12 +630,9 @@ class _LoyaltyComingSoonCard extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
             const Divider(height: 1),
             const SizedBox(height: 12),
-
-            // ─── Subtitle ───
             Text(
               isArabic
                   ? '🎁 كيف ستكسب نقاطًا من تفاعلك؟'
@@ -553,8 +643,6 @@ class _LoyaltyComingSoonCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
-            // ─── Points Rules ───
             _LoyaltyRuleRow(
               icon: Icons.favorite_border,
               label: isArabic ? 'إضافة مفضلة' : 'Add favorite',
@@ -687,8 +775,8 @@ class _ReferralComingSoonCard extends StatelessWidget {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.15),
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
