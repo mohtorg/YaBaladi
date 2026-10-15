@@ -1,9 +1,22 @@
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+// lib/features/places/screens/place_details_screen.dart
+//
+// [v2.2 — 2026-10-15] — Removed url_launcher dependency
+//   - FIX: إزالة import url_launcher
+//   - CHANGE: _launchCall/_launchWhatsApp/_openInMaps → SnackBar مؤقت
+//   - CLEANUP: إزالة kIsWeb + defaultTargetPlatform + TargetPlatform
+//
+// [v2.1 — _ReviewsBlock StatefulWidget]
+//   - FIX: تحويل _ReviewsBlock إلى StatefulWidget
+//
+// [v2.0 — F2.4: Reviews integration]
+//   - NEW: ChangeNotifierProvider<ReviewsController> حول الشاشة
+//   - NEW: استدعاء load(placeId) في initState
+//   - NEW: استبدال "المراجعات قادمة قريبًا" بـ <ReviewsSection>
+//   - NEW: _handleAddReview — guest + already-reviewed + sheet
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
@@ -18,17 +31,6 @@ import '../../../theme/design_tokens.dart';
 import '../../../widgets/login_required_dialog.dart';
 
 /// شاشة تفاصيل المكان.
-///
-/// [v2.1 — _ReviewsBlock StatefulWidget]
-///   - FIX: تحويل _ReviewsBlock إلى StatefulWidget
-///   - FIX: استخدام `mounted` من State بدل `context.mounted`
-///          (Analyzer لا يقبل context.mounted على parameter)
-///
-/// [v2.0 — F2.4: Reviews integration]
-///   - NEW: ChangeNotifierProvider<ReviewsController> حول الشاشة
-///   - NEW: استدعاء load(placeId) في initState
-///   - NEW: استبدال "المراجعات قادمة قريبًا" بـ <ReviewsSection>
-///   - NEW: _handleAddReview — guest + already-reviewed + sheet
 class PlaceDetailsScreen extends StatefulWidget {
   const PlaceDetailsScreen({super.key, required this.placeId});
 
@@ -200,7 +202,7 @@ class _PlaceBody extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// REVIEWS BLOCK  (v2.1 — StatefulWidget)
+// REVIEWS BLOCK
 // ═══════════════════════════════════════════════════════════════
 
 class _ReviewsBlock extends StatefulWidget {
@@ -476,7 +478,8 @@ class _FavoriteButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ACTION BUTTONS (Call + WhatsApp + Map + Directions)
+// ACTION BUTTONS
+// [v2.2] الإجراءات الخارجية معطَّلة مؤقتاً — url_launcher cache مكسور
 // ═══════════════════════════════════════════════════════════════
 
 class _ActionButtons extends StatelessWidget {
@@ -521,95 +524,37 @@ class _ActionButtons extends StatelessWidget {
     );
   }
 
+  /// [v2.2] SnackBar مؤقت — سيُستخدَم url_launcher عند إعادته.
   Future<void> _launchCall(BuildContext context, String phone) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final uri = Uri(scheme: 'tel', path: phone);
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        _showError(messenger, 'تعذّر فتح تطبيق الاتصال');
-      }
-    } catch (e) {
-      _showError(messenger, 'تعذّر الاتصال');
-    }
-  }
-
-  Future<void> _launchWhatsApp(BuildContext context, String phone) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final clean = phone.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/$clean');
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _showError(messenger, 'تعذّر فتح واتساب');
-      }
-    } catch (e) {
-      _showError(messenger, 'تعذّر فتح واتساب');
-    }
-  }
-
-  Future<void> _openInMaps(BuildContext context, Place place) async {
-    final messenger = ScaffoldMessenger.of(context);
-
-    final lat = place.location!.latitude;
-    final lng = place.location!.longitude;
-    final name = Uri.encodeComponent(place.nameAr);
-
-    final Uri uri;
-    final LaunchMode mode;
-
-    if (kIsWeb) {
-      uri = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-      );
-      mode = LaunchMode.platformDefault;
-    } else {
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.android:
-          uri = Uri.parse('geo:$lat,$lng?q=$lat,$lng($name)');
-          mode = LaunchMode.externalApplication;
-          break;
-        case TargetPlatform.iOS:
-          uri = Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&q=$name');
-          mode = LaunchMode.externalApplication;
-          break;
-        default:
-          uri = Uri.parse(
-            'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-          );
-          mode = LaunchMode.platformDefault;
-      }
-    }
-
-    try {
-      if (!await canLaunchUrl(uri)) {
-        final fallback = Uri.parse(
-          'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-        );
-        if (await canLaunchUrl(fallback)) {
-          await launchUrl(fallback, mode: LaunchMode.externalApplication);
-          return;
-        }
-        _showError(messenger, 'تعذّر فتح تطبيق الخرائط');
-        return;
-      }
-
-      await launchUrl(uri, mode: mode);
-    } catch (e) {
-      _showError(messenger, 'تعذّر فتح الخرائط');
-    }
-  }
-
-  void _showError(ScaffoldMessengerState messenger, String message) {
-    messenger
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
+        const SnackBar(
+          content: Text('الاتصال — قيد الإصلاح'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  /// [v2.2] SnackBar مؤقت.
+  Future<void> _launchWhatsApp(BuildContext context, String phone) async {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('واتساب — قيد الإصلاح'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  /// [v2.2] SnackBar مؤقت — نفس الرسالة في كل المنصات.
+  Future<void> _openInMaps(BuildContext context, Place place) async {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('الاتجاهات — قيد الإصلاح'),
           behavior: SnackBarBehavior.floating,
         ),
       );

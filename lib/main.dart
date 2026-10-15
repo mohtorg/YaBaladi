@@ -11,6 +11,7 @@ import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
 import 'features/favorites/controllers/favorites_controller.dart';
 import 'features/places/controllers/places_controller.dart';
+import 'features/trip/controllers/trip_plans_controller.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/locale_controller.dart';
@@ -66,6 +67,10 @@ class YaBaladiApp extends StatelessWidget {
         // [v1.1 — 2026-10-14] — G4.2-c
         ChangeNotifierProvider<BrowsingLocationController>(
           create: (_) => BrowsingLocationController(),
+        ),
+        // [v1.2 — 2026-10-15] — G6.7: Trip Planner
+        ChangeNotifierProvider<TripPlansController>(
+          create: (_) => TripPlansController(),
         ),
       ],
       child: const _AppRoot(),

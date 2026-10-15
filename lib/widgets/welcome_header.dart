@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/location/browsing_location_controller.dart';
+import '../core/location/governorate_picker_sheet.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../services/location_service.dart';
 import '../theme/design_tokens.dart';
 
-/// Header ترحيبي نظيف للشاشة الرئيسية.
+/// Header ترحيبي للشاشة الرئيسية.
 ///
-/// [v1.1 — PostFrame Deferral Fix]
-///   - FIX: _fetchLocation() تُستدعى الآن من addPostFrameCallback
-///          بدل initState مباشرة → setState لم يعد يُنفَّذ أثناء build.
-///          يمنع "setState() called during build" المتكرر في Run log.
+/// [v2.0.3 — 2026-10-14] — Nominatim integration
+///   - CHANGE: _GovernorateButton يستقبل `label` بدل `browsing`
+///   - CHANGE: يعرض "بورسعيد - الشرق" عبر browsingShortLabel
+///   - FIX: إزالة `_location` (غير مستخدم)
+///   - CLEANUP: إزالة import egypt_governorates
+///
+/// [v2.0.1 — 2026-10-14] — Type-safety fix
+/// [v2.0 — 2026-10-14] — G4.2-c-3: Governorate Switcher
+/// [v1.1 — 2026-10-13] — PostFrame deferral
 class WelcomeHeader extends StatefulWidget {
   const WelcomeHeader({
     super.key,
@@ -29,7 +36,6 @@ class WelcomeHeader extends StatefulWidget {
 
 class _WelcomeHeaderState extends State<WelcomeHeader>
     with SingleTickerProviderStateMixin {
-  LocationData? _location;
   _LocState _state = _LocState.loading;
 
   late final AnimationController _waveController;
@@ -53,7 +59,6 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
     );
 
-    // [v1.1] تأجيل الاستدعاء لما بعد الإطار الأول — يمنع setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _fetchLocation();
@@ -67,7 +72,6 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
   }
 
   Future<void> _fetchLocation({bool forceRefresh = false}) async {
-    // [v1.1] setState الآن آمن (خارج initState، خارج build)
     if (mounted && _state != _LocState.loading) {
       setState(() => _state = _LocState.loading);
     }
@@ -82,11 +86,17 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     if (!mounted) return;
 
     setState(() {
-      _location = loc;
       _state = loc == null ? _LocState.denied : _LocState.loaded;
     });
 
-    if (loc != null) _waveController.forward();
+    // [v2.0] أبلغ BrowsingLocationController بالموقع الفعلي
+    if (loc != null) {
+      context.read<BrowsingLocationController>().setPhysicalLocation(
+            loc.latitude,
+            loc.longitude,
+          );
+      _waveController.forward();
+    }
   }
 
   String _greeting(String? name, bool isGuest) {
@@ -100,13 +110,8 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = context.watch<AuthController>();
+    final browsingCtrl = context.watch<BrowsingLocationController>();
     final isGuest = auth.isGuest;
-
-    final locationText = switch (_state) {
-      _LocState.loading => 'جارٍ تحديد الموقع…',
-      _LocState.denied => 'الموقع غير مفعّل',
-      _LocState.loaded => _location?.governorateAr ?? '',
-    };
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -156,7 +161,8 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
+                    // ─── زر تبديل المحافظة ───
                     if (_state == _LocState.denied)
                       TextButton.icon(
                         onPressed: () => _fetchLocation(forceRefresh: true),
@@ -172,14 +178,21 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                         ),
                       )
                     else
-                      Text(
-                        '📍 $locationText',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      _GovernorateButton(
+                        label: browsingCtrl.browsingShortLabel,
+                        isLoading: _state == _LocState.loading,
+                        onTap: () => GovernoratePickerSheet.show(
+                          context,
+                          controller: browsingCtrl,
                         ),
                       ),
+                    // ─── شارة "أنت في" ───
+                    if (browsingCtrl.isBrowsingOtherGovernorate) ...[
+                      const SizedBox(height: 4),
+                      _PhysicalBadge(
+                        physicalName: browsingCtrl.physical?.nameAr ?? '',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -234,7 +247,99 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
 enum _LocState { loading, loaded, denied }
 
 // ═══════════════════════════════════════════════════════════════
-// SMART AVATAR (بدون CircleAvatar — يتفادى assertion)
+// GOVERNORATE BUTTON  [v2.0.3 — label-based]
+// ═══════════════════════════════════════════════════════════════
+
+class _GovernorateButton extends StatelessWidget {
+  const _GovernorateButton({
+    required this.label,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  /// [v2.0.3] نص جاهز من `BrowsingLocationController.browsingShortLabel`
+  /// مثال: "بورسعيد - الشرق" أو "الإسكندرية"
+  final String label;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.location_on,
+              size: 14,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                isLoading ? 'جارٍ التحديد…' : label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PHYSICAL BADGE
+// ═══════════════════════════════════════════════════════════════
+
+class _PhysicalBadge extends StatelessWidget {
+  const _PhysicalBadge({required this.physicalName});
+
+  final String physicalName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.my_location,
+          size: 12,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'أنت في: $physicalName',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SMART AVATAR
 // ═══════════════════════════════════════════════════════════════
 
 class _SmartAvatar extends StatelessWidget {

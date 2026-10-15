@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/location/browsing_location_controller.dart';
 import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../features/categories/controllers/categories_controller.dart';
@@ -14,19 +15,17 @@ import '../models/place.dart';
 import '../services/location_service.dart';
 import '../widgets/welcome_header.dart';
 
-/// الصفحة الرئيسية:
-/// - Welcome Header
-/// - Categories Grid (3 أعمدة)
-/// - الأقرب إليك
-/// - الأعلى تقييمًا
-/// - Guest Banner
+/// الصفحة الرئيسية.
+///
+/// [v2.8 — 2026-10-14] — G4.2-c-3: Governorate-aware Home
+///   - NEW: يستمع لـ BrowsingLocationController
+///   - NEW: فلترة Places حسب المحافظة المُتصفَّحة
+///   - NEW: Empty state عند عدم وجود أماكن في المحافظة
+///   - CHANGE: _loadLocation يُبلّغ BrowsingController بالموقع الفعلي
+///   - CHANGE: عنوان "الأعلى تقييماً" يُشير لاسم المحافظة
 ///
 /// [v2.7 — Deferred Reload Fix]
-///   - FIX: didChangeDependencies يؤجّل load() بـ addPostFrameCallback
-///          لتفادي notifyListeners during build عند العودة من ExploreScreen.
-///
 /// [v2.6 — Route Guard]
-///   - FIX: تجاهُل إعادة التحميل إذا لم يكن Home الشاشة العلوية.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -50,14 +49,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // [v2.6] Route Guard: تجاهُل إن لم نكن الشاشة العلوية
+    // [v2.6] Route Guard
     if (ModalRoute.of(context)?.isCurrent != true) return;
 
     final controller = context.read<PlacesController>();
     if (controller.mode != PlacesMode.all) {
-      // [v2.7] Deferred: أجّل load() لما بعد الإطار
-      // لأن didChangeDependencies يعمل داخل build phase،
-      // و load() تستدعي notifyListeners() synchronously.
+      // [v2.7] Deferred load
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         controller.load();
@@ -69,6 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final loc = await LocationService.getCurrentLocation();
     if (!mounted) return;
     setState(() => _userLocation = loc);
+
+    // [v2.8] أبلغ BrowsingLocationController بالموقع الفعلي
+    if (loc != null) {
+      context.read<BrowsingLocationController>().setPhysicalLocation(
+            loc.latitude,
+            loc.longitude,
+          );
+    }
   }
 
   Future<void> _refresh() async {
@@ -86,6 +91,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final categories = context.watch<CategoriesController>();
     final places = context.watch<PlacesController>();
     final auth = context.watch<AuthController>();
+    final browsingCtrl = context.watch<BrowsingLocationController>();
+    final browsing = browsingCtrl.browsing;
+
+    // [v2.8] فلترة Places حسب المحافظة المُتصفَّحة
+    // نستخدم governorate (الاسم العربي) — الموجود في Firestore حالياً
+    final placesInGovernorate =
+        places.places.where((p) => p.governorate == browsing.nameAr).toList();
 
     return Scaffold(
       body: SafeArea(
@@ -105,9 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   onAvatarTap: () => context.go(RoutePaths.profile),
                 ),
               ),
+
+              // ─── Category Grid ───
               if (categories.status == CategoriesStatus.loaded &&
                   categories.categories.isNotEmpty)
                 _CategoryGrid(categories: categories.categories),
+
               if (categories.status == CategoriesStatus.loading)
                 const SliverToBoxAdapter(
                   child: Padding(
@@ -115,21 +130,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 ),
+
+              // ─── Places Sections ───
               if (places.status == PlacesStatus.loaded &&
-                  places.places.isNotEmpty) ...[
+                  placesInGovernorate.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _HorizontalSection(
                     title: '📍 الأقرب إليك',
-                    places: _nearestPlaces(places.places, limit: 5),
+                    places: _nearestPlaces(placesInGovernorate, limit: 5),
                   ),
                 ),
                 SliverToBoxAdapter(
                   child: _HorizontalSection(
-                    title: '⭐ الأعلى تقييمًا',
-                    places: _topRatedPlaces(places.places, limit: 5),
+                    title: '⭐ الأعلى تقييماً في ${browsing.nameAr}',
+                    places: _topRatedPlaces(placesInGovernorate, limit: 5),
                   ),
                 ),
               ],
+
+              // ─── Empty State: المحافظة المُتصفَّحة ليس بها أماكن ───
+              if (places.status == PlacesStatus.loaded &&
+                  placesInGovernorate.isEmpty)
+                SliverToBoxAdapter(
+                  child: _EmptyGovernorateView(
+                    governorateName: browsing.nameAr,
+                    isBrowsingOther: browsingCtrl.isBrowsingOtherGovernorate,
+                    physicalName: browsingCtrl.physical?.nameAr,
+                    onResetToPhysical: () => browsingCtrl.resetToPhysical(),
+                  ),
+                ),
+
               if (auth.isGuest) const SliverToBoxAdapter(child: _GuestBanner()),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
@@ -185,6 +215,66 @@ class _HomeScreenState extends State<HomeScreen> {
             math.sin(dLng / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return R * c;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMPTY GOVERNORATE VIEW  [v2.8]
+// ═══════════════════════════════════════════════════════════════
+
+class _EmptyGovernorateView extends StatelessWidget {
+  const _EmptyGovernorateView({
+    required this.governorateName,
+    required this.isBrowsingOther,
+    required this.physicalName,
+    required this.onResetToPhysical,
+  });
+
+  final String governorateName;
+  final bool isBrowsingOther;
+  final String? physicalName;
+  final VoidCallback onResetToPhysical;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+      child: Column(
+        children: [
+          Icon(
+            Icons.explore_off_outlined,
+            size: 72,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'لا توجد أماكن في $governorateName بعد',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'نعمل على إضافة أماكن ومقدمي خدمات في هذه المحافظة قريباً',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (isBrowsingOther && physicalName != null) ...[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onResetToPhysical,
+              icon: const Icon(Icons.my_location, size: 18),
+              label: Text('العودة لـ $physicalName'),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

@@ -1,9 +1,16 @@
+// lib/features/places/screens/place_map_screen.dart
+//
+// [v1.1 — 2026-10-15] — Removed url_launcher dependency
+//   - FIX: إزالة import url_launcher
+//   - CHANGE: _openDirections → SnackBar مؤقت
+//
+// [v1.0] — خريطة OpenStreetMap عبر flutter_map
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../features/categories/controllers/categories_controller.dart';
@@ -341,7 +348,7 @@ class _PlaceBottomSheet extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _openDirections(place),
+                  onPressed: () => _openDirections(context, place),
                   icon: const Icon(Icons.directions, size: 18),
                   label: Text(l10n.directions),
                 ),
@@ -353,15 +360,17 @@ class _PlaceBottomSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _openDirections(Place place) async {
-    final lat = place.location!.latitude;
-    final lng = place.location!.longitude;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  /// [v1.1] مؤقتاً — SnackBar بدل فتح الخرائط الخارجية.
+  /// سيعود `url_launcher` عند إعادة الحزمة.
+  void _openDirections(BuildContext context, Place place) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('الاتجاهات — قيد الإصلاح'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 }
 

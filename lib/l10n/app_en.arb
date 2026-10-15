@@ -161,5 +161,6 @@
   "noCoordinates": "No coordinates available to show this place on the map",
   "continueWithGoogle": "Continue with Google",
   "googleSignInFailed": "Google sign-in failed",
-  "registerCta": "Create New Account"
+  "registerCta": "Create New Account",
+  "tripsTitle": "My Trips"
 }

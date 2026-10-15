@@ -2,19 +2,23 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
+// [v2.2 — 2026-10-15]
+//   - NEW: trip_plans rules (G6.7 — Trip Planner)
+//     * read: owner or admin
+//     * create: self, userId == uid
+//     * update: owner or admin, userId must stay same
+//     * delete: owner or admin
+//
 // [v2.1 — 2026-10-14]
-//   - FIX: 'text' → 'comment' in reviews validation (model uses 'comment')
-//   - NEW: isVerified/visitId/verifiedAt protected (G6 QR foundation)
-//     * user عادي: لا يمكن تعيين isVerified=true أو visitId/verifiedAt
-//     * update: isVerified غير قابل للترقية من user عادي
-//   - يُنفَّذ QR Verification في G6 عبر Cloud Function (Admin SDK)
+//   - FIX: 'text' → 'comment' in reviews validation
+//   - NEW: isVerified/visitId/verifiedAt protected (QR foundation)
 //
 // [v2.0 — 2026-10-14]
-//   - NEW: visit_requests rules (was missing)
+//   - NEW: visit_requests rules
 //   - HARDEN: users update — email locked to auth token
 //
 // [v1.1 — 2026-10-13]
-//   - allow delete: self in /users (fixes deleteAccount permission-denied)
+//   - allow delete: self in /users (deleteAccount fix)
 // ═══════════════════════════════════════════════════════════════
 
 service cloud.firestore {
@@ -70,8 +74,7 @@ service cloud.firestore {
       return request.auth.token.email;
     }
 
-    // [v2.1] — QR Verification guards (للاستخدام في reviews)
-    // user عادي لا يستطيع تعيين isVerified=true أو visitId/verifiedAt
+    // [v2.1] — QR Verification guards
     function noQrFieldsOnCreate() {
       return (
         !('isVerified' in request.resource.data)
@@ -81,7 +84,6 @@ service cloud.firestore {
       && !('verifiedAt' in request.resource.data);
     }
 
-    // update: منع ترقية isVerified من false → true
     function noQrUpgrade() {
       return !('isVerified' in request.resource.data)
              || request.resource.data.isVerified
@@ -118,7 +120,6 @@ service cloud.firestore {
 
       allow delete: if isSelf(userId) || isAdmin();
 
-      // ─── Favorites subcollection ───
       match /favorites/{placeId} {
         allow read: if isSelf(userId);
         allow create: if isSelf(userId)
@@ -176,8 +177,6 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
 
-      // ─── Reviews subcollection ───
-      // [v2.1] 'text' → 'comment' + QR guards
       match /reviews/{reviewId} {
         allow read: if true;
 
@@ -205,8 +204,7 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REVIEWS (top-level) — المستخدم من قبل ReviewsController
-    // [v2.1] 'text' → 'comment' + QR guards
+    // REVIEWS (top-level)
     // ═══════════════════════════════════════════════════════════
     match /reviews/{reviewId} {
       allow read: if true;
@@ -258,6 +256,34 @@ service cloud.firestore {
                        && resource.data.status == 'pending')
                       || isAdmin()
                     );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // [v2.2 — NEW] TRIP PLANS
+    // G6.7 — Trip Planner
+    // ═══════════════════════════════════════════════════════════
+    match /trip_plans/{planId} {
+
+      // قراءة: صاحب الرحلة أو Admin
+      allow read: if isSignedIn()
+                  && (resource.data.userId == uid() || isAdmin());
+
+      // إنشاء: مستخدم مسجل، لنفسه
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && isString(request.resource.data.title, 1, 100);
+
+      // تحديث: صاحب الرحلة فقط (userId يبقى ثابتاً)
+      allow update: if isSignedIn()
+                    && resource.data.userId == uid()
+                    && request.resource.data.userId == uid();
+
+      // Admin update (استثناء)
+      allow update: if isAdmin();
+
+      // حذف: صاحب الرحلة أو Admin
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin());
     }
 
     // ═══════════════════════════════════════════════════════════

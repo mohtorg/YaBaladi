@@ -1,24 +1,20 @@
 // lib/features/search/screens/explore_screen.dart
 //
-// [v1.2.4 — Reactive SearchBar Fix]
-//   - FIX: _SearchBar.build يلفّ TextField داخل ValueListenableBuilder
-//          لضمان تحديث suffixIcon (زر X) فورياً عند الكتابة/المسح
-//          بمعزل عن دورة rebuild الأب.
+// [v1.2.5 — 2026-10-15] — Governorate filter
+//   - NEW: فلترة Places حسب browsing.nameAr (المحافظة المُتصفَّحة)
+//   - NEW: Empty state مع زر "العودة لموقعي"
+//   - يستمع لـ BrowsingLocationController
 //
-// [v1.2.3 — Analyzer Fix]
-//   - FIX: _setupController يستدعي clearAll(notify: false)
-//
-// [v1.2.2 — Instant Search Fix]
-//   - FIX: _applyRecent يستخدم setQuery(q) مباشرة
-//
-// [v1.2.1] إصلاح ?action → if (action != null) action!
-// [v1.2] إصلاح (_, _) → (_, __)
+// [v1.2.4 — 2026-10-14] — Reactive SearchBar
+// [v1.2.3 — 2026-10-14] — Analyzer Fix
+// [v1.2.2 — 2026-10-14] — Instant Search Fix
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/location/browsing_location_controller.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/categories/controllers/categories_controller.dart';
 import '../../../features/places/controllers/places_controller.dart';
@@ -29,9 +25,6 @@ import '../../../repositories/places_repository.dart';
 import '../../../services/search_history_service.dart';
 import '../../../theme/design_tokens.dart';
 
-/// [categoryId] اختياري:
-///   - null  → وضع بحث حر
-///   - قيمة  → وضع تصنيف محدد
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key, this.categoryId});
 
@@ -53,7 +46,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
-    // تركيز تلقائي للكيبورد فقط في وضع البحث الحر
     if (widget.categoryId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusNode.requestFocus();
@@ -66,10 +58,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
   }
 
-  /// يجهّز PlacesController حسب الوضع (بحث / تصنيف).
-  ///
-  /// v1.2.3: نمرر notify: false لـ clearAll() لمنع notifyListeners
-  /// أثناء دورة build الأولى.
   void _setupController() {
     final controller = context.read<PlacesController>();
     controller.clearAll(notify: false);
@@ -112,12 +100,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   // ═══════════════════════════════════════════════════════════════
 
   void _onQueryChanged(String value) {
-    // v1.2.2: البحث فوري — لا debounce
     context.read<PlacesController>().setQuery(value);
   }
 
   void _onSubmitted(String value) {
-    // v1.2.2: no-op للبحث (فوري بالفعل) — فقط احفظ في السجل
     if (value.trim().isNotEmpty) {
       _saveToHistory(value.trim());
     }
@@ -136,7 +122,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _applyRecent(String q) {
-    // v1.2.2 — FIX: نُحدّث PlacesController عبر setQuery
     _searchController.text = q;
     _searchController.selection = TextSelection.collapsed(offset: q.length);
     context.read<PlacesController>().setQuery(q);
@@ -177,12 +162,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final controller = context.watch<PlacesController>();
+    final browsingCtrl = context.watch<BrowsingLocationController>();
+    final browsing = browsingCtrl.browsing;
 
     final catId = widget.categoryId;
     final isCategoryMode = catId != null && catId.isNotEmpty;
     final hasQuery = controller.hasQuery;
 
-    // عنوان الشاشة
+    // [v1.2.5] فلترة حسب المحافظة المُتصفَّحة
+    final placesInGovernorate = _filterByGovernorate(
+      controller.places,
+      browsing.nameAr,
+    );
+
     String title = l10n.search;
     if (isCategoryMode) {
       final cats = context.watch<CategoriesController>().categories;
@@ -200,7 +192,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
           tooltip: l10n.home,
           onPressed: _onBack,
         ),
-        title: Text(title),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title),
+            // [v1.2.5] عرض المحافظة تحت العنوان
+            Text(
+              browsing.nameAr,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           if (isCategoryMode || hasQuery)
             _FilterButton(
@@ -225,9 +229,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: _buildBody(
                 context,
                 controller,
+                browsingCtrl,
                 l10n,
                 isCategoryMode,
                 hasQuery,
+                placesInGovernorate,
               ),
             ),
           ),
@@ -236,16 +242,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Body Router
-  // ═══════════════════════════════════════════════════════════════
+  /// [v1.2.5] فلترة Places حسب المحافظة المُتصفَّحة.
+  List<Place> _filterByGovernorate(List<Place> places, String governorateName) {
+    if (governorateName.isEmpty) return places;
+    return places.where((p) => p.governorate == governorateName).toList();
+  }
 
   Widget _buildBody(
     BuildContext context,
     PlacesController controller,
+    BrowsingLocationController browsingCtrl,
     AppLocalizations l10n,
     bool isCategoryMode,
     bool hasQuery,
+    List<Place> placesInGovernorate,
   ) {
     // ═══ وضع البحث الحر (بدون categoryId) ═══
     if (!isCategoryMode) {
@@ -261,13 +271,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }
 
       if (controller.status == PlacesStatus.loading &&
-          controller.places.isEmpty) {
+          placesInGovernorate.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
 
-      if (controller.places.isNotEmpty) {
+      if (placesInGovernorate.isNotEmpty) {
         return _ResultsList(
-          places: controller.places,
+          places: placesInGovernorate,
           query: controller.query,
         );
       }
@@ -281,7 +291,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     // ═══ وضع التصنيف (categoryId موجود) ═══
     if (controller.status == PlacesStatus.loading &&
-        controller.places.isEmpty) {
+        placesInGovernorate.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -299,23 +309,87 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
     }
 
-    if (controller.places.isEmpty) {
-      return _NoResultsView(
-        query: controller.query,
-        hasFilters: controller.hasActiveFilters,
-        onClearFilters: controller.clearFilters,
+    // [v1.2.5] Empty State خاص بالمحافظة
+    if (placesInGovernorate.isEmpty) {
+      return _EmptyGovernorateView(
+        governorateName: browsingCtrl.browsing.nameAr,
+        isBrowsingOther: browsingCtrl.isBrowsingOtherGovernorate,
+        physicalName: browsingCtrl.physical?.nameAr,
+        onResetToPhysical: () => browsingCtrl.resetToPhysical(),
       );
     }
 
     return _ResultsList(
-      places: controller.places,
+      places: placesInGovernorate,
       query: controller.query,
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Search Bar  — [v1.2.4] Reactive via ValueListenableBuilder
+// EMPTY GOVERNORATE VIEW  [v1.2.5]
+// ═══════════════════════════════════════════════════════════════
+
+class _EmptyGovernorateView extends StatelessWidget {
+  const _EmptyGovernorateView({
+    required this.governorateName,
+    required this.isBrowsingOther,
+    required this.physicalName,
+    required this.onResetToPhysical,
+  });
+
+  final String governorateName;
+  final bool isBrowsingOther;
+  final String? physicalName;
+  final VoidCallback onResetToPhysical;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 60),
+        Icon(
+          Icons.explore_off_outlined,
+          size: 72,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'لا توجد نتائج في $governorateName',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'لم نجد أماكن تطابق بحثك في هذه المحافظة',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (isBrowsingOther && physicalName != null) ...[
+          const SizedBox(height: 20),
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: onResetToPhysical,
+              icon: const Icon(Icons.my_location, size: 18),
+              label: Text('العودة لـ $physicalName'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Search Bar
 // ═══════════════════════════════════════════════════════════════
 
 class _SearchBar extends StatelessWidget {
@@ -400,7 +474,7 @@ class _FilterButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Empty State (Recent + Trending فقط)
+// Empty State (Recent + Trending)
 // ═══════════════════════════════════════════════════════════════
 
 class _EmptyStateView extends StatelessWidget {
