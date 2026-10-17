@@ -8,16 +8,15 @@ import '../features/auth/controllers/auth_controller.dart';
 import '../features/favorites/controllers/favorites_controller.dart';
 import '../l10n/app_localizations.dart';
 
-/// [v1.2 — StatefulShellRoute + Favorites Race Fix]
-///   - REFACTOR: يستقبل StatefulNavigationShell بدل Widget child.
-///     التنقل بين التبويبات يحفظ الحالة (لا rebuild للشاشات السابقة).
-///   - FIX: _syncFavoritesWatcher محمي بمولّد طلبات (_favoritesSyncGeneration)
-///          لمنع race condition عند login/logout متتاليين.
-///   - NavigationBar يستخدم navigationShell.currentIndex و goBranch().
+/// [v1.3 — 2026-10-15] — G6.7: Bottom Nav (4 tabs)
+///   - CHANGE: 5 tabs → 4 tabs: الرئيسية | رحلتي | حسابي | الإعدادات
+///   - CHANGE: المفضلة انتقلت لـ ProfileScreen (drill-down)
+///   - NEW: تبويب "رحلتي" (trips)
+///
+/// [v1.2 — 2026-10-14] — StatefulShellRoute + Favorites race fix
 class MainShell extends StatefulWidget {
   const MainShell({super.key, required this.navigationShell});
 
-  /// [v1.2] StatefulNavigationShell — يحفظ حالة كل تبويب.
   final StatefulNavigationShell navigationShell;
 
   @override
@@ -29,9 +28,6 @@ class _MainShellState extends State<MainShell> {
   String? _lastSyncedUid;
   int _favoritesSyncGeneration = 0;
 
-  /// زامن الـ FavoritesController مع حالة المصادقة.
-  ///
-  /// [v1.1] محمي بمولّد طلبات — آخر طلب فقط يُنفَّذ.
   void _syncFavoritesWatcher(String? uid) {
     if (_lastSyncedUid == uid) return;
     _lastSyncedUid = uid;
@@ -52,11 +48,6 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
-  /// عند الضغط على Bottom Nav
-  ///
-  /// [v1.2] يستخدم navigationShell.goBranch() بدل context.go()
-  ///   - إذا نفس التبويب → reset إلى الـ root (initialLocation: true)
-  ///   - إذا تبويب آخر → التبديل مع حفظ الحالة
   void _onTap(BuildContext context, _NavDest dest, int index) {
     final auth = context.read<AuthController>();
 
@@ -65,7 +56,7 @@ class _MainShellState extends State<MainShell> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('سجّل دخولك لعرض مفضلاتك'),
+            content: Text('سجّل دخولك للوصول لهذه الميزة'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -78,9 +69,6 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// منطق زر الرجوع:
-  /// - إذا لم نكن في Home branch على الـ root → ارجع للـ Home root
-  /// - إذا كنا في Home root → "اضغط مرة أخرى للخروج"
   void _handleBack(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
@@ -112,12 +100,11 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthController>();
-    final favorites = context.watch<FavoritesController>();
-    final isGuest = auth.isGuest;
     final currentIndex = widget.navigationShell.currentIndex;
 
     _syncFavoritesWatcher(auth.uid);
 
+    // [v1.3] 4 tabs — المفضلة انتقلت لـ Profile
     final destinations = [
       _NavDest(
         icon: Icons.home_outlined,
@@ -126,17 +113,16 @@ class _MainShellState extends State<MainShell> {
         lockForGuest: false,
       ),
       _NavDest(
+        icon: Icons.explore_outlined,
+        selectedIcon: Icons.explore,
+        label: l10n.tripsTitle,
+        lockForGuest: false, // الزائر يرى Empty State
+      ),
+      _NavDest(
         icon: Icons.person_outline,
         selectedIcon: Icons.person,
         label: l10n.profile,
         lockForGuest: false,
-      ),
-      _NavDest(
-        icon: Icons.favorite_border,
-        selectedIcon: Icons.favorite,
-        label: l10n.favorites,
-        lockForGuest: true,
-        badgeCount: favorites.count,
       ),
       _NavDest(
         icon: Icons.settings_outlined,
@@ -160,48 +146,14 @@ class _MainShellState extends State<MainShell> {
           destinations: [
             for (final d in destinations)
               NavigationDestination(
-                icon: _buildIcon(
-                  context,
-                  Icon(d.icon),
-                  locked: d.lockForGuest && isGuest,
-                  badgeCount: d.badgeCount,
-                ),
-                selectedIcon: _buildIcon(
-                  context,
-                  Icon(d.selectedIcon),
-                  locked: d.lockForGuest && isGuest,
-                  badgeCount: d.badgeCount,
-                ),
+                icon: Icon(d.icon),
+                selectedIcon: Icon(d.selectedIcon),
                 label: d.label,
               ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildIcon(
-    BuildContext context,
-    Widget icon, {
-    required bool locked,
-    int badgeCount = 0,
-  }) {
-    if (locked) {
-      return Badge(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        smallSize: 10,
-        child: icon,
-      );
-    }
-
-    if (badgeCount > 0) {
-      return Badge(
-        label: Text('$badgeCount'),
-        child: icon,
-      );
-    }
-
-    return icon;
   }
 }
 
@@ -211,12 +163,10 @@ class _NavDest {
     required this.selectedIcon,
     required this.label,
     required this.lockForGuest,
-    this.badgeCount = 0,
   });
 
   final IconData icon;
   final IconData selectedIcon;
   final String label;
   final bool lockForGuest;
-  final int badgeCount;
 }

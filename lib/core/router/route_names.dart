@@ -21,4 +21,11 @@ class RouteNames {
   // [v1.2 — 2026-10-14] مسارات فرعية
   static const String myReviews = 'myReviews';
   static const String profileFavorites = 'profileFavorites';
+
+  // [v1.3 — 2026-10-15] G6.7 — Trip Planner
+  static const String trips = 'trips';
+  static const String tripPlanner = 'tripPlanner';
+
+  // [v1.4 — 2026-10-15] Trip details
+  static const String tripDetails = 'tripDetails';
 }

@@ -1,33 +1,21 @@
 // lib/core/auth/role.dart
 //
-// [v1.0 — 2026-10-14] — G4.1: UserRole enum + extension
-//   - يمثل الأدوار السبعة من Master Plan § 7.
-//   - يوفر helpers: code, labelAr, labelEn, level, isGuest, isAtLeast...
-//   - مستقل تماماً — لا imports، لا breaking changes.
+// [v1.1 — 2026-10-16] — Wave 1a AUTH-BUG-1 fix
+//   - FIX: roleFromCode يقبل 'user' كمرادف لـ 'member'
+//     السبب: signUp() يكتب role='user' في Firestore
+//     بينما الـ enum.code = 'member'
+//   - النتيجة: توافق كامل بدون تعديل firestore.rules
 //
-// المرجع: docs/YA_BALADI_MASTER_PLAN_v1.0.md — الفصل 7
+// [v1.0 — 2026-10-14] — G4.1: UserRole enum + extension
 
 /// الأدوار السبعة في YaBaladi — من الأقل صلاحية إلى الأعلى.
 enum UserRole {
-  /// زائر غير مسجل — تصفح عام فقط.
   visitor,
-
-  /// عضو مسجل — حساب + مفضلة + تقييمات.
   member,
-
-  /// تاجر — نشاطه فقط (Phase 2).
   merchant,
-
-  /// عضو فريق — مهامه الموكلة.
   team,
-
-  /// مشرف مراجعة — صلاحيات محدودة داخل النطاق.
   moderator,
-
-  /// مدير فريق — إدارة الفريق.
   manager,
-
-  /// مسؤول عام — كل الصلاحيات.
   admin,
 }
 
@@ -104,11 +92,14 @@ extension UserRoleX on UserRole {
 
 /// يحوّل نصاً قادماً من Firestore إلى [UserRole].
 ///
+/// [v1.1] — يقبل 'user' كمرادف لـ 'member'
+///   (لأن signUp() يكتب 'user' في Firestore بينما code = 'member').
+///
 /// - `null` أو نص غير معروف → [UserRole.member] (افتراضي للمستخدمين المسجلين).
 UserRole roleFromCode(String? code) {
   return switch (code) {
     'visitor' => UserRole.visitor,
-    'member' => UserRole.member,
+    'member' || 'user' => UserRole.member, // ← المرادف
     'merchant' => UserRole.merchant,
     'team' => UserRole.team,
     'moderator' => UserRole.moderator,

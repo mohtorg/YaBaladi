@@ -161,5 +161,6 @@
   "noCoordinates": "لا توجد إحداثيات لعرض هذا المكان على الخريطة",
   "continueWithGoogle": "المتابعة باستخدام Google",
   "registerCta": "إنشاء حساب جديد",
-  "googleSignInFailed": "فشل تسجيل الدخول بـ Google"
+  "googleSignInFailed": "فشل تسجيل الدخول بـ Google",
+  "tripsTitle": "رحلتي"
 }

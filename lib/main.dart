@@ -1,5 +1,23 @@
+// lib/main.dart
+//
+// [v1.5 — 2026-10-17] — Documentation: accurate cold-start comment
+//   - CHANGE: v1.4's comment now reflects that the real fix is in
+//     PlacesRepository (Source.server + retry), not long-polling.
+//   - NO code changes.
+//
+// [v1.4 — 2026-10-15] — Firestore long-polling (FlutLab Web)
+//   - FirebaseFirestore.settings.webExperimentalForceLongPolling = true
+//   - ⚠️ NOTE: Long-polling alone did NOT fix the 38s cold start.
+//            Real fix is in PlacesRepository (Source.server + retry).
+//
+// [v1.3 — 2026-10-15] — FIX: PlacesController..load()
+// [v1.2 — 2026-10-15] — G6.7: TripPlansController provider
+// [v1.1 — 2026-10-14] — G4.2-c: BrowsingLocationController provider
+// [v1.0 — 2026-10-13] — Initial app setup
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +29,7 @@ import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
 import 'features/favorites/controllers/favorites_controller.dart';
 import 'features/places/controllers/places_controller.dart';
+import 'features/trip/controllers/trip_plans_controller.dart';
 import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/locale_controller.dart';
@@ -31,6 +50,18 @@ Future<void> main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // Firestore settings — FlutLab Web specific
+  // ═══════════════════════════════════════════════════════════════
+  // FlutLab Free يحجب WebChannel → SDK يفشل.
+  // الحل المؤقت: long-polling.
+  // الحل الجذري: PlacesRepository يستخدم Source.server + retry.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: false,
+    webExperimentalForceLongPolling: true,
+    webExperimentalAutoDetectLongPolling: true,
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -57,15 +88,18 @@ class YaBaladiApp extends StatelessWidget {
         ChangeNotifierProvider<CategoriesController>(
           create: (_) => CategoriesController()..start(),
         ),
+        // ✅ [v1.3] ..load() — ضروري لجلب Places عند الإقلاع
         ChangeNotifierProvider<PlacesController>(
-          create: (_) => PlacesController(),
+          create: (_) => PlacesController()..load(),
         ),
         ChangeNotifierProvider<FavoritesController>(
           create: (_) => FavoritesController(),
         ),
-        // [v1.1 — 2026-10-14] — G4.2-c
         ChangeNotifierProvider<BrowsingLocationController>(
           create: (_) => BrowsingLocationController(),
+        ),
+        ChangeNotifierProvider<TripPlansController>(
+          create: (_) => TripPlansController(),
         ),
       ],
       child: const _AppRoot(),

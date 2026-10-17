@@ -1,5 +1,13 @@
-// services/seed_service.dart
-// يزرع Firestore ببيانات أولية (9 تصنيفات + 12 مكان تجريبي) للـ MVP.
+// lib/services/seed_service.dart
+//
+// [v1.1 — 2026-10-16] — Wave Seed: merge: true
+//   - FIX: batch.set يستخدم SetOptions(merge: true)
+//     السبب: abu_tarek + beit_elqahwa + fish_market موجودون
+//     بدون merge تُفقد حقولهم (imageUrls, tags, whatsapp).
+//   - النتيجة: الحقول الموجودة تبقى، الحقول الجديدة تُضاف.
+//
+// [v1.0] — يزرع Firestore ببيانات أولية (9 تصنيفات + 12 مكان تجريبي).
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' hide Category;
 
@@ -19,19 +27,73 @@ class SeedService {
   // 9 تصنيفات MVP — iconKey يطابق PlaceCategories.byId() الموجود
   // ════════════════════════════════════════════════════════════
   static const List<Category> seedCategories = [
-    Category(id: 'restaurants', nameAr: 'مطاعم', nameEn: 'Restaurants', iconKey: 'مطعم', order: 1),
-    Category(id: 'cafes', nameAr: 'كافيهات', nameEn: 'Cafes', iconKey: 'كافيه', order: 2),
-    Category(id: 'beaches', nameAr: 'شواطئ وبلاجات', nameEn: 'Beaches', iconKey: 'بلاج', order: 3),
-    Category(id: 'hotels', nameAr: 'فنادق ومنتجعات', nameEn: 'Hotels & Resorts', iconKey: 'فندق ومنتجع', order: 4),
-    Category(id: 'family', nameAr: 'ترفيه أسري', nameEn: 'Family & Entertainment', iconKey: 'ترفيه أسري', order: 5),
-    Category(id: 'landmarks', nameAr: 'معالم تاريخية', nameEn: 'Historical Landmarks', iconKey: 'معلم تاريخي', order: 6),
-    Category(id: 'shopping', nameAr: 'تسوق', nameEn: 'Shopping', iconKey: 'تسوق', order: 7),
-    Category(id: 'parks', nameAr: 'حدائق ومتنزهات', nameEn: 'Parks', iconKey: 'حديقة', order: 8),
-    Category(id: 'events', nameAr: 'فعاليات', nameEn: 'Events', iconKey: 'فعالية', order: 9),
+    Category(
+      id: 'restaurants',
+      nameAr: 'مطاعم',
+      nameEn: 'Restaurants',
+      iconKey: 'مطعم',
+      order: 1,
+    ),
+    Category(
+      id: 'cafes',
+      nameAr: 'كافيهات',
+      nameEn: 'Cafes',
+      iconKey: 'كافيه',
+      order: 2,
+    ),
+    Category(
+      id: 'beaches',
+      nameAr: 'شواطئ وبلاجات',
+      nameEn: 'Beaches',
+      iconKey: 'بلاج',
+      order: 3,
+    ),
+    Category(
+      id: 'hotels',
+      nameAr: 'فنادق ومنتجعات',
+      nameEn: 'Hotels & Resorts',
+      iconKey: 'فندق ومنتجع',
+      order: 4,
+    ),
+    Category(
+      id: 'family',
+      nameAr: 'ترفيه أسري',
+      nameEn: 'Family & Entertainment',
+      iconKey: 'ترفيه أسري',
+      order: 5,
+    ),
+    Category(
+      id: 'landmarks',
+      nameAr: 'معالم تاريخية',
+      nameEn: 'Historical Landmarks',
+      iconKey: 'معلم تاريخي',
+      order: 6,
+    ),
+    Category(
+      id: 'shopping',
+      nameAr: 'تسوق',
+      nameEn: 'Shopping',
+      iconKey: 'تسوق',
+      order: 7,
+    ),
+    Category(
+      id: 'parks',
+      nameAr: 'حدائق ومتنزهات',
+      nameEn: 'Parks',
+      iconKey: 'حديقة',
+      order: 8,
+    ),
+    Category(
+      id: 'events',
+      nameAr: 'فعاليات',
+      nameEn: 'Events',
+      iconKey: 'فعالية',
+      order: 9,
+    ),
   ];
 
   // ════════════════════════════════════════════════════════════
-  // 12 مكان تجريبي — موزّعين على التصنيفات
+  // 12 مكان تجريبي — موزّعين على 5 محافظات
   // priceLevel: 1=$ · 2=$$ · 3=$$$ · 4=$$$$
   // ════════════════════════════════════════════════════════════
   static final List<Place> seedPlaces = [
@@ -257,20 +319,30 @@ class SeedService {
   // العمليات
   // ════════════════════════════════════════════════════════════
 
+  /// [v1.1] merge:true — لا يمسح حقولاً موجودة.
   Future<int> seedAllCategories() async {
     final batch = _db.batch();
     for (final cat in seedCategories) {
-      batch.set(_db.collection(categoriesCol).doc(cat.id), cat.toMap());
+      batch.set(
+        _db.collection(categoriesCol).doc(cat.id),
+        cat.toMap(),
+        SetOptions(merge: true),
+      );
     }
     await batch.commit();
     debugPrint('✅ Seeded ${seedCategories.length} categories');
     return seedCategories.length;
   }
 
+  /// [v1.1] merge:true — لا يمسح imageUrls / tags الموجودة.
   Future<int> seedAllPlaces() async {
     final batch = _db.batch();
     for (final place in seedPlaces) {
-      batch.set(_db.collection(placesCol).doc(place.id), place.toMap());
+      batch.set(
+        _db.collection(placesCol).doc(place.id),
+        place.toMap(),
+        SetOptions(merge: true),
+      );
     }
     await batch.commit();
     debugPrint('✅ Seeded ${seedPlaces.length} places');
@@ -283,7 +355,7 @@ class SeedService {
     return {'categories': cats, 'places': places};
   }
 
-  /// ⚠️ للتطوير فقط — يمسح كل البيانات
+  /// ⚠️ للتطوير فقط — يمسح كل البيانات.
   Future<void> clearAll() async {
     final cats = await _db.collection(categoriesCol).get();
     final places = await _db.collection(placesCol).get();
@@ -295,6 +367,8 @@ class SeedService {
       batch.delete(d.reference);
     }
     await batch.commit();
-    debugPrint('🗑️ Cleared ${cats.docs.length} cats + ${places.docs.length} places');
+    debugPrint(
+      '🗑️ Cleared ${cats.docs.length} cats + ${places.docs.length} places',
+    );
   }
 }

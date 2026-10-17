@@ -1,25 +1,17 @@
 // features/places/controllers/places_controller.dart
 //
-// [v2.4 — Single Notification Fix]
-//   - FIX: clearAll() أصبحت تقبل `notify` parameter
-//          (يُستخدَم `notify: false` قبل loadCategory/load لمنع
-//          "notifyListeners during build" — إشعاران متزامنان)
-//   - الملف مُراجَع بالكامل ضد Flutter 3.32 / Dart 3.8.1
+// [v2.7 — 2026-10-17] — Architectural separation: raw vs filtered
+//   - NEW: allPlacesRaw getter — unfiltered data for Services
+//   - NEW: hasData getter — check if any data exists (regardless of filters)
+//   - NEW: isFiltered getter — check if any filter is active
+//   - DOC: places getter now clearly documented as UI-only
+//   - This fixes Trip Planner showing "no places" when filters are active
 //
-// [v2.3 — No Flash of Stale Content]
-//   - FIX: عند تغيير الوضع/الفئة، تُمسح _allPlaces فوراً قبل الانتظار
-//   - Pull-to-refresh داخل نفس الفئة لا يمسح (سلوك صحيح)
-//   - _doLoad() تقبل clearBeforeLoad للتحكم الدقيق
-//
-// [v2.2 — Instant Search Fix]
-//   - حذف الـ debounce بالكامل (client-side filtering فوري)
-//   - تبسيط Search API: setQuery / clearQuery فقط
-//   - applyQueryNow() مُبقاة كـ no-op للتوافق الخلفي
-//
-// [v2.1 — Simple Revolution] يستخدم `.get()` بدل `.snapshots()`
-//   - يعمل في كل البيئات (FlutLab Web, Mobile, Desktop)
-//   - لا يحتاج Composite Indexes
-//   - البحث + الفلاتر + الترتيب كلهم client-side
+// [v2.6 — 2026-10-16] — Cleanup
+// [v2.5-DEBUG] — تشخيص (مؤقت)
+// [v2.4] — clearAll notify parameter
+// [v2.3] — clearBeforeLoad
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -33,10 +25,6 @@ enum PlacesStatus { idle, loading, loaded, error }
 
 enum PlaceSort { ratingDesc, reviewsDesc, nameAsc, newest }
 
-/// وضع الـ Controller:
-/// - all: كل الأماكن (Home)
-/// - category: تصنيف محدد
-/// - search: بحث نصي حر
 enum PlacesMode { all, category, search }
 
 class PlacesController extends ChangeNotifier {
@@ -63,21 +51,17 @@ class PlacesController extends ChangeNotifier {
   String? _activeCategoryId;
   PlacesMode _mode = PlacesMode.all;
 
-  // ─── Query (v2.2: فوري، بلا debounce) ───
   String _query = '';
-
-  // ─── Filters: Basic ───
   double? _minRating;
   int? _priceLevel;
   PlaceSort _sort = PlaceSort.ratingDesc;
 
-  // ─── Filters: Multi-select ───
   final Set<String> _amenities = <String>{};
   final Set<String> _features = <String>{};
   final Set<String> _payments = <String>{};
 
   // ═══════════════════════════════════════════════════════════════
-  // Getters
+  // Getters — Basic
   // ═══════════════════════════════════════════════════════════════
 
   bool get firebaseAvailable => _firebaseAvailable;
@@ -86,14 +70,11 @@ class PlacesController extends ChangeNotifier {
   String? get activeCategoryId => _activeCategoryId;
   bool get isLoading => _status == PlacesStatus.loading;
   PlacesMode get mode => _mode;
-
   String get query => _query;
   bool get hasQuery => _query.trim().isNotEmpty;
-
   double? get minRating => _minRating;
   int? get priceLevel => _priceLevel;
   PlaceSort get sort => _sort;
-
   Set<String> get amenities => Set.unmodifiable(_amenities);
   Set<String> get features => Set.unmodifiable(_features);
   Set<String> get payments => Set.unmodifiable(_payments);
@@ -112,21 +93,53 @@ class PlacesController extends ChangeNotifier {
       _features.length +
       _payments.length;
 
-  /// القائمة النهائية: بحث + فلاتر + ترتيب — كلهم client-side وفوريين.
+  // ═══════════════════════════════════════════════════════════════
+  // Getters — Data Access (Architectural)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// [v2.7] البيانات الخام — بدون query/filters/sort.
+  ///
+  /// **الاستخدام:** الخدمات (Services) التي تريد كل البيانات
+  /// لتصفيتها بطريقتها الخاصة.
+  ///
+  /// **مثال:** `TripPlannerService.generateTrip()` —
+  /// يفلتر حسب governorate + interests الخاصة بالرحلة،
+  /// وليس حسب فلاتر شاشة Explore.
+  ///
+  /// **🚫 لا تستخدمها في Widgets** — استخدم `places` بدلاً.
+  List<Place> get allPlacesRaw => List.unmodifiable(_allPlaces);
+
+  /// [v2.7] هل هناك بيانات محمّلة أصلاً (بغض النظر عن الفلاتر)؟
+  ///
+  /// **الفرق عن `places.isEmpty`:**
+  ///   - `hasData = false` → المشكلة في تحميل البيانات (شبكة، Firestore)
+  ///   - `hasData = true` + `places.isEmpty` → الفلاتر تخفي كل النتائج
+  bool get hasData => _allPlaces.isNotEmpty;
+
+  /// [v2.7] هل يوجد فلتر نشط الآن (query أو خصائص)؟
+  bool get isFiltered => hasQuery || hasActiveFilters;
+
+  // ═══════════════════════════════════════════════════════════════
+  // Getters — UI View (filtered)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// **القائمة النهائية للعرض في UI** — مطبَّق عليها query + filters + sort.
+  ///
+  /// **الاستخدام:** شاشات العرض فقط (Home, Explore, Search).
+  ///
+  /// **🚫 لا تستخدمها في Services** — استخدم `allPlacesRaw` بدلاً
+  /// (وإلا فسيعتمد التوليد على فلاتر شاشة العرض).
   List<Place> get places {
     var result = _allPlaces;
 
-    // فلتر البحث — يُطبَّق فوراً بناءً على _query مباشرة (v2.2)
     final q = _query.trim();
     if (q.isNotEmpty) {
       result = result.where((p) => _matchesQueryFor(p, q)).toList();
     }
 
-    // فلتر السمات
     result = result.where(_matchesFilters).toList();
     result = List<Place>.from(result);
 
-    // الترتيب
     switch (_sort) {
       case PlaceSort.ratingDesc:
         result.sort((a, b) => b.averageRating.compareTo(a.averageRating));
@@ -193,34 +206,23 @@ class PlacesController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Search API (v2.2 — فوري، بلا debounce)
+  // Search API
   // ═══════════════════════════════════════════════════════════════
 
-  /// يُحدّث نص البحث فوراً (بدون debounce).
   void setQuery(String value) {
     if (_query == value) return;
     _query = value;
     notifyListeners();
   }
 
-  /// [v2.2] no-op — البحث فوري الآن. مُبقاة للتوافق الخلفي فقط.
-  void applyQueryNow() {
-    // لا شيء — setQuery يقوم بكل العمل فوراً.
-  }
+  void applyQueryNow() {}
 
-  /// يمسح نص البحث فقط (يبقي الفلاتر والفئة).
   void clearQuery() {
     if (_query.isEmpty) return;
     _query = '';
     notifyListeners();
   }
 
-  /// يمسح كل شيء: البحث + الفلاتر + الترتيب (لا يمسح الفئة).
-  ///
-  /// [v2.4] `notify` parameter:
-  ///   - `true` (افتراضي): يُشعِر المستمعين — للاستخدام العادي.
-  ///   - `false`: صامت — للاستخدام قبل `loadCategory()`/`load()` مباشرة
-  ///     لتجنّب "notifyListeners during build" (إشعاران متزامنان).
   void clearAll({bool notify = true}) {
     _query = '';
     _minRating = null;
@@ -233,17 +235,13 @@ class PlacesController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // LOAD (One-shot)
+  // LOAD
   // ═══════════════════════════════════════════════════════════════
 
-  /// يحمّل كل الأماكن مرة واحدة.
-  /// [v2.3]: يمسح _allPlaces فوراً لو كنّا في وضع مختلف (تصنيف سابق).
   Future<void> load() async {
     if (!_firebaseAvailable || _repo == null) return;
 
-    // نمسح فقط لو كنّا في وضع مختلف (يسمح بـ pull-to-refresh بدون وميض)
     final isModeChange = _mode != PlacesMode.all || _activeCategoryId != null;
-
     _activeCategoryId = null;
     _mode = PlacesMode.all;
 
@@ -253,15 +251,10 @@ class PlacesController extends ChangeNotifier {
     );
   }
 
-  /// يحمّل أماكن تصنيف معين.
-  /// [v2.3]: يمسح _allPlaces فوراً لو الفئة مختلفة (يسمح بـ pull-to-refresh
-  /// داخل نفس الفئة بدون وميض).
   Future<void> loadCategory(String categoryId) async {
     if (!_firebaseAvailable || _repo == null) return;
 
-    // نمسح فقط لو الفئة مختلفة
     final isCategoryChange = _activeCategoryId != categoryId;
-
     _activeCategoryId = categoryId;
     _mode = PlacesMode.category;
 
@@ -271,15 +264,10 @@ class PlacesController extends ChangeNotifier {
     );
   }
 
-  /// إعادة التحميل حسب الوضع الحالي.
-  /// [v2.3]: pull-to-refresh لا يمسح القائمة الحالية (تجربة أفضل).
   Future<void> refresh() async {
     switch (_mode) {
       case PlacesMode.all:
-        await _doLoad(
-          () => _repo!.loadAll(),
-          clearBeforeLoad: false,
-        );
+        await _doLoad(() => _repo!.loadAll(), clearBeforeLoad: false);
       case PlacesMode.category:
         if (_activeCategoryId != null) {
           await _doLoad(
@@ -287,38 +275,27 @@ class PlacesController extends ChangeNotifier {
             clearBeforeLoad: false,
           );
         } else {
-          await _doLoad(
-            () => _repo!.loadAll(),
-            clearBeforeLoad: false,
-          );
+          await _doLoad(() => _repo!.loadAll(), clearBeforeLoad: false);
         }
       case PlacesMode.search:
-        await _doLoad(
-          () => _repo!.loadAll(),
-          clearBeforeLoad: false,
-        );
+        await _doLoad(() => _repo!.loadAll(), clearBeforeLoad: false);
     }
   }
 
-  /// [v2.3] يقبل clearBeforeLoad لمسح _allPlaces فوراً قبل الانتظار.
-  ///
-  /// - `clearBeforeLoad: true` → يُستخدَم عند **تغيير الوضع/الفئة**
-  ///   (يمنع ظهور المحتوى القديم لحظة ثم اختفائه)
-  /// - `clearBeforeLoad: false` → يُستخدَم عند **pull-to-refresh**
-  ///   (يبقي القائمة الحالية معروضة أثناء التحديث)
   Future<void> _doLoad(
     Future<List<Place>> Function() fetcher, {
     bool clearBeforeLoad = false,
   }) async {
     if (clearBeforeLoad) {
-      _allPlaces = const []; // ← امسح فوراً قبل الانتظار
+      _allPlaces = const [];
     }
     _status = PlacesStatus.loading;
     _error = null;
     notifyListeners();
 
     try {
-      _allPlaces = await fetcher();
+      final result = await fetcher();
+      _allPlaces = result;
       _status = PlacesStatus.loaded;
     } catch (e) {
       _error = e.toString();
@@ -332,13 +309,8 @@ class PlacesController extends ChangeNotifier {
   // Backward Compatibility
   // ═══════════════════════════════════════════════════════════════
 
-  void watchAll() {
-    load(); // fire-and-forget
-  }
-
-  void watchCategory(String categoryId) {
-    loadCategory(categoryId); // fire-and-forget
-  }
+  void watchAll() => load();
+  void watchCategory(String categoryId) => loadCategory(categoryId);
 
   // ═══════════════════════════════════════════════════════════════
   // Filter Setters
@@ -388,11 +360,5 @@ class PlacesController extends ChangeNotifier {
     _features.clear();
     _payments.clear();
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    // [v2.4] لا يوجد timers لإلغائها — البحث فوري
-    super.dispose();
   }
 }
