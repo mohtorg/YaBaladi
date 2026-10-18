@@ -1,5 +1,13 @@
 // lib/services/seed_service.dart
 //
+// [v1.2 — 2026-10-18] — Lint fix: static const for seedPlaces
+//   - FIX: static final List<Place> → static const List<Place>
+//          (Place و GeoPoint كلاهما const-constructible،
+//           وكل القيم بداخلهم const → يُصحح 12 تحذير)
+//   - NOTE: هذا الملف غير مستخدَم حالياً في التطبيق
+//           (بعد حذف زر Seed من profile_screen).
+//           يُحتفَظ به كأداة admin للتطوير المستقبلي.
+//
 // [v1.1 — 2026-10-16] — Wave Seed: merge: true
 //   - FIX: batch.set يستخدم SetOptions(merge: true)
 //     السبب: abu_tarek + beit_elqahwa + fish_market موجودون
@@ -95,8 +103,9 @@ class SeedService {
   // ════════════════════════════════════════════════════════════
   // 12 مكان تجريبي — موزّعين على 5 محافظات
   // priceLevel: 1=$ · 2=$$ · 3=$$$ · 4=$$$$
+  // ✅ [v1.2] static const (كان final) — Place و GeoPoint const
   // ════════════════════════════════════════════════════════════
-  static final List<Place> seedPlaces = [
+  static const List<Place> seedPlaces = [
     Place(
       id: 'abu_tarek',
       nameAr: 'مطعم أبو طارق',
@@ -104,7 +113,7 @@ class SeedService {
       description: 'أشهر مطعم كشري في القاهرة',
       categoryId: 'restaurants',
       ownerId: 'seed',
-      location: const GeoPoint(30.0589, 31.2436),
+      location: GeoPoint(30.0589, 31.2436),
       address: '27 شارع شريف، وسط البلد',
       city: 'القاهرة',
       governorate: 'القاهرة',
@@ -122,7 +131,7 @@ class SeedService {
       description: 'أسماك طازة على البحر المتوسط',
       categoryId: 'restaurants',
       ownerId: 'seed',
-      location: const GeoPoint(31.2001, 29.9187),
+      location: GeoPoint(31.2001, 29.9187),
       address: 'كورنيش الإسكندرية',
       city: 'الإسكندرية',
       governorate: 'الإسكندرية',
@@ -140,7 +149,7 @@ class SeedService {
       description: 'كافيه بإطلالة على البحر',
       categoryId: 'cafes',
       ownerId: 'seed',
-      location: const GeoPoint(27.2579, 33.8116),
+      location: GeoPoint(27.2579, 33.8116),
       address: 'ممشى السياحة، الغردقة',
       city: 'الغردقة',
       governorate: 'البحر الأحمر',
@@ -158,7 +167,7 @@ class SeedService {
       description: 'قهوة مختصة في وسط البلد',
       categoryId: 'cafes',
       ownerId: 'seed',
-      location: const GeoPoint(30.0459, 31.2621),
+      location: GeoPoint(30.0459, 31.2621),
       address: 'شارع المعز',
       city: 'القاهرة',
       governorate: 'القاهرة',
@@ -176,7 +185,7 @@ class SeedService {
       description: 'شاطئ رملي خاص بالمنتجع',
       categoryId: 'beaches',
       ownerId: 'seed',
-      location: const GeoPoint(27.2311, 33.8399),
+      location: GeoPoint(27.2311, 33.8399),
       address: 'الغردقة',
       city: 'الغردقة',
       governorate: 'البحر الأحمر',
@@ -194,7 +203,7 @@ class SeedService {
       description: 'شاطئ عائلي على الكورنيش',
       categoryId: 'beaches',
       ownerId: 'seed',
-      location: const GeoPoint(31.2411, 29.9621),
+      location: GeoPoint(31.2411, 29.9621),
       address: 'سان ستيفانو',
       city: 'الإسكندرية',
       governorate: 'الإسكندرية',
@@ -212,7 +221,7 @@ class SeedService {
       description: 'فندق 5 نجوم في وسط القاهرة',
       categoryId: 'hotels',
       ownerId: 'seed',
-      location: const GeoPoint(30.0561, 31.2262),
+      location: GeoPoint(30.0561, 31.2262),
       address: 'ميدان التحرير',
       city: 'القاهرة',
       governorate: 'القاهرة',
@@ -230,7 +239,7 @@ class SeedService {
       description: 'منتجع فاخر على البحر الأحمر',
       categoryId: 'hotels',
       ownerId: 'seed',
-      location: const GeoPoint(27.9158, 34.3299),
+      location: GeoPoint(27.9158, 34.3299),
       address: 'خليج نبق',
       city: 'شرم الشيخ',
       governorate: 'جنوب سيناء',
@@ -248,7 +257,7 @@ class SeedService {
       description: 'مدينة ملاهي للأسر والأطفال',
       categoryId: 'family',
       ownerId: 'seed',
-      location: const GeoPoint(30.0331, 31.0171),
+      location: GeoPoint(30.0331, 31.0171),
       address: '6 أكتوبر',
       city: 'الجيزة',
       governorate: 'الجيزة',
@@ -266,7 +275,7 @@ class SeedService {
       description: 'مدينة تعليمية ترفيهية للأطفال',
       categoryId: 'family',
       ownerId: 'seed',
-      location: const GeoPoint(30.0263, 31.4925),
+      location: GeoPoint(30.0263, 31.4925),
       address: 'كايرو فيستيفال سيتي',
       city: 'القاهرة',
       governorate: 'القاهرة',
@@ -284,7 +293,7 @@ class SeedService {
       description: 'أعظم معالم مصر التاريخية',
       categoryId: 'landmarks',
       ownerId: 'seed',
-      location: const GeoPoint(29.9792, 31.1342),
+      location: GeoPoint(29.9792, 31.1342),
       address: 'الهرم',
       city: 'الجيزة',
       governorate: 'الجيزة',
@@ -302,7 +311,7 @@ class SeedService {
       description: 'أكبر مول تجاري في مصر',
       categoryId: 'shopping',
       ownerId: 'seed',
-      location: const GeoPoint(30.0729, 31.3456),
+      location: GeoPoint(30.0729, 31.3456),
       address: 'مدينة نصر',
       city: 'القاهرة',
       governorate: 'القاهرة',

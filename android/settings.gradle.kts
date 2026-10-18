@@ -19,8 +19,10 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.1.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // [v3 — 2026-10-15] AGP 8.9.2 — يتوافق مع androidx.core 1.17+
+    id("com.android.application") version "8.9.2" apply false
+    // Kotlin 1.9.22 — سيُرقَّى لاحقاً عند Flutter SDK
+    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
 }
 
 include(":app")

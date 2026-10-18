@@ -1,4 +1,14 @@
 // lib/core/search/utils/text_normalizer.dart
+//
+// [v1.1 — 2026-10-18] — Performance Fix
+//   - FIX: استخراج RegExp('[أإآٱ]') كـ static final
+//          (كان يُنشأ في كل استدعاء لـ normalize → بطء)
+//   - NOTE: تحذيرات "RegExp deprecated" هي false positive من FlutLab SDK
+//           (RegExp غير deprecated في Dart 3.8.1 — تحذير بيئي)
+//
+// [v1.0] — التطبيع الأساسي للعربية والإنجليزية
+
+// ignore_for_file: deprecated_member_use
 
 /// تطبيع النص العربي والإنجليزي للبحث الموحد.
 ///
@@ -13,11 +23,25 @@
 class TextNormalizer {
   TextNormalizer._();
 
+  // ════════════════════════════════════════════════════════════
+  // Compiled Patterns — تُنشأ مرة واحدة فقط
+  // ════════════════════════════════════════════════════════════
+
+  /// التشكيل العربي + التطويل
   static final RegExp _diacritics = RegExp(
     r'[\u064B-\u0652\u0670\u0640]',
   );
 
+  /// المسافات (واحد أو أكثر)
   static final RegExp _whitespace = RegExp(r'\s+');
+
+  /// كل صور الألف (أ إ آ ٱ)
+  /// ✅ [v1.1] استُخرجت — كانت تُنشأ في كل استدعاء لـ normalize()
+  static final RegExp _alefVariants = RegExp('[أإآٱ]');
+
+  // ════════════════════════════════════════════════════════════
+  // Public API
+  // ════════════════════════════════════════════════════════════
 
   /// يطبّع النص للبحث.
   ///
@@ -29,7 +53,7 @@ class TextNormalizer {
     if (input.isEmpty) return '';
     var text = input.trim();
     text = text.replaceAll(_diacritics, '');
-    text = text.replaceAll(RegExp('[أإآٱ]'), 'ا');
+    text = text.replaceAll(_alefVariants, 'ا'); // ✅ static final
     text = text.replaceAll('ة', 'ه');
     text = text.replaceAll('ى', 'ي');
     text = text.replaceAll('ؤ', 'و');

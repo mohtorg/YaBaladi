@@ -1,12 +1,17 @@
 // lib/features/trip/controllers/trip_plans_controller.dart
 //
+// [v1.1 — 2026-10-18] — Lint Fixes
+//   - FIX: onError: (Object e) instead of (e) [untyped_e_parameter]
+//   - FIX: on Exception catch (e) instead of catch (e) [avoid_catches_without_on_clauses]
+//   - FIX: on StateError in selectPlanById (firstWhere throws StateError)
+//   - FIX: trailing comma in upcomingPlans getter
+//
 // [v1.0 — 2026-10-15] — G6.7: TripPlansController
 //   - يدير حالة رحلات المستخدم.
 //   - يستخدم Stream (watchByUser) للتحديث الفوري.
 //   - يوفر: load, save, delete, updateStatus.
 //   - حماية من Race Conditions عبر _loadGeneration.
 //   - Auto-select: آخر رحلة نشطة عند التحميل.
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -65,9 +70,11 @@ class TripPlansController extends ChangeNotifier {
   List<TripPlan> get upcomingPlans {
     final now = DateTime.now();
     return _plans
-        .where((p) =>
-            (p.status == TripStatus.draft || p.status == TripStatus.active) &&
-            (p.startDate == null || p.startDate!.isAfter(now)))
+        .where(
+          (p) =>
+              (p.status == TripStatus.draft || p.status == TripStatus.active) &&
+              (p.startDate == null || p.startDate!.isAfter(now)),
+        )
         .toList();
   }
 
@@ -102,7 +109,8 @@ class TripPlansController extends ChangeNotifier {
           _autoSelectPlan();
           notifyListeners();
         },
-        onError: (e) {
+        // ✅ التصويب 1: explicit type (Object e)
+        onError: (Object e) {
           if (myGen != _loadGeneration) return;
           _error = e.toString();
           _status = TripPlansStatus.error;
@@ -110,7 +118,8 @@ class TripPlansController extends ChangeNotifier {
           notifyListeners();
         },
       );
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ التصويب 2: on Exception
       if (myGen != _loadGeneration) return;
       _error = e.toString();
       _status = TripPlansStatus.error;
@@ -150,7 +159,7 @@ class TripPlansController extends ChangeNotifier {
       _error = null;
       notifyListeners();
       return true;
-    } catch (e) {
+    } on Exception catch (e) {
       _error = e.toString();
       debugPrint('TripPlansController.save error: $e');
       notifyListeners();
@@ -170,7 +179,7 @@ class TripPlansController extends ChangeNotifier {
       _error = null;
       notifyListeners();
       return true;
-    } catch (e) {
+    } on Exception catch (e) {
       _error = e.toString();
       debugPrint('TripPlansController.delete error: $e');
       notifyListeners();
@@ -188,7 +197,7 @@ class TripPlansController extends ChangeNotifier {
       await _repo.updateStatus(tripId, status);
       // Stream سيُحدِّث القائمة تلقائياً
       return true;
-    } catch (e) {
+    } on Exception catch (e) {
       _error = e.toString();
       debugPrint('TripPlansController.updateStatus error: $e');
       notifyListeners();
@@ -216,7 +225,8 @@ class TripPlansController extends ChangeNotifier {
     try {
       final plan = _plans.firstWhere((p) => p.id == id);
       selectPlan(plan);
-    } catch (_) {
+    } on StateError {
+      // ✅ التصويب 3: firstWhere throws StateError when not found
       selectPlan(null);
     }
   }

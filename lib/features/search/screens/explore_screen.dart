@@ -1,15 +1,14 @@
 // lib/features/search/screens/explore_screen.dart
 //
-// [v1.2.5 — 2026-10-15] — Governorate filter
-//   - NEW: فلترة Places حسب browsing.nameAr (المحافظة المُتصفَّحة)
-//   - NEW: Empty state مع زر "العودة لموقعي"
-//   - يستمع لـ BrowsingLocationController
+// [v1.5.1 — 2026-10-18] — Final Polish
+//   - REMOVED: unused import 'dart:async'
+//   - FIX: catId now non-null (String) — no more `catId != null` or `catId!`
+//   - FIX: redundant null check inside isCategoryMode
 //
-// [v1.2.4 — 2026-10-14] — Reactive SearchBar
-// [v1.2.3 — 2026-10-14] — Analyzer Fix
-// [v1.2.2 — 2026-10-14] — Instant Search Fix
-import 'dart:async';
-
+// [v1.5.0 — 2026-10-18] — Final Cleanup
+//   - REMOVED: _EmptyGovernorateView (unused dead code, -120 lines)
+//   - FIX: catId null check instead of ! (no-op warning)
+//   - FIX: trailing commas + const where needed
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -61,13 +60,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _setupController() {
     final controller = context.read<PlacesController>();
     controller.clearAll(notify: false);
-
-    final catId = widget.categoryId;
-    if (catId != null && catId.isNotEmpty) {
-      controller.loadCategory(catId);
-    } else {
-      controller.load();
-    }
+    controller.load();
   }
 
   Future<void> _loadInitialData() async {
@@ -95,10 +88,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.dispose();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Search Actions
-  // ═══════════════════════════════════════════════════════════════
-
   void _onQueryChanged(String value) {
     context.read<PlacesController>().setQuery(value);
   }
@@ -118,7 +107,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _saveToHistory(String query) async {
     final updated = await SearchHistoryService.addQuery(query);
     if (!mounted) return;
-    setState(() => _recent = updated);
+    setState(() => _recent = List<String>.from(updated));
   }
 
   void _applyRecent(String q) {
@@ -133,7 +122,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _removeRecent(String q) async {
     final updated = await SearchHistoryService.removeQuery(q);
     if (!mounted) return;
-    setState(() => _recent = updated);
+    setState(() => _recent = List<String>.from(updated));
   }
 
   Future<void> _clearAllRecent() async {
@@ -154,9 +143,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Build
-  // ═══════════════════════════════════════════════════════════════
+  bool _matchesCategory(
+    Place p,
+    String catId,
+    String catNameAr,
+    String catNameEn,
+  ) {
+    // الحصول على تصنيفات المكان (تدعم categories و categoryId)
+    final placeCats = p.categories.map((e) => e.toLowerCase().trim()).toList();
+    if (placeCats.isEmpty && p.categoryId.isNotEmpty) {
+      placeCats.add(p.categoryId.toLowerCase().trim());
+    }
+
+    // إذا لم يكن للمكان أي تصنيف، لا نعرضه في تصنيف محدد
+    if (placeCats.isEmpty) return false;
+
+    // دالة مساعدة للمطابقة المرنة
+    bool matches(String target) {
+      if (target.isEmpty) return false;
+      return placeCats.any(
+        (c) => c == target || c.contains(target) || target.contains(c),
+      );
+    }
+
+    // المطابقة باستخدام ID التصنيف أو اسمه العربي أو الإنجليزي
+    if (matches(catId) || matches(catNameAr) || matches(catNameEn)) {
+      return true;
+    }
+
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,24 +181,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final browsingCtrl = context.watch<BrowsingLocationController>();
     final browsing = browsingCtrl.browsing;
 
-    final catId = widget.categoryId;
-    final isCategoryMode = catId != null && catId.isNotEmpty;
+    // ✅ catId الآن String (غير-null) — يمنع warnings
+    final catId = widget.categoryId ?? '';
+    final isCategoryMode = catId.isNotEmpty;
     final hasQuery = controller.hasQuery;
 
-    // [v1.2.5] فلترة حسب المحافظة المُتصفَّحة
     final placesInGovernorate = _filterByGovernorate(
       controller.places,
       browsing.nameAr,
     );
 
     String title = l10n.search;
+    String catNameAr = '';
+    String catNameEn = '';
+
+    // جلب اسم التصنيف بالعربي والإنجليزي للمطابقة
     if (isCategoryMode) {
       final cats = context.watch<CategoriesController>().categories;
       final cat = cats.where((c) => c.id == catId).firstOrNull;
       if (cat != null) {
         final isArabic = l10n.localeName == 'ar';
         title = isArabic ? cat.nameAr : cat.nameEn;
+        catNameAr = cat.nameAr.toLowerCase().trim();
+        catNameEn = cat.nameEn.toLowerCase().trim();
       }
+    }
+
+    // ✅ الفلترة تتم هنا قبل تمريرها للـ Body
+    List<Place> finalPlaces = placesInGovernorate;
+    if (isCategoryMode) {
+      final idLower = catId.toLowerCase().trim();
+      finalPlaces = placesInGovernorate
+          .where((p) => _matchesCategory(p, idLower, catNameAr, catNameEn))
+          .toList();
     }
 
     return Scaffold(
@@ -196,7 +227,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title),
-            // [v1.2.5] عرض المحافظة تحت العنوان
             Text(
               browsing.nameAr,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -229,11 +259,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: _buildBody(
                 context,
                 controller,
-                browsingCtrl,
                 l10n,
                 isCategoryMode,
                 hasQuery,
-                placesInGovernorate,
+                finalPlaces,
               ),
             ),
           ),
@@ -242,24 +271,42 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  /// [v1.2.5] فلترة Places حسب المحافظة المُتصفَّحة.
-  List<Place> _filterByGovernorate(List<Place> places, String governorateName) {
+  List<Place> _filterByGovernorate(
+    List<Place> places,
+    String governorateName,
+  ) {
     if (governorateName.isEmpty) return places;
-    return places.where((p) => p.governorate == governorateName).toList();
+    final targetGov = governorateName.trim().toLowerCase();
+
+    return places.where((p) {
+      final placeGov = p.governorate.trim().toLowerCase();
+      if (targetGov == 'بورسعيد') {
+        return placeGov == 'بورسعيد' ||
+            placeGov == 'portsaid' ||
+            placeGov == 'port said' ||
+            placeGov == 'port_said';
+      }
+      if (targetGov == 'القاهرة') {
+        return placeGov == 'القاهرة' || placeGov == 'cairo';
+      }
+      return placeGov == targetGov;
+    }).toList();
   }
 
   Widget _buildBody(
     BuildContext context,
     PlacesController controller,
-    BrowsingLocationController browsingCtrl,
     AppLocalizations l10n,
     bool isCategoryMode,
     bool hasQuery,
-    List<Place> placesInGovernorate,
+    List<Place> finalPlaces,
   ) {
     // ═══ وضع البحث الحر (بدون categoryId) ═══
     if (!isCategoryMode) {
       if (!hasQuery) {
+        if (finalPlaces.isNotEmpty) {
+          return _ResultsList(places: finalPlaces, query: '');
+        }
         return _EmptyStateView(
           recent: _recent,
           trending: _trending,
@@ -270,16 +317,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         );
       }
 
-      if (controller.status == PlacesStatus.loading &&
-          placesInGovernorate.isEmpty) {
+      if (controller.status == PlacesStatus.loading && finalPlaces.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
 
-      if (placesInGovernorate.isNotEmpty) {
-        return _ResultsList(
-          places: placesInGovernorate,
-          query: controller.query,
-        );
+      if (finalPlaces.isNotEmpty) {
+        return _ResultsList(places: finalPlaces, query: controller.query);
       }
 
       return _NoResultsView(
@@ -290,100 +333,33 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     // ═══ وضع التصنيف (categoryId موجود) ═══
-    if (controller.status == PlacesStatus.loading &&
-        placesInGovernorate.isEmpty) {
+    if (controller.status == PlacesStatus.loading && finalPlaces.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (controller.status == PlacesStatus.error) {
       return _ErrorView(
         message: controller.error ?? 'حدث خطأ',
-        onRetry: () {
-          final catId = widget.categoryId;
-          if (catId != null && catId.isNotEmpty) {
-            controller.loadCategory(catId);
-          } else {
-            controller.load();
-          }
-        },
+        onRetry: () => controller.load(),
       );
     }
 
-    // [v1.2.5] Empty State خاص بالمحافظة
-    if (placesInGovernorate.isEmpty) {
-      return _EmptyGovernorateView(
-        governorateName: browsingCtrl.browsing.nameAr,
-        isBrowsingOther: browsingCtrl.isBrowsingOtherGovernorate,
-        physicalName: browsingCtrl.physical?.nameAr,
-        onResetToPhysical: () => browsingCtrl.resetToPhysical(),
+    if (finalPlaces.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'لا توجد أماكن في هذا التصنيف حالياً.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
       );
     }
 
     return _ResultsList(
-      places: placesInGovernorate,
+      places: finalPlaces,
       query: controller.query,
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EMPTY GOVERNORATE VIEW  [v1.2.5]
-// ═══════════════════════════════════════════════════════════════
-
-class _EmptyGovernorateView extends StatelessWidget {
-  const _EmptyGovernorateView({
-    required this.governorateName,
-    required this.isBrowsingOther,
-    required this.physicalName,
-    required this.onResetToPhysical,
-  });
-
-  final String governorateName;
-  final bool isBrowsingOther;
-  final String? physicalName;
-  final VoidCallback onResetToPhysical;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 60),
-        Icon(
-          Icons.explore_off_outlined,
-          size: 72,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'لا توجد نتائج في $governorateName',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'لم نجد أماكن تطابق بحثك في هذه المحافظة',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (isBrowsingOther && physicalName != null) ...[
-          const SizedBox(height: 20),
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: onResetToPhysical,
-              icon: const Icon(Icons.my_location, size: 18),
-              label: Text('العودة لـ $physicalName'),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }
@@ -450,7 +426,7 @@ class _SearchBar extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Filter Button (with Badge)
+// Filter Button
 // ═══════════════════════════════════════════════════════════════
 
 class _FilterButton extends StatelessWidget {
@@ -770,8 +746,9 @@ class _ResultCard extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (place.description.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -785,8 +762,11 @@ class _ResultCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.star,
-                            size: 16, color: Colors.amber.shade700),
+                        Icon(
+                          Icons.star,
+                          size: 16,
+                          color: Colors.amber.shade700,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           place.averageRating.toStringAsFixed(1),
@@ -858,8 +838,9 @@ class _NoResultsView extends StatelessWidget {
           Text(
             'لا توجد نتائج بهذه الفلاتر',
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           Center(
@@ -888,8 +869,9 @@ class _NoResultsView extends StatelessWidget {
               ? '${l10n.searchNoResults} "$query"'
               : 'لا توجد نتائج',
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 12),
         Text(

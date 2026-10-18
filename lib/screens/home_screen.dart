@@ -1,3 +1,18 @@
+// lib/screens/home_screen.dart
+//
+// [v2.9 — 2026-10-18] — Wave 3: Quick Actions
+//   - NEW: _QuickActionCard widget (خطط رحلة + رحلاتي)
+//   - NEW: Quick Actions row after WelcomeHeader
+//
+// [v2.8 — 2026-10-14] — G4.2-c-3: Governorate-aware Home
+//   - NEW: يستمع لـ BrowsingLocationController
+//   - NEW: فلترة Places حسب المحافظة المُتصفَّحة
+//   - NEW: Empty state عند عدم وجود أماكن في المحافظة
+//   - CHANGE: _loadLocation يُبلّغ BrowsingController بالموقع الفعلي
+//   - CHANGE: عنوان "الأعلى تقييماً" يُشير لاسم المحافظة
+//
+// [v2.7 — Deferred Reload Fix]
+// [v2.6 — Route Guard]
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -16,16 +31,6 @@ import '../services/location_service.dart';
 import '../widgets/welcome_header.dart';
 
 /// الصفحة الرئيسية.
-///
-/// [v2.8 — 2026-10-14] — G4.2-c-3: Governorate-aware Home
-///   - NEW: يستمع لـ BrowsingLocationController
-///   - NEW: فلترة Places حسب المحافظة المُتصفَّحة
-///   - NEW: Empty state عند عدم وجود أماكن في المحافظة
-///   - CHANGE: _loadLocation يُبلّغ BrowsingController بالموقع الفعلي
-///   - CHANGE: عنوان "الأعلى تقييماً" يُشير لاسم المحافظة
-///
-/// [v2.7 — Deferred Reload Fix]
-/// [v2.6 — Route Guard]
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -95,7 +100,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final browsing = browsingCtrl.browsing;
 
     // [v2.8] فلترة Places حسب المحافظة المُتصفَّحة
-    // نستخدم governorate (الاسم العربي) — الموجود في Firestore حالياً
     final placesInGovernorate =
         places.places.where((p) => p.governorate == browsing.nameAr).toList();
 
@@ -106,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              // ─── Welcome Header ───
               SliverToBoxAdapter(
                 child: WelcomeHeader(
                   onSearchTap: () => context.go(RoutePaths.search),
@@ -115,6 +120,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   },
                   onAvatarTap: () => context.go(RoutePaths.profile),
+                ),
+              ),
+
+              // ─── ✅ Wave 3: Quick Actions ───
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _QuickActionCard(
+                          icon: Icons.add_road,
+                          label: 'خطط رحلة',
+                          color: Theme.of(context).colorScheme.primary,
+                          onTap: () {
+                            context.push(RoutePaths.tripPlanner);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _QuickActionCard(
+                          icon: Icons.luggage,
+                          label: 'رحلاتي',
+                          color: Colors.orange.shade700,
+                          onTap: () {
+                            context.push(RoutePaths.trips);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -215,6 +252,63 @@ class _HomeScreenState extends State<HomeScreen> {
             math.sin(dLng / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return R * c;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUICK ACTION CARD  [Wave 3]
+// ═══════════════════════════════════════════════════════════════
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 26, color: color),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -465,8 +559,11 @@ class _PlaceMiniCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        Icon(Icons.star,
-                            size: 12, color: Colors.amber.shade700),
+                        Icon(
+                          Icons.star,
+                          size: 12,
+                          color: Colors.amber.shade700,
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           place.averageRating.toStringAsFixed(1),
@@ -530,8 +627,11 @@ class _GuestBanner extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.card_giftcard,
-                  color: theme.colorScheme.primary, size: 24),
+              Icon(
+                Icons.card_giftcard,
+                color: theme.colorScheme.primary,
+                size: 24,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

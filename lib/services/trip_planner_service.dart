@@ -1,53 +1,26 @@
 // lib/services/trip_planner_service.dart
 //
-// [v1.0 — 2026-10-15] — G6.7: Trip Planner Service
-//   - يولّد خطة رحلة كاملة من معطيات المستخدم.
-//   - خطوات التوليد:
-//     1. جمع المرشحين (governorate + interests)
-//     2. ترتيب حسب score = (rating × 0.6) + (proximity × 0.4)
-//     3. اختيار Top N حسب مدة الرحلة
-//     4. تحسين المسار (Greedy Nearest Neighbor)
-//     5. حساب الأوقات والمسافات
-//     6. بناء TripPlan
-//   - مستقل — يعتمد على: models + egypt_governorates فقط.
-
+// [v1.1 — 2026-10-18] — Resilience Fixes
+//   - FIX: Fallback to startLat/startLng if location is null (fixes "Not enough places")
+//   - FIX: Flexible governorate matching (supports 'بورسعيد' & 'PortSaid')
+//   - FIX: Flexible category matching (supports 'categories' list or 'categoryId')
 import 'dart:math' as math;
 
 import '../core/location/egypt_governorates.dart';
 import '../models/place.dart';
 import '../models/trip_plan.dart';
 
-/// ترتيب أولوية لقيمة الرحلة — يمنح فرصة لمقدمي الخدمة المتميزين.
 class TripPlannerService {
   TripPlannerService._();
 
-  // ═══════════════════════════════════════════════════════════════
-  // الأوزان — قابلة للتعديل
-  // ═══════════════════════════════════════════════════════════════
-
-  /// وزن التقييم في الترتيب.
   static const double _ratingWeight = 0.6;
-
-  /// وزن القرب في الترتيب.
   static const double _proximityWeight = 0.4;
-
-  /// نصف قطر "القرب المثالي" بالكيلومترات — للـ proximity score.
   static const double _proximityRadiusKm = 10.0;
 
   // ═══════════════════════════════════════════════════════════════
   // MAIN
   // ═══════════════════════════════════════════════════════════════
 
-  /// يولّد خطة رحلة بناءً على المعطيات.
-  ///
-  /// - [allPlaces]: كل الأماكن المُحمَّلة (client-side filtering).
-  /// - [governorateId]: المحافظة المستهدفة (id ASCII).
-  /// - [durationType]: مدة الرحلة.
-  /// - [interests]: categoryIds المطلوبة (فارغة = كل الفئات).
-  /// - [transportMode]: وسيلة النقل.
-  /// - [startPoint]: نقطة البدء (عادةً مركز المحافظة).
-  ///
-  /// يُعيد `TripPlan` جاهز — قد تكون `stops` فارغة إذا لم توجد أماكن.
   static TripPlan generateTrip({
     required List<Place> allPlaces,
     required String governorateId,
@@ -134,20 +107,34 @@ class TripPlannerService {
   // 1. FILTER
   // ═══════════════════════════════════════════════════════════════
 
-  /// فلترة المرشحين — governorate + interests + isApproved.
   static List<Place> _filterCandidates({
     required List<Place> allPlaces,
     required String governorateNameAr,
     required Set<String> interests,
   }) {
+    // ✅ مطابقة مرنة للمحافظة (عربي/إنجليزي)
+    bool matchesGov(String placeGov, String targetGov) {
+      final pg = placeGov.trim().toLowerCase();
+      final tg = targetGov.trim().toLowerCase();
+      if (pg == tg) return true;
+      if (tg == 'بورسعيد' && (pg == 'portsaid' || pg == 'port said' || pg == 'port_said')) return true;
+      if (tg == 'القاهرة' && pg == 'cairo') return true;
+      return false;
+    }
+
+    // ✅ لا نستبعد الأماكن التي ليس لها location (لتجنب الشاشة الفارغة)
     var list = allPlaces
-        .where((p) => p.governorate == governorateNameAr)
-        .where((p) => p.location != null)
+        .where((p) => matchesGov(p.governorate, governorateNameAr))
         .toList();
 
-    // فلترة حسب الاهتمامات (إن حُدِّدت)
+    // فلترة حسب الاهتمامات
     if (interests.isNotEmpty) {
-      list = list.where((p) => interests.contains(p.categoryId)).toList();
+      list = list.where((p) {
+        if (p.categories.isNotEmpty) {
+          return p.categories.any((c) => interests.contains(c.toLowerCase()));
+        }
+        return interests.contains(p.categoryId.toLowerCase());
+      }).toList();
     }
 
     return list;
@@ -157,7 +144,6 @@ class TripPlannerService {
   // 2. RANK
   // ═══════════════════════════════════════════════════════════════
 
-  /// ترتيب المرشحين حسب score مركّب.
   static List<Place> _rankCandidates({
     required List<Place> candidates,
     required double startLat,
@@ -165,18 +151,15 @@ class TripPlannerService {
   }) {
     final scored = candidates.map((p) {
       final ratingScore = (p.averageRating / 5.0).clamp(0.0, 1.0);
-      final distance = _haversineKm(
-        startLat,
-        startLng,
-        p.location!.latitude,
-        p.location!.longitude,
-      );
-      // proximity: 1.0 عند المسافة 0، → 0.5 عند 10 km، → 0 عند ∞
+      
+      // ✅ استخدام نقطة البداية كاحتياطي إذا لم يوجد location
+      final pLat = p.location?.latitude ?? startLat;
+      final pLng = p.location?.longitude ?? startLng;
+      
+      final distance = _haversineKm(startLat, startLng, pLat, pLng);
       final proximityScore = 1.0 / (1.0 + distance / _proximityRadiusKm);
 
-      final score =
-          ratingScore * _ratingWeight + proximityScore * _proximityWeight;
-
+      final score = ratingScore * _ratingWeight + proximityScore * _proximityWeight;
       return _ScoredPlace(place: p, score: score);
     }).toList();
 
@@ -188,7 +171,6 @@ class TripPlannerService {
   // 3. SELECT
   // ═══════════════════════════════════════════════════════════════
 
-  /// اختيار Top N حسب مدة الرحلة — مع احترام categoryBalance.
   static List<Place> _selectStops({
     required List<Place> ranked,
     required TripDurationType durationType,
@@ -196,43 +178,34 @@ class TripPlannerService {
     final maxStops = durationType.maxStops;
     if (ranked.length <= maxStops) return ranked;
 
-    // نُحاول تنويع الفئات — لا نأخذ كل شيء من مطاعم
     final byCategory = <String, List<Place>>{};
     for (final p in ranked) {
-      byCategory.putIfAbsent(p.categoryId, () => []).add(p);
+      final cat = p.categories.isNotEmpty ? p.categories.first : p.categoryId;
+      byCategory.putIfAbsent(cat, () => []).add(p);
     }
 
     final selected = <Place>[];
     final usedIds = <String>{};
 
-    // جولة أولى: واحد من كل فئة
     for (final cat in byCategory.keys) {
       if (selected.length >= maxStops) break;
       final p = byCategory[cat]!.first;
       if (usedIds.add(p.id)) selected.add(p);
     }
 
-    // جولة ثانية: أكمل من الأعلى ترتيباً
     for (final p in ranked) {
       if (selected.length >= maxStops) break;
       if (usedIds.add(p.id)) selected.add(p);
     }
 
-    // أعد الترتيب حسب score الأصلي (سنُحسّن المسار لاحقاً)
-    selected.sort((a, b) {
-      final ai = ranked.indexOf(a);
-      final bi = ranked.indexOf(b);
-      return ai.compareTo(bi);
-    });
-
+    selected.sort((a, b) => ranked.indexOf(a).compareTo(ranked.indexOf(b)));
     return selected;
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 4. OPTIMIZE ROUTE (Greedy Nearest Neighbor)
+  // 4. OPTIMIZE ROUTE
   // ═══════════════════════════════════════════════════════════════
 
-  /// يحسّن ترتيب الزيارات — Greedy: من الأقرب للأقرب.
   static List<Place> _optimizeRoute({
     required List<Place> places,
     required double startLat,
@@ -247,18 +220,15 @@ class TripPlannerService {
     var curLng = startLng;
 
     while (remaining.isNotEmpty) {
-      // ابحث عن الأقرب للموقع الحالي
       var nearestIdx = 0;
       var nearestDist = double.infinity;
 
       for (var i = 0; i < remaining.length; i++) {
         final p = remaining[i];
-        final d = _haversineKm(
-          curLat,
-          curLng,
-          p.location!.latitude,
-          p.location!.longitude,
-        );
+        final pLat = p.location?.latitude ?? startLat;
+        final pLng = p.location?.longitude ?? startLng;
+        final d = _haversineKm(curLat, curLng, pLat, pLng);
+        
         if (d < nearestDist) {
           nearestDist = d;
           nearestIdx = i;
@@ -267,8 +237,8 @@ class TripPlannerService {
 
       final next = remaining.removeAt(nearestIdx);
       result.add(next);
-      curLat = next.location!.latitude;
-      curLng = next.location!.longitude;
+      curLat = next.location?.latitude ?? startLat;
+      curLng = next.location?.longitude ?? startLng;
     }
 
     return result;
@@ -278,7 +248,6 @@ class TripPlannerService {
   // 5. TIMES
   // ═══════════════════════════════════════════════════════════════
 
-  /// يحوّل Places إلى TripStops مع أوقات متوقعة.
   static List<TripStop> _estimateTimes({
     required List<Place> places,
     required double startLat,
@@ -286,43 +255,29 @@ class TripPlannerService {
     required TripTransportMode transportMode,
   }) {
     final stops = <TripStop>[];
-    // نبدأ الرحلة الساعة 9:00 صباحاً (وقت منطقي)
     final startTime = DateTime.now();
-    var currentTime = DateTime(
-      startTime.year,
-      startTime.month,
-      startTime.day,
-      9,
-      0,
-    );
+    var currentTime = DateTime(startTime.year, startTime.month, startTime.day, 9, 0);
 
     var curLat = startLat;
     var curLng = startLng;
 
     for (final place in places) {
-      // وقت الانتقال من الموقع الحالي إلى المكان
-      final travelKm = _haversineKm(
-        curLat,
-        curLng,
-        place.location!.latitude,
-        place.location!.longitude,
-      );
+      final pLat = place.location?.latitude ?? startLat;
+      final pLng = place.location?.longitude ?? startLng;
+      
+      final travelKm = _haversineKm(curLat, curLng, pLat, pLng);
       final travelMin = (travelKm / transportMode.speedKmH * 60).round();
-
-      // وقت الوصول = الوقت الحالي + الانتقال
       currentTime = currentTime.add(Duration(minutes: travelMin));
 
-      // مدة الزيارة حسب الفئة
-      final visitDuration = _visitDurationForCategory(place.categoryId);
+      final visitDuration = _visitDurationForCategory(place.categories.isNotEmpty ? place.categories.first : place.categoryId);
 
       stops.add(TripStop(
         placeId: place.id,
         placeNameAr: place.nameAr,
         placeNameEn: place.nameEn,
-        placeImageUrl:
-            place.imageUrls.isNotEmpty ? place.imageUrls.first : null,
-        lat: place.location!.latitude,
-        lng: place.location!.longitude,
+        placeImageUrl: place.imageUrls.isNotEmpty ? place.imageUrls.first : null,
+        lat: pLat,
+        lng: pLng,
         categoryId: place.categoryId,
         rating: place.averageRating,
         reviewCount: place.reviewCount,
@@ -330,28 +285,25 @@ class TripPlannerService {
         plannedDurationMin: visitDuration,
       ));
 
-      // الوقت الحالي += مدة الزيارة
       currentTime = currentTime.add(Duration(minutes: visitDuration));
-
-      curLat = place.location!.latitude;
-      curLng = place.location!.longitude;
+      curLat = pLat;
+      curLng = pLng;
     }
 
     return stops;
   }
 
-  /// مدة الزيارة حسب الفئة بالدقائق.
   static int _visitDurationForCategory(String categoryId) {
-    return switch (categoryId) {
-      'restaurants' => 75,
+    return switch (categoryId.toLowerCase()) {
+      'restaurants' || 'food' => 75,
       'cafes' => 45,
-      'landmarks' => 90,
-      'beaches' => 120,
+      'landmarks' || 'history' || 'culture' => 90,
+      'beaches' || 'beach' => 120,
       'hotels' => 30,
       'shopping' => 90,
-      'parks' => 60,
+      'parks' || 'nature' => 60,
       'family' => 120,
-      'events' => 90,
+      'events' || 'nightlife' => 90,
       _ => 60,
     };
   }
@@ -360,28 +312,23 @@ class TripPlannerService {
   // 6. TOTALS
   // ═══════════════════════════════════════════════════════════════
 
-  /// إجمالي المسافة (كم) — بما فيها من نقطة البدء.
   static double _totalDistance({
     required List<TripStop> stops,
     required double startLat,
     required double startLng,
   }) {
     if (stops.isEmpty) return 0.0;
-
     var total = 0.0;
     var curLat = startLat;
     var curLng = startLng;
-
     for (final s in stops) {
       total += _haversineKm(curLat, curLng, s.lat, s.lng);
       curLat = s.lat;
       curLng = s.lng;
     }
-
     return total;
   }
 
-  /// إجمالي وقت الانتقالات (دقائق).
   static int _totalTravelTime({
     required List<TripStop> stops,
     required double startLat,
@@ -389,18 +336,15 @@ class TripPlannerService {
     required TripTransportMode transportMode,
   }) {
     if (stops.isEmpty) return 0;
-
     var totalMin = 0;
     var curLat = startLat;
     var curLng = startLng;
-
     for (final s in stops) {
       final km = _haversineKm(curLat, curLng, s.lat, s.lng);
       totalMin += (km / transportMode.speedKmH * 60).round();
       curLat = s.lat;
       curLng = s.lng;
     }
-
     return totalMin;
   }
 
@@ -408,11 +352,7 @@ class TripPlannerService {
   // HELPERS
   // ═══════════════════════════════════════════════════════════════
 
-  /// عنوان الرحلة — "رحلة الإسكندرية".
-  static String _generateTitle(
-    String governorateNameAr,
-    TripDurationType durationType,
-  ) {
+  static String _generateTitle(String governorateNameAr, TripDurationType durationType) {
     final suffix = switch (durationType) {
       TripDurationType.halfDay => 'نصف يوم',
       TripDurationType.fullDay => 'يوم كامل',
@@ -421,37 +361,21 @@ class TripPlannerService {
     return 'رحلة $governorateNameAr — $suffix';
   }
 
-  /// Haversine — مسافة بالكيلومترات.
-  static double _haversineKm(
-    double lat1,
-    double lng1,
-    double lat2,
-    double lng2,
-  ) {
+  static double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
     double rad(double d) => d * math.pi / 180.0;
-
     final dLat = rad(lat2 - lat1);
     final dLng = rad(lng2 - lng1);
-
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(rad(lat1)) *
-            math.cos(rad(lat2)) *
-            math.sin(dLng / 2) *
-            math.sin(dLng / 2);
-
+        math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.sin(dLng / 2) * math.sin(dLng / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return 6371.0 * c;
   }
 }
 
-/// نموذج داخلي — Place + score.
 class _ScoredPlace {
   const _ScoredPlace({required this.place, required this.score});
-
   final Place place;
   final double score;
-
   @override
-  String toString() =>
-      '_ScoredPlace(${place.nameAr}, ${score.toStringAsFixed(2)})';
+  String toString() => '_ScoredPlace(${place.nameAr}, ${score.toStringAsFixed(2)})';
 }

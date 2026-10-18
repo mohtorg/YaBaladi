@@ -1,27 +1,24 @@
 // lib/features/trip/screens/trip_planner_screen.dart
 //
-// [v1.5 — 2026-10-17] — CRITICAL FIX: bypass UI filters in generation
-//   - FIX: _generateTrip now uses allPlacesRaw (unfiltered) instead of places
-//     This ensures Trip Planner ignores Explore/Search filters.
-//   - NEW: smart retry (2 attempts) + orange SnackBar for network failures.
-//   - FIX: also reloads if mode != all (user visited a category before).
-//
-// [v1.4 — 2026-10-17] — CRITICAL FIX: inject real userId into save
-// [v1.3 — 2026-10-17] — Race condition fix + UI sync
-// [v1.2 — 2026-10-15] — DateRangePicker clarity + AppBar subtitle
+// [v2.0.2 — 2026-10-18] — Lint fixes for strict analyze
+//   - FIX: unawaited() + MaterialPageRoute<void> for Navigator
+//   - ADDED: import 'dart:async'
+import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../core/location/browsing_location_controller.dart';
 import '../../../core/location/egypt_governorates.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../features/places/controllers/places_controller.dart';
 import '../../../models/trip_plan.dart';
 import '../../../services/trip_planner_service.dart';
 import '../controllers/trip_plans_controller.dart';
+import 'trip_overview_screen.dart';
 
 class TripPlannerScreen extends StatefulWidget {
   const TripPlannerScreen({super.key});
@@ -34,20 +31,15 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   static const int _totalSteps = 4;
 
   int _currentStep = 0;
-
-  // ═══ Step 1: المحافظة ═══
   String _governorateId = kDefaultGovernorate.id;
 
-  // ═══ Step 2: المدة + الاهتمامات ═══
   TripDurationType _durationType = TripDurationType.fullDay;
   Set<String> _interests = {};
   TripTransportMode _transportMode = TripTransportMode.driving;
 
-  // ═══ Step 3: المعاينة ═══
   TripPlan? _generatedPlan;
   bool _generating = false;
 
-  // ═══ Step 4: الحفظ ═══
   final _titleController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
@@ -69,10 +61,6 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
     super.dispose();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // HEADER
-  // ═══════════════════════════════════════════════════════════════
-
   String _headerSubtitle() {
     final gov = governorateById(_governorateId);
     final govName = gov?.nameAr ?? '';
@@ -85,11 +73,21 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   // NAVIGATION
   // ═══════════════════════════════════════════════════════════════
 
-  void _next() {
+  Future<void> _next() async {
     if (_generating || _saving) return;
-    if (_currentStep == 2) {
-      _generateIfNeeded();
+
+    if (_currentStep == 1) {
+      final hasPlan = _generatedPlan != null && _generatedPlan!.isNotEmpty;
+      setState(() {
+        _currentStep = 2;
+        if (!hasPlan) _generating = true;
+      });
+      if (!hasPlan) {
+        await _generateTrip(skipGuard: true);
+      }
+      return;
     }
+
     if (_currentStep < _totalSteps - 1) {
       setState(() => _currentStep++);
     }
@@ -112,57 +110,51 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // GENERATION — [v1.5] uses allPlacesRaw (bypass UI filters)
+  // GENERATION
   // ═══════════════════════════════════════════════════════════════
 
-  Future<void> _generateIfNeeded({bool force = false}) async {
-    if (!force && _generatedPlan != null && _generatedPlan!.isNotEmpty) {
-      return;
-    }
-    await _generateTrip();
-  }
-
-  Future<void> _generateTrip() async {
-    if (_generating) return;
-    setState(() => _generating = true);
+  Future<void> _generateTrip({bool skipGuard = false}) async {
+    if (!skipGuard && _generating) return;
+    if (!_generating) setState(() => _generating = true);
 
     final placesCtrl = context.read<PlacesController>();
+    final browsingCtrl = context.read<BrowsingLocationController>();
+    final messenger = ScaffoldMessenger.of(context);
 
-    // ✅ [v1.5 FIX] استخدم allPlacesRaw للفحص (تجاوز فلاتر UI)
-    // وأعد التحميل إذا كان mode ليس 'all' (المستخدم زار تصنيفاً سابقاً)
-    if (placesCtrl.allPlacesRaw.isEmpty ||
-        placesCtrl.mode != PlacesMode.all) {
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      if (placesCtrl.allPlacesRaw.isNotEmpty &&
+          placesCtrl.mode == PlacesMode.all) {
+        break;
+      }
+
       await placesCtrl.load();
       if (!mounted) return;
 
-      // محاولة ثانية (شبكة قد تفشل مرة واحدة)
-      if (placesCtrl.allPlacesRaw.isEmpty) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (!mounted) return;
-        await placesCtrl.load();
+      if (placesCtrl.allPlacesRaw.isNotEmpty) break;
+
+      if (attempt < 3) {
+        await Future<void>.delayed(Duration(seconds: attempt * 2));
         if (!mounted) return;
       }
     }
 
-    // ✅ [v1.5 FIX] حماية: فشل تحميل الأماكن (شبكة) — ليس "لا أماكن في المحافظة"
     if (placesCtrl.allPlacesRaw.isEmpty) {
       if (!mounted) return;
       setState(() => _generating = false);
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             content: Text(
-              'تعذر تحميل الأماكن. تحقق من الاتصال وأعد المحاولة',
+              'تعذر تحميل الأماكن. تحقق من الاتصال ثم أعد المحاولة',
             ),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 4),
+            duration: Duration(seconds: 5),
           ),
         );
       return;
     }
 
-    final browsingCtrl = context.read<BrowsingLocationController>();
     final governorate = governorateById(_governorateId) ?? kDefaultGovernorate;
 
     final isCurrentGov = browsingCtrl.browsing.id == _governorateId;
@@ -174,7 +166,6 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
         ? physical!.lng!
         : governorate.lng;
 
-    // ✅ [v1.5 FIX] استخدم allPlacesRaw — يتجاوز أي فلتر من Explore/Search
     final plan = TripPlannerService.generateTrip(
       allPlaces: placesCtrl.allPlacesRaw,
       governorateId: _governorateId,
@@ -196,18 +187,85 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SAVE — [v1.4] inject real userId
+  // PLACE PICKER
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> _openPlacePicker() async {
+    if (_generatedPlan == null) return;
+
+    final auth = context.read<AuthController>();
+    final uid = auth.uid ?? 'guest';
+
+    final result = await context.push<List<TripStop>>(
+      RoutePaths.tripPlacePicker,
+      extra: {
+        'initialStops': _generatedPlan!.stops,
+        'governorateId': _governorateId,
+        'governorateNameAr': _generatedPlan!.governorateNameAr,
+        'maxStops': _durationType.maxStops,
+        'userId': uid,
+      },
+    );
+
+    if (result == null || !mounted) return;
+
+    final updated = _generatedPlan!.copyWith(
+      stops: result,
+      totalDistanceKm: _recalcDistance(result),
+      totalDurationMin: _recalcDuration(result),
+    );
+
+    setState(() => _generatedPlan = updated);
+  }
+
+  double _recalcDistance(List<TripStop> stops) {
+    if (stops.length < 2) return 0;
+    var total = 0.0;
+    for (var i = 1; i < stops.length; i++) {
+      total += _haversine(
+        stops[i - 1].lat,
+        stops[i - 1].lng,
+        stops[i].lat,
+        stops[i].lng,
+      );
+    }
+    return total;
+  }
+
+  int _recalcDuration(List<TripStop> stops) {
+    return stops.fold<int>(
+      0,
+      (sum, s) => sum + (s.plannedDurationMin ?? 0),
+    );
+  }
+
+  double _haversine(double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371.0;
+    double rad(double d) => d * math.pi / 180.0;
+    final dLat = rad(lat2 - lat1);
+    final dLng = rad(lng2 - lng1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(rad(lat1)) *
+            math.cos(rad(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAVE
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> _save() async {
     if (_generatedPlan == null || _generatedPlan!.isEmpty) return;
 
-    // ✅ [v1.4 FIX] اقرأ uid الحقيقي
     final auth = context.read<AuthController>();
     final uid = auth.uid;
+    final messenger = ScaffoldMessenger.of(context);
 
     if (uid == null) {
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
@@ -219,11 +277,9 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
     }
 
     final tripCtrl = context.read<TripPlansController>();
-    final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _saving = true);
 
-    // ✅ [v1.4 FIX] حقن userId في الخطة قبل الحفظ
     final toSave = _generatedPlan!.copyWith(
       userId: uid,
       title: _titleController.text.trim().isEmpty
@@ -248,9 +304,17 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-      Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) _onClose();
-      });
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (mounted) {
+        // ✅ explicit type args + unawaited to satisfy strict lints
+        unawaited(
+          Navigator.of(context).pushReplacement<void, void>(
+            MaterialPageRoute<void>(
+              builder: (context) => TripOverviewScreen(plan: toSave),
+            ),
+          ),
+        );
+      }
     } else {
       messenger
         ..hideCurrentSnackBar()
@@ -338,6 +402,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
           plan: _generatedPlan,
           generating: _generating,
           onRegenerate: () => _generateTrip(),
+          onEditManually: _openPlacePicker,
         );
       case 3:
         return _Step4Save(
@@ -406,7 +471,8 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                       label: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ الرحلة'),
                     )
                   : FilledButton.icon(
-                      onPressed: (_generating || !canProceed) ? null : _next,
+                      onPressed:
+                          (_generating || !canProceed) ? null : () => _next(),
                       icon: _generating
                           ? const SizedBox(
                               width: 16,
@@ -654,7 +720,6 @@ class _Step2Preferences extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-
         Text(
           'كم من الوقت؟',
           style: theme.textTheme.titleSmall?.copyWith(
@@ -678,9 +743,7 @@ class _Step2Preferences extends StatelessWidget {
             }).toList(),
           ),
         ),
-
         const SizedBox(height: 20),
-
         Text(
           'وسيلة النقل',
           style: theme.textTheme.titleSmall?.copyWith(
@@ -699,9 +762,7 @@ class _Step2Preferences extends StatelessWidget {
           selected: {transportMode},
           onSelectionChanged: (s) => onTransportChanged(s.first),
         ),
-
         const SizedBox(height: 20),
-
         Text(
           'ما يهمك؟',
           style: theme.textTheme.titleSmall?.copyWith(
@@ -757,11 +818,13 @@ class _Step3Preview extends StatelessWidget {
     required this.plan,
     required this.generating,
     required this.onRegenerate,
+    required this.onEditManually,
   });
 
   final TripPlan? plan;
   final bool generating;
   final VoidCallback onRegenerate;
+  final VoidCallback onEditManually;
 
   @override
   Widget build(BuildContext context) {
@@ -879,6 +942,16 @@ class _Step3Preview extends StatelessWidget {
           );
         }),
         const SizedBox(height: 16),
+        if (plan!.isNotEmpty)
+          FilledButton.icon(
+            onPressed: onEditManually,
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('اختر يدوياً'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: onRegenerate,
           icon: const Icon(Icons.refresh),
@@ -1009,15 +1082,22 @@ class _StopPreviewCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 12, color: Colors.amber.shade700),
+                      Icon(
+                        Icons.star,
+                        size: 12,
+                        color: Colors.amber.shade700,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         stop.rating.toStringAsFixed(1),
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(width: 8),
-                      Icon(Icons.schedule,
-                          size: 12, color: theme.colorScheme.onSurfaceVariant),
+                      Icon(
+                        Icons.schedule,
+                        size: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         '${stop.plannedDurationMin ?? 0} د',
@@ -1089,8 +1169,18 @@ class _Step4Save extends StatelessWidget {
 
   String _formatDate(DateTime d) {
     const months = [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
     ];
     return '${d.day} ${months[d.month - 1]}';
   }
@@ -1117,7 +1207,6 @@ class _Step4Save extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-
         TextField(
           controller: titleController,
           onChanged: (_) => onTitleChanged(),
@@ -1129,7 +1218,6 @@ class _Step4Save extends StatelessWidget {
           maxLength: 60,
         ),
         const SizedBox(height: 12),
-
         Text(
           '📅 متى ستسافر؟',
           style: theme.textTheme.titleMedium?.copyWith(
@@ -1144,7 +1232,6 @@ class _Step4Save extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-
         Material(
           color: hasRange
               ? theme.colorScheme.primaryContainer
@@ -1183,7 +1270,6 @@ class _Step4Save extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-
                   if (!hasRange)
                     Row(
                       children: [
@@ -1290,9 +1376,7 @@ class _Step4Save extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(height: 20),
-
         if (plan != null) ...[
           Container(
             padding: const EdgeInsets.all(16),

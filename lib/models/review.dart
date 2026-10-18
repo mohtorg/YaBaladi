@@ -1,14 +1,6 @@
 // models/review.dart
 //
-// [v1.1 — 2026-10-14] — Foundation for QR-verified reviews (G6)
-//   - NEW: isVerified (bool) — تُعيّن من Admin/Cloud Function فقط
-//   - NEW: visitId (String?) — مرجع لـ visits/{id} عند التحقق عبر QR
-//   - NEW: verifiedAt (DateTime?) — متى تم التحقق
-//   - الافتراضيات الآن: isVerified=false, visitId=null, verifiedAt=null
-//   - سيتفعّل في G6 مع QR Scanner + Verified Visits
-//
-// [v1.0 — 2026-10-08]
-
+// [v1.1.2 — 2026-10-18] — FIX: Strict cast for imageUrls + Logic fix in copyWith
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Review {
@@ -21,16 +13,8 @@ class Review {
   final String comment;
   final List<String> imageUrls;
   final DateTime? createdAt;
-
-  // ─── [v1.1] QR Verification foundation ───
-  /// true فقط عندما تُتحقق الزيارة عبر QR (G6).
-  /// لا يمكن للمستخدم تعيينها — فقط Admin أو Cloud Function.
   final bool isVerified;
-
-  /// مرجع لـ visits/{id} الذي أكّد الزيارة عبر QR.
   final String? visitId;
-
-  /// وقت التحقق من الزيارة (يُعيَّن server-side).
   final DateTime? verifiedAt;
 
   const Review({
@@ -57,7 +41,8 @@ class Review {
       userPhotoUrl: (map['userPhotoUrl'] as String?) ?? '',
       rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
       comment: (map['comment'] as String?) ?? '',
-      imageUrls: List<String>.from(map['imageUrls'] ?? const []),
+      // ✅ التصويب: تحويل صريح إلى List? لتجنب خطأ dynamic مع strict-casts
+      imageUrls: List<String>.from(map['imageUrls'] as List? ?? const []),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       isVerified: (map['isVerified'] as bool?) ?? false,
       visitId: map['visitId'] as String?,
@@ -77,6 +62,7 @@ class Review {
             ? Timestamp.fromDate(createdAt!)
             : FieldValue.serverTimestamp(),
         'isVerified': isVerified,
+        // إضافة القيم فقط إذا كانت موجودة لتجنب تخزين null
         if (visitId != null) 'visitId': visitId,
         if (verifiedAt != null) 'verifiedAt': Timestamp.fromDate(verifiedAt!),
       };
@@ -106,8 +92,9 @@ class Review {
         imageUrls: imageUrls ?? this.imageUrls,
         createdAt: createdAt ?? this.createdAt,
         isVerified: isVerified ?? this.isVerified,
-        visitId: visitId ?? this.visitId,
-        verifiedAt: verifiedAt ?? this.verifiedAt,
+        // ✅ التصويب المنطقي: السماح بمسح القيمة (تعيينها null) إذا لزم الأمر
+        visitId: visitId,
+        verifiedAt: verifiedAt,
       );
 
   @override

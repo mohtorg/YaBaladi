@@ -1,3 +1,12 @@
+// lib/features/profile/profile_screen.dart
+//
+// [v2.0 — 2026-10-18] — Production Cleanup
+//   - REMOVED: TEMPORARY Seed Button (development only, done)
+//   - REMOVED: _TempSeedCard class and import of port_said_seed_service
+//   - PRODUCTION READY: no dev tools in profile screen
+//
+// [v1.4 — 2026-10-14] — G4.1-d: Role Badge
+// [v1.3 — 2026-10-14] — Favorites drill-down
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +16,6 @@ import '../../../core/router/route_paths.dart';
 import '../../../features/favorites/controllers/favorites_controller.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../repositories/reviews_repository.dart';
-import '../../../services/seed_service.dart'; // ⚠️ TEMPORARY — يُحذف بعد Seed
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
@@ -16,13 +24,6 @@ import '../auth/controllers/auth_controller.dart';
 /// شاشة حسابي:
 /// - Guest → بطاقة ترقية الحساب + خروج من الوضع الزائر
 /// - User → بيانات + إحصائيات + بطاقات مستقبلية + خروج
-///
-/// [v1.5 — 2026-10-16] — TEMPORARY: Seed Button
-///   - NEW: _TempSeedCard يظهر للمسجلين فقط
-///   - ⚠️ يُحذف هذا القسم فوراً بعد تنفيذ Seed
-///
-/// [v1.4 — 2026-10-14] — G4.1-d: Role Badge
-/// [v1.3 — 2026-10-14] — Favorites drill-down
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -85,11 +86,6 @@ class ProfileScreen extends StatelessWidget {
 
           // ─── دعوة صديق (قريبًا) ───
           const _ReferralComingSoonCard(),
-
-          // ═══════════════════════════════════════════════════════
-          // ⚠️ TEMPORARY — Seed Data (يُحذف بعد الـ Seed)
-          // ═══════════════════════════════════════════════════════
-          const _TempSeedCard(),
 
           const SizedBox(height: YaBaladiDesignTokens.space4),
           const Divider(height: 1),
@@ -157,128 +153,6 @@ class ProfileScreen extends StatelessWidget {
     if (confirmed == true) {
       await auth.signOut();
     }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ⚠️ TEMPORARY — SEED CARD (يُحذف بعد الـ Seed)
-// ═══════════════════════════════════════════════════════════════
-
-class _TempSeedCard extends StatefulWidget {
-  const _TempSeedCard();
-
-  @override
-  State<_TempSeedCard> createState() => _TempSeedCardState();
-}
-
-class _TempSeedCardState extends State<_TempSeedCard> {
-  bool _busy = false;
-
-  Future<void> _runSeed() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(content: Text('⏳ جارٍ الزرع...')),
-    );
-
-    try {
-      final result = await SeedService().seedAll();
-      if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Seed: ${result['categories']} تصنيف + '
-              '${result['places']} مكان',
-            ),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-    } catch (e) {
-      if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text('❌ فشل: $e'),
-            backgroundColor: Colors.red.shade700,
-            duration: const Duration(seconds: 6),
-          ),
-        );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.shade300),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.orange.shade800,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '⚠️ إجراء مؤقت — Seed Data',
-                    style: TextStyle(
-                      color: Colors.orange.shade900,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'هذا الزر يزرع 9 تصنيفات + 12 مكان في Firestore. '
-              'يُحذف من الكود بعد نجاح الزرع.',
-              style: TextStyle(
-                color: Colors.orange.shade900,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _busy ? null : _runSeed,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.cloud_upload, size: 18),
-              label: Text(_busy ? 'جارٍ الزرع…' : 'زرع البيانات الأولية'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

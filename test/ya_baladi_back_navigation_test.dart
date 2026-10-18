@@ -1,3 +1,8 @@
+// test/ya_baladi_back_navigation_test.dart
+//
+// [v1.1.0 — 2026-10-18] — Lint fixes: const + unawaited + explicit types
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yabaladi_rebuild/navigation/ya_baladi_back_navigation.dart';
@@ -9,16 +14,18 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigatorKey,
-        home: YaBaladiBackNavigation(
-          child: const Text('Parent'),
+        home: const YaBaladiBackNavigation(
+          child: Text('Parent'),
         ),
       ),
     );
 
-    navigatorKey.currentState!.push(
-      MaterialPageRoute(
-        builder: (_) => const YaBaladiBackNavigation(
-          child: Text('Child'),
+    unawaited(
+      navigatorKey.currentState!.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const YaBaladiBackNavigation(
+            child: Text('Child'),
+          ),
         ),
       ),
     );

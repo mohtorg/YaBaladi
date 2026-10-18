@@ -1,5 +1,4 @@
 // models/place.dart
-// Firestore Place model.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Place {
@@ -8,6 +7,7 @@ class Place {
   final String nameEn;
   final String description;
   final String categoryId;
+  final List<String> categories;
   final String ownerId;
   final GeoPoint? location;
   final String address;
@@ -19,28 +19,17 @@ class Place {
   final List<String> tags;
   final double averageRating;
   final int reviewCount;
-
-  /// 1=< 100 · 2=< 500 · 3=< 1000 · 4=> 1000 ج.م
-  /// 0 = غير محدد
   final int priceLevel;
-
-  // ─── Amenities (المرافق) ───
   final bool hasWifi;
   final bool hasParking;
   final bool hasRestroom;
   final bool hasAccessibility;
-
-  // ─── Features (المميزات) ───
   final bool isFamilyFriendly;
   final bool isHalal;
   final bool hasDelivery;
   final bool hasReservation;
   final bool hasOffers;
-
-  // ─── Payment Methods (طرق الدفع) ───
-  /// القيم المتاحة: 'cash', 'card', 'instapay', 'wallet'
   final List<String> paymentMethods;
-
   final bool isApproved;
   final bool isActive;
   final DateTime? createdAt;
@@ -51,7 +40,8 @@ class Place {
     required this.nameAr,
     required this.nameEn,
     this.description = '',
-    required this.categoryId,
+    this.categoryId = '',
+    this.categories = const [],
     this.ownerId = '',
     this.location,
     this.address = '',
@@ -81,12 +71,25 @@ class Place {
   });
 
   factory Place.fromMap(String id, Map<String, dynamic> map) {
+    List<String> parsedCategories = [];
+    if (map['categories'] != null) {
+      // ✅ التصويب: تحويل صريح للنوع لتجنب خطأ dynamic
+      parsedCategories = List<String>.from(map['categories'] as List);
+    } else if (map['categoryId'] != null &&
+        (map['categoryId'] as String).isNotEmpty) {
+      parsedCategories = [map['categoryId'] as String];
+    }
+
+    final parsedCategoryId = (map['categoryId'] as String?) ??
+        (parsedCategories.isNotEmpty ? parsedCategories.first : '');
+
     return Place(
       id: id,
       nameAr: (map['nameAr'] as String?) ?? '',
       nameEn: (map['nameEn'] as String?) ?? '',
       description: (map['description'] as String?) ?? '',
-      categoryId: (map['categoryId'] as String?) ?? '',
+      categoryId: parsedCategoryId,
+      categories: parsedCategories,
       ownerId: (map['ownerId'] as String?) ?? '',
       location: map['location'] as GeoPoint?,
       address: (map['address'] as String?) ?? '',
@@ -94,8 +97,9 @@ class Place {
       governorate: (map['governorate'] as String?) ?? '',
       phone: (map['phone'] as String?) ?? '',
       whatsapp: (map['whatsapp'] as String?) ?? '',
-      imageUrls: List<String>.from(map['imageUrls'] ?? const []),
-      tags: List<String>.from(map['tags'] ?? const []),
+      // ✅ التصويب: تحويل صريح للنوع لتجنب خطأ dynamic
+      imageUrls: List<String>.from(map['imageUrls'] as List? ?? const []),
+      tags: List<String>.from(map['tags'] as List? ?? const []),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 0,
@@ -108,7 +112,8 @@ class Place {
       hasDelivery: (map['hasDelivery'] as bool?) ?? false,
       hasReservation: (map['hasReservation'] as bool?) ?? false,
       hasOffers: (map['hasOffers'] as bool?) ?? false,
-      paymentMethods: List<String>.from(map['paymentMethods'] ?? const []),
+      paymentMethods:
+          List<String>.from(map['paymentMethods'] as List? ?? const []),
       isApproved: (map['isApproved'] as bool?) ?? false,
       isActive: (map['isActive'] as bool?) ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -121,6 +126,7 @@ class Place {
         'nameEn': nameEn,
         'description': description,
         'categoryId': categoryId,
+        'categories': categories,
         'ownerId': ownerId,
         'location': location,
         'address': address,
@@ -157,6 +163,7 @@ class Place {
     String? nameEn,
     String? description,
     String? categoryId,
+    List<String>? categories,
     String? ownerId,
     GeoPoint? location,
     String? address,
@@ -190,6 +197,7 @@ class Place {
         nameEn: nameEn ?? this.nameEn,
         description: description ?? this.description,
         categoryId: categoryId ?? this.categoryId,
+        categories: categories ?? this.categories,
         ownerId: ownerId ?? this.ownerId,
         location: location ?? this.location,
         address: address ?? this.address,

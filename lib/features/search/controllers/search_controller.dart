@@ -1,3 +1,6 @@
+// lib/features/search/controllers/places_search_controller.dart
+//
+// [v1.1.1 — 2026-10-18] — Lint fixes (on Exception)
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -7,19 +10,11 @@ import '../../../repositories/places_repository.dart';
 
 enum PlacesSearchStatus { idle, loading, loaded, error }
 
-/// يدير حالة البحث:
-/// - نص البحث (مع debounce)
-/// - التصنيف المختار
-/// - النتائج
-///
-/// ملاحظة: الاسم `PlacesSearchController` مقصود — لتجنب التعارض مع
-/// `SearchController` الجاهز في Flutter (material/search_anchor.dart).
 class PlacesSearchController extends ChangeNotifier {
   PlacesSearchController({PlacesRepository? repo})
       : _repo = repo ?? PlacesRepository();
 
   final PlacesRepository _repo;
-
   Timer? _debounce;
 
   String _query = '';
@@ -93,7 +88,8 @@ class PlacesSearchController extends ChangeNotifier {
         categoryId: _categoryId,
       );
       _status = PlacesSearchStatus.loaded;
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ تم التصويب: on Exception لتجنب تحذير الـ Lint
       _error = e.toString();
       _status = PlacesSearchStatus.error;
     }

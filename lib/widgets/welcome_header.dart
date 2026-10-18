@@ -1,3 +1,25 @@
+// lib/widgets/welcome_header.dart
+//
+// [v2.0.4 — 2026-10-17] — Lint fixes + async safety
+//   - FIX: unawaited(_fetchLocation()) في initState (unawaited_futures)
+//   - FIX: unawaited() في Retry button (نفس التحذير)
+//   - FIX: التقاط BrowsingLocationController قبل await
+//          (يمنع use_build_context_synchronously)
+//   - ADD: import 'dart:async' لـ unawaited()
+//   - NOTE: RegExp deprecation متفق على تجاهله (SDK warning)
+//
+// [v2.0.3 — 2026-10-14] — Nominatim integration
+//   - CHANGE: _GovernorateButton يستقبل `label` بدل `browsing`
+//   - CHANGE: يعرض "بورسعيد - الشرق" عبر browsingShortLabel
+//   - FIX: إزالة `_location` (غير مستخدم)
+//   - CLEANUP: إزالة import egypt_governorates
+//
+// [v2.0.1 — 2026-10-14] — Type-safety fix
+// [v2.0 — 2026-10-14] — G4.2-c-3: Governorate Switcher
+// [v1.1 — 2026-10-13] — PostFrame deferral
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,16 +30,6 @@ import '../services/location_service.dart';
 import '../theme/design_tokens.dart';
 
 /// Header ترحيبي للشاشة الرئيسية.
-///
-/// [v2.0.3 — 2026-10-14] — Nominatim integration
-///   - CHANGE: _GovernorateButton يستقبل `label` بدل `browsing`
-///   - CHANGE: يعرض "بورسعيد - الشرق" عبر browsingShortLabel
-///   - FIX: إزالة `_location` (غير مستخدم)
-///   - CLEANUP: إزالة import egypt_governorates
-///
-/// [v2.0.1 — 2026-10-14] — Type-safety fix
-/// [v2.0 — 2026-10-14] — G4.2-c-3: Governorate Switcher
-/// [v1.1 — 2026-10-13] — PostFrame deferral
 class WelcomeHeader extends StatefulWidget {
   const WelcomeHeader({
     super.key,
@@ -61,7 +73,8 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _fetchLocation();
+      // ✅ [v2.0.4] unawaited — fire-and-forget مُعلَن صراحةً
+      unawaited(_fetchLocation());
     });
   }
 
@@ -71,10 +84,17 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     super.dispose();
   }
 
+  /// [v2.0.4] — نلتقط Controller **قبل** await لتجنب
+  /// use_build_context_synchronously.
   Future<void> _fetchLocation({bool forceRefresh = false}) async {
-    if (mounted && _state != _LocState.loading) {
+    if (!mounted) return;
+
+    if (_state != _LocState.loading) {
       setState(() => _state = _LocState.loading);
     }
+
+    // ✅ التقاط Controller مبكراً
+    final browsingCtrl = context.read<BrowsingLocationController>();
 
     if (forceRefresh) {
       await LocationService.clearCache();
@@ -89,12 +109,11 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       _state = loc == null ? _LocState.denied : _LocState.loaded;
     });
 
-    // [v2.0] أبلغ BrowsingLocationController بالموقع الفعلي
     if (loc != null) {
-      context.read<BrowsingLocationController>().setPhysicalLocation(
-            loc.latitude,
-            loc.longitude,
-          );
+      browsingCtrl.setPhysicalLocation(
+        loc.latitude,
+        loc.longitude,
+      );
       _waveController.forward();
     }
   }
@@ -156,8 +175,10 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                             angle: _waveAnim.value,
                             child: child,
                           ),
-                          child:
-                              const Text('👋', style: TextStyle(fontSize: 18)),
+                          child: const Text(
+                            '👋',
+                            style: TextStyle(fontSize: 18),
+                          ),
                         ),
                       ],
                     ),
@@ -165,8 +186,14 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                     // ─── زر تبديل المحافظة ───
                     if (_state == _LocState.denied)
                       TextButton.icon(
-                        onPressed: () => _fetchLocation(forceRefresh: true),
-                        icon: const Icon(Icons.location_off_outlined, size: 14),
+                        // ✅ [v2.0.4] unawaited — صريح
+                        onPressed: () => unawaited(
+                          _fetchLocation(forceRefresh: true),
+                        ),
+                        icon: const Icon(
+                          Icons.location_off_outlined,
+                          size: 14,
+                        ),
                         label: const Text(
                           'تفعيل الموقع',
                           style: TextStyle(fontSize: 12),
@@ -247,7 +274,7 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
 enum _LocState { loading, loaded, denied }
 
 // ═══════════════════════════════════════════════════════════════
-// GOVERNORATE BUTTON  [v2.0.3 — label-based]
+// GOVERNORATE BUTTON
 // ═══════════════════════════════════════════════════════════════
 
 class _GovernorateButton extends StatelessWidget {
@@ -257,8 +284,8 @@ class _GovernorateButton extends StatelessWidget {
     required this.onTap,
   });
 
-  /// [v2.0.3] نص جاهز من `BrowsingLocationController.browsingShortLabel`
-  /// مثال: "بورسعيد - الشرق" أو "الإسكندرية"
+  /// نص جاهز من `BrowsingLocationController.browsingShortLabel`
+  /// مثال: "بورسعيد - الشرق" أو "الإسكندرية".
   final String label;
   final bool isLoading;
   final VoidCallback onTap;
@@ -417,6 +444,7 @@ class _SmartAvatar extends StatelessWidget {
     );
   }
 
+  /// ⚠️ RegExp deprecation — متفق على تجاهله (SDK warning).
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '؟';
     final parts = name.trim().split(RegExp(r'\s+'));

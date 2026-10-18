@@ -1,12 +1,6 @@
 // lib/models/trip_plan.dart
 //
-// [v1.1 — 2026-10-15] — Added endDate + date range helpers
-//   - NEW: endDate (DateTime?) — تاريخ انتهاء الرحلة
-//   - NEW: durationInDays, isMultiDay, isValidRange
-//   - NEW: effectiveEndDate — حساب تلقائي عند غياب endDate
-//
-// [v1.0 — 2026-10-15] — G6.7: Trip Planner models
-
+// [v1.1.2 — 2026-10-18] — FIX: Strict cast for interests list
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -77,7 +71,6 @@ extension TripDurationTypeX on TripDurationType {
         TripDurationType.weekend => 8,
       };
 
-  /// [v1.1] عدد الأيام المتوقع لهذا النوع.
   int get expectedDays => switch (this) {
         TripDurationType.halfDay => 1,
         TripDurationType.fullDay => 1,
@@ -94,7 +87,6 @@ TripDurationType tripDurationFromCode(String? code) {
   };
 }
 
-/// [v1.1] يحوّل عدد الأيام إلى durationType مناسب.
 TripDurationType tripDurationFromDays(int days) {
   if (days <= 1) return TripDurationType.fullDay;
   if (days == 2) return TripDurationType.weekend;
@@ -162,8 +154,6 @@ class TripStop {
   final DateTime? plannedArrival;
   final int? plannedDurationMin;
   final String? notes;
-
-  /// [v1.1] هل تمت زيارتها؟
   final bool isVisited;
 
   factory TripStop.fromMap(Map<String, dynamic> map) {
@@ -228,8 +218,7 @@ class TripStop {
         rating: rating ?? this.rating,
         reviewCount: reviewCount ?? this.reviewCount,
         plannedArrival: plannedArrival ?? this.plannedArrival,
-        plannedDurationMin:
-            plannedDurationMin ?? this.plannedDurationMin,
+        plannedDurationMin: plannedDurationMin ?? this.plannedDurationMin,
         notes: notes ?? this.notes,
         isVisited: isVisited ?? this.isVisited,
       );
@@ -274,21 +263,10 @@ class TripPlan {
   final List<TripStop> stops;
   final double totalDistanceKm;
   final int totalDurationMin;
-
-  /// تاريخ بدء الرحلة.
-  /// - null: لم يُحدَّد بعد.
   final DateTime? startDate;
-
-  /// [v1.1] تاريخ انتهاء الرحلة.
-  /// - null: لم يُحدَّد (رحلة يوم واحد أو غير مجدولة).
   final DateTime? endDate;
-
   final DateTime? createdAt;
   final DateTime? updatedAt;
-
-  // ═══════════════════════════════════════════════════════════════
-  // GETTERS
-  // ═══════════════════════════════════════════════════════════════
 
   bool get isEmpty => stops.isEmpty;
   bool get isNotEmpty => stops.isNotEmpty;
@@ -309,39 +287,25 @@ class TripPlan {
     return '$h ساعات $m دقيقة';
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // [v1.1] DATE RANGE HELPERS
-  // ═══════════════════════════════════════════════════════════════
-
-  /// عدد الأيام المُخطَّطة.
-  /// - إذا `endDate == null` → 1 (يوم واحد).
-  /// - إذا `startDate == null` → 0.
   int get durationInDays {
     if (startDate == null || endDate == null) return 1;
     final diff = endDate!.difference(startDate!).inDays;
     return diff < 0 ? 1 : diff + 1;
   }
 
-  /// هل هي رحلة متعددة الأيام؟
   bool get isMultiDay => durationInDays > 1;
 
-  /// هل الفترة صحيحة؟ (endDate >= startDate)
   bool get isValidRange {
     if (startDate == null || endDate == null) return true;
     return !endDate!.isBefore(startDate!);
   }
 
-  /// تاريخ الانتهاء الفعلي:
-  /// - إذا `endDate` محدد → يُعيده.
-  /// - إذا `startDate` محدد فقط → يُعيد `startDate + durationType.expectedDays - 1`.
-  /// - إذا لا شيء → null.
   DateTime? get effectiveEndDate {
     if (endDate != null) return endDate;
     if (startDate == null) return null;
     return startDate!.add(Duration(days: durationType.expectedDays - 1));
   }
 
-  /// هل الرحلة في المستقبل؟
   bool get isUpcoming {
     if (startDate == null) return false;
     final now = DateTime.now();
@@ -349,7 +313,6 @@ class TripPlan {
     return end.isAfter(now);
   }
 
-  /// هل الرحلة جارية الآن؟
   bool get isOngoing {
     if (startDate == null) return false;
     final now = DateTime.now();
@@ -357,7 +320,6 @@ class TripPlan {
     return startDate!.isBefore(now) && end.isAfter(now);
   }
 
-  /// نص نطاق التاريخ — "20 أكتوبر" أو "20 → 22 أكتوبر".
   String get dateRangeLabel {
     if (startDate == null) return 'غير مجدولة';
     final s = _formatDate(startDate!);
@@ -366,10 +328,6 @@ class TripPlan {
     }
     return '$s → ${_formatDate(endDate!)}';
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // FACTORY
-  // ═══════════════════════════════════════════════════════════════
 
   factory TripPlan.fromMap(String id, Map<String, dynamic> map) {
     final stopsRaw = (map['stops'] as List<dynamic>?) ?? const [];
@@ -385,7 +343,8 @@ class TripPlan {
       governorateNameAr: (map['governorateNameAr'] as String?) ?? '',
       transportMode: tripTransportFromCode(map['transportMode'] as String?),
       durationType: tripDurationFromCode(map['durationType'] as String?),
-      interests: List<String>.from(map['interests'] ?? const []),
+      // ✅ التصويب: تحويل صريح إلى List? لتجنب خطأ dynamic
+      interests: List<String>.from(map['interests'] as List? ?? const []),
       status: tripStatusFromCode(map['status'] as String?),
       stops: stops,
       totalDistanceKm: (map['totalDistanceKm'] as num?)?.toDouble() ?? 0.0,
@@ -396,10 +355,6 @@ class TripPlan {
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // TO MAP
-  // ═══════════════════════════════════════════════════════════════
 
   Map<String, dynamic> toMap() => {
         'userId': userId,
@@ -420,10 +375,6 @@ class TripPlan {
             : FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
-
-  // ═══════════════════════════════════════════════════════════════
-  // COPY
-  // ═══════════════════════════════════════════════════════════════
 
   TripPlan copyWith({
     String? id,
@@ -467,19 +418,23 @@ class TripPlan {
       'TripPlan($id, "$title", $stopCount stops, ${status.code})';
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════
-
-/// تنسيق تاريخ — "20 أكتوبر".
 String _formatDate(DateTime d) {
   const months = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
   ];
   return '${d.day} ${months[d.month - 1]}';
 }
 
-/// هل نفس اليوم؟
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;

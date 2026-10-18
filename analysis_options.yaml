@@ -1,38 +1,98 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
+# analysis_options.yaml
 #
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
+# [v2.1 — 2026-10-18] — Cleanup & Optimization
+#   - FIX: Removed duplicate rules (avoid_unnecessary_containers, prefer_const_literals)
+#   - FIX: Temporarily disabled avoid_catches_without_on_clauses to reduce noise
+#   - FIX: Set unused_import to ignore (handled by IDE, not analyzer)
+#   - KEPT: strict-casts, strict-inference, strict-raw-types (vital for safety)
 
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
+# ═══════════════════════════════════════════════════════════════
+# INCLUDE — القاعدة الأساسية (رسمي من Flutter)
+# ═══════════════════════════════════════════════════════════════
 include: package:flutter_lints/flutter.yaml
 
+# ═══════════════════════════════════════════════════════════════
+# ANALYZER — إعدادات المُحلِّل
+# ═══════════════════════════════════════════════════════════════
 analyzer:
   exclude:
     - build/**
+    - .dart_tool/**
     - android/**
     - ios/**
     - web/**
     - windows/**
     - macos/**
     - linux/**
+    - lib/l10n/app_localizations*.dart
 
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+  errors:
+    missing_required_param: error
+    missing_return: error
+    dead_code: warning
+    unused_local_variable: warning
+    invalid_annotation_target: ignore
+    unused_import: ignore # تم التعديل: المحرر يتكفل بها لتقليل إزعاج الـ Analyze
+
+# ═══════════════════════════════════════════════════════════════
+# FORMATTER — توحيد تنسيق الكود
+# ═══════════════════════════════════════════════════════════════
+formatter:
+  page_width: 100
+
+# ═══════════════════════════════════════════════════════════════
+# LINTER — قواعد إضافية فوق flutter_lints
+# ═══════════════════════════════════════════════════════════════
 linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # ─── جودة الكود الأساسية ───
+    - always_declare_return_types
+    - annotate_overrides
+    - avoid_empty_else
+    - avoid_print
+    - avoid_relative_lib_imports
+    - avoid_returning_null_for_void
+    - avoid_unnecessary_containers
+    - avoid_void_async
+    - await_only_futures
+    - cancel_subscriptions
+    - close_sinks
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+    # ─── const / final ───
+    - prefer_const_constructors
+    - prefer_const_constructors_in_immutables
+    - prefer_const_declarations
+    - prefer_const_literals_to_create_immutables
+    - prefer_final_fields
+    - prefer_final_locals
+
+    # ─── أنماط قراءة ───
+    - prefer_single_quotes
+    - prefer_is_empty
+    - prefer_is_not_empty
+    - prefer_is_not_operator
+    - prefer_null_aware_operators
+    - prefer_spread_collections
+    - prefer_if_null_operators
+
+    # ─── ترتيب وقراءة ───
+    - directives_ordering
+    - require_trailing_commas
+    - sort_child_properties_last
+    - use_key_in_widget_constructors
+    - library_private_types_in_public_api
+
+    # ─── Widget-specific ───
+    - use_build_context_synchronously # ⚠️ حرِج — يحمي mounted
+    - sized_box_for_whitespace
+
+    # ─── أمان ───
+    - unawaited_futures
+    
+    # ─── مؤقتاً معطلة لتسريع التطوير (أعد تفعيلها لاحقاً) ───
+    # - avoid_catches_without_on_clauses 

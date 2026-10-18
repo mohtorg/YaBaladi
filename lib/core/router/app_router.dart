@@ -1,16 +1,15 @@
 // lib/core/router/app_router.dart
 //
+// [v2.6 — 2026-10-17] — Wave 1c hardening
+//   - FIX: sort imports alphabetically (search before trip)
+//   - FIX: defensive extra handling (redirect if null, safe cast)
+//   - NEW: redirect to /trips/planner if picker opened without extra
+//   - DOC: clarify trip_plan import purpose
+//
+// [v2.5 — 2026-10-17] — Wave 1c: TripPlacePicker route
 // [v2.4.2 — 2026-10-15] — FIX: /trips/planner كان يُطابق :id خطأً
-//   - نقل planner INSIDE Branch 1 (static before dynamic)
-//   - حذف top-level planner route (تجنب duplicate name)
-//
-// [v2.4.1 — 2026-10-15] — Added missing import: trip_details_screen
-//
 // [v2.4 — 2026-10-15] — Trip details route /trips/:id
 // [v2.3 — 2026-10-15] — G6.7: Trip Planner routes
-// [v2.2 — 2026-10-14] — Favorites drill-down
-// [v2.1 — 2026-10-14] — My Reviews route
-// [v2.0 — 2026-10-14] — StatefulShellRoute Migration
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -24,12 +23,14 @@ import '../../features/places/screens/place_details_screen.dart';
 import '../../features/places/screens/place_map_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reviews/screens/my_reviews_screen.dart';
+import '../../features/search/screens/explore_screen.dart'; // ✅ [v2.6] moved up
 import '../../features/trip/screens/trip_details_screen.dart';
 import '../../features/trip/screens/trip_planner_screen.dart';
 import '../../features/trip/screens/trip_plans_screen.dart';
+import '../../features/trip/screens/trip_place_picker_screen.dart';
+import '../../models/trip_plan.dart'; // TripStop type (used in picker extra cast)
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
-import '../../features/search/screens/explore_screen.dart';
 import '../../screens/settings_screen.dart';
 import 'route_guards.dart';
 import 'route_names.dart';
@@ -96,7 +97,7 @@ GoRouter createAppRouter(AuthController auth) {
             ],
           ),
 
-          // ─── Branch 1: Trips (Trips + Planner + Details) ───
+          // ─── Branch 1: Trips (Trips + Planner + Picker + Details) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -109,6 +110,54 @@ GoRouter createAppRouter(AuthController auth) {
                     path: 'planner',
                     name: RouteNames.tripPlanner,
                     builder: (context, state) => const TripPlannerScreen(),
+                    routes: [
+                      // ✅ [v2.5] Wave 1c — Picker (Static child of planner)
+                      // [v2.6] redirect إذا لم يوجد extra (دخول مباشر)
+                      GoRoute(
+                        path: 'picker',
+                        name: RouteNames.tripPlacePicker,
+                        redirect: (context, state) {
+                          final extra = state.extra;
+                          if (extra is! Map<String, dynamic>) {
+                            // دخول مباشر بدون بيانات → ارجع للـ planner
+                            return RoutePaths.tripPlanner;
+                          }
+                          return null;
+                        },
+                        builder: (context, state) {
+                          final extra = state.extra as Map<String, dynamic>;
+
+                          // ✅ [v2.6] defensive casts — لا crash
+                          final initialStopsRaw = extra['initialStops'];
+                          final initialStops = initialStopsRaw is List
+                              ? initialStopsRaw.whereType<TripStop>().toList()
+                              : <TripStop>[];
+
+                          final govIdRaw = extra['governorateId'];
+                          final governorateId =
+                              govIdRaw is String ? govIdRaw : '';
+
+                          final govNameRaw = extra['governorateNameAr'];
+                          final governorateNameAr =
+                              govNameRaw is String ? govNameRaw : '';
+
+                          final maxStopsRaw = extra['maxStops'];
+                          final maxStops = maxStopsRaw is int ? maxStopsRaw : 8;
+
+                          final userIdRaw = extra['userId'];
+                          final userId =
+                              userIdRaw is String ? userIdRaw : 'guest';
+
+                          return TripPlacePickerScreen(
+                            initialStops: initialStops,
+                            governorateId: governorateId,
+                            governorateNameAr: governorateNameAr,
+                            maxStops: maxStops,
+                            userId: userId,
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   // [v2.4] Dynamic AFTER — /trips/:id
                   GoRoute(
@@ -159,8 +208,6 @@ GoRouter createAppRouter(AuthController auth) {
           ),
         ],
       ),
-
-      // ⚠️ [v2.4.2] تم حذف top-level tripPlanner — أصبح داخل Branch 1
 
       // ─── Auth routes — خارج الـ Shell ───
       GoRoute(
