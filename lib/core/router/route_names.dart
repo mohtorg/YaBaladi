@@ -1,48 +1,60 @@
 // lib/core/router/route_names.dart
 //
-// [v1.7 — 2026-10-17] — Polish + docs
-//   - ADD: file header + usage docs
-//   - ADD: section headers (مطابقة route_paths.dart)
-//   - DOC: favorites (legacy) vs profileFavorites (current)
+// [v1.8 — 2026-10-18] — Wave 5.4: tripDetailed
+//   - NEW: tripDetailed — '/trips/detailed/:id'
+//   - KEPT: tripDetails (legacy) — '/trips/:id'
 //
-// [v1.6 — 2026-10-17] — Wave 1c: tripPlacePicker
-// [v1.5 — 2026-10-15] — Trip planner + details
+// [v1.7 — 2026-10-17] — Wave 1c: tripPlacePicker
+// [v1.6 — 2026-10-15] — G6.7: tripPlanner + tripDetails
+// [v1.5 — 2026-10-15] — Routes + Bottom Nav
 
-/// أسماء التنقل — تُستخدم مع GoRouter:
+/// أسماء المسارات — للاستخدام مع `context.goNamed()` / `goNamed()`
 ///
-/// **الاستخدام:**
-/// ```dart
-/// // Simple navigation:
-/// context.goNamed(RouteNames.trips);
-///
-/// // With path parameters:
-/// context.pushNamed(
-///   RouteNames.tripDetails,
-///   pathParameters: {'id': 'abc123'},
-/// );
-/// ```
-///
-/// **الفرق عن `RoutePaths`:**
-///   - `RouteNames`  → للاستخدام في `name:` داخل `app_router.dart`
-///                    + `context.goNamed()` / `pushNamed()`
-///   - `RoutePaths`  → للاستخدام في `path:` داخل `app_router.dart`
-///                    + `context.go()` / `push()`
-///
-/// **القواعد:**
-///   1. كل اسم **فريد** (Dart يرمي exception عند التكرار في GoRouter).
-///   2. camelCase (اتفاقية Dart لـ `static const`).
-///   3. يُفضَّل استخدام `Named` في navigation — أقل عرضة للأخطاء.
+/// **قاعدة:** كل اسم يبدأ بحرف صغير (camelCase) — مطابقة لـ `GoRoute.name`.
 class RouteNames {
   RouteNames._();
 
   // ═══════════════════════════════════════════════════════════════
-  // MAIN NAVIGATION (Bottom Tabs)
+  // HOME
   // ═══════════════════════════════════════════════════════════════
   static const String home = 'home';
+
+  // ═══════════════════════════════════════════════════════════════
+  // CATEGORY
+  // ═══════════════════════════════════════════════════════════════
+  static const String category = 'category';
+  static const String categoryMap = 'categoryMap';
+
+  // ═══════════════════════════════════════════════════════════════
+  // PLACE
+  // ═══════════════════════════════════════════════════════════════
+  static const String place = 'place';
+  static const String placeMap = 'placeMap';
+
+  // ═══════════════════════════════════════════════════════════════
+  // TRIPS
+  // ═══════════════════════════════════════════════════════════════
   static const String trips = 'trips';
+  static const String tripPlanner = 'tripPlanner';
+  static const String tripPlacePicker = 'tripPlacePicker';
+
+  /// ✅ [v1.8] Wave 5.4 — الشاشة التفصيلية (Timeline بالساعات)
+  static const String tripDetailed = 'tripDetailed';
+
+  /// Legacy — تفاصيل الرحلة القديمة
+  static const String tripDetails = 'tripDetails';
+
+  // ═══════════════════════════════════════════════════════════════
+  // PROFILE
+  // ═══════════════════════════════════════════════════════════════
   static const String profile = 'profile';
+  static const String myReviews = 'myReviews';
+  static const String profileFavorites = 'profileFavorites';
+
+  // ═══════════════════════════════════════════════════════════════
+  // SETTINGS
+  // ═══════════════════════════════════════════════════════════════
   static const String settings = 'settings';
-  static const String search = 'search';
 
   // ═══════════════════════════════════════════════════════════════
   // AUTH
@@ -52,44 +64,12 @@ class RouteNames {
   static const String forgotPassword = 'forgotPassword';
 
   // ═══════════════════════════════════════════════════════════════
-  // CATEGORIES & PLACES
+  // SEARCH
   // ═══════════════════════════════════════════════════════════════
-  static const String category = 'category';
-  static const String place = 'place';
-
-  // ─── الخرائط ───
-  static const String placeMap = 'placeMap';
-  static const String categoryMap = 'categoryMap';
+  static const String search = 'search';
 
   // ═══════════════════════════════════════════════════════════════
-  // PROFILE SUB-ROUTES
+  // FAVORITES (legacy)
   // ═══════════════════════════════════════════════════════════════
-  static const String myReviews = 'myReviews';
-
-  /// ✅ **الحديث** — `/profile/favorites` (داخل BottomNav).
-  /// استخدم هذا للوصول للمفضلة من شاشة الحساب.
-  static const String profileFavorites = 'profileFavorites';
-
-  // ═══════════════════════════════════════════════════════════════
-  // TRIPS (G6.7 — Wave 1c)
-  // ═══════════════════════════════════════════════════════════════
-  static const String tripPlanner = 'tripPlanner';
-  static const String tripPlacePicker = 'tripPlacePicker';
-  static const String tripDetails = 'tripDetails';
-
-  // ═══════════════════════════════════════════════════════════════
-  // FAVORITES (legacy — backward compat)
-  // ═══════════════════════════════════════════════════════════════
-  /// 🔴 **Legacy** — `/favorites` (خارج BottomNav).
-  ///
-  /// ⚠️ **لا تستخدم هذا للتنقل الجديد** — يقفز خارج `MainShell`
-  /// (لا Bottom Navigation Bar أسفل الشاشة).
-  ///
-  /// **البديل الحديث:** استخدم `profileFavorites` أو `RoutePaths.profileFavorites`.
-  ///
-  /// هذا المسار محفوظ للتوافق مع:
-  ///   - روابط قديمة (deep links)
-  ///   - إشعارات سابقة
-  ///   - أي كود لم يُحدَّث بعد
   static const String favorites = 'favorites';
 }

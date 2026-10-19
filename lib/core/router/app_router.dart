@@ -1,10 +1,17 @@
 // lib/core/router/app_router.dart
 //
+// [v2.8 — 2026-10-18] — Wave 5.4: Trip Detailed Route
+//   - NEW: GoRoute for /trips/detailed/:id → TripDetailedScreen
+//   - NEW: import '../../features/trip/screens/trip_detailed_screen.dart'
+//   - ORDER: detailed/:id BEFORE :id (وإلا "detailed" يُطابق كـ :id)
+//
+// [v2.7 — 2026-10-18] — Wave 5.3 Integration
+//   - REPLACED: TripPlannerScreen → WizardContainerScreen
+//
 // [v2.6 — 2026-10-17] — Wave 1c hardening
-//   - FIX: sort imports alphabetically (search before trip)
+//   - FIX: sort imports alphabetically
 //   - FIX: defensive extra handling (redirect if null, safe cast)
 //   - NEW: redirect to /trips/planner if picker opened without extra
-//   - DOC: clarify trip_plan import purpose
 //
 // [v2.5 — 2026-10-17] — Wave 1c: TripPlacePicker route
 // [v2.4.2 — 2026-10-15] — FIX: /trips/planner كان يُطابق :id خطأً
@@ -23,12 +30,13 @@ import '../../features/places/screens/place_details_screen.dart';
 import '../../features/places/screens/place_map_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reviews/screens/my_reviews_screen.dart';
-import '../../features/search/screens/explore_screen.dart'; // ✅ [v2.6] moved up
+import '../../features/search/screens/explore_screen.dart';
+import '../../features/trip/screens/trip_detailed_screen.dart';
 import '../../features/trip/screens/trip_details_screen.dart';
-import '../../features/trip/screens/trip_planner_screen.dart';
 import '../../features/trip/screens/trip_plans_screen.dart';
 import '../../features/trip/screens/trip_place_picker_screen.dart';
-import '../../models/trip_plan.dart'; // TripStop type (used in picker extra cast)
+import '../../features/trip/screens/wizard/wizard_container_screen.dart';
+import '../../models/trip_plan.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../screens/settings_screen.dart';
@@ -48,7 +56,9 @@ GoRouter createAppRouter(AuthController auth) {
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
         branches: [
-          // ─── Branch 0: Home + Category + Place ───
+          // ═══════════════════════════════════════════════════════════
+          // Branch 0: Home + Category + Place
+          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -97,7 +107,9 @@ GoRouter createAppRouter(AuthController auth) {
             ],
           ),
 
-          // ─── Branch 1: Trips (Trips + Planner + Picker + Details) ───
+          // ═══════════════════════════════════════════════════════════
+          // Branch 1: Trips (Trips + Planner + Picker + Detailed + Details)
+          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -105,14 +117,13 @@ GoRouter createAppRouter(AuthController auth) {
                 name: RouteNames.trips,
                 builder: (context, state) => const TripPlansScreen(),
                 routes: [
-                  // ✅ [v2.4.2] Static FIRST — يحل تعارض /trips/planner
+                  // ─── Static FIRST — يحل تعارض /trips/planner ───
                   GoRoute(
                     path: 'planner',
                     name: RouteNames.tripPlanner,
-                    builder: (context, state) => const TripPlannerScreen(),
+                    builder: (context, state) => const WizardContainerScreen(),
                     routes: [
-                      // ✅ [v2.5] Wave 1c — Picker (Static child of planner)
-                      // [v2.6] redirect إذا لم يوجد extra (دخول مباشر)
+                      // Wave 1c — Picker (Static child of planner)
                       GoRoute(
                         path: 'picker',
                         name: RouteNames.tripPlacePicker,
@@ -127,7 +138,7 @@ GoRouter createAppRouter(AuthController auth) {
                         builder: (context, state) {
                           final extra = state.extra as Map<String, dynamic>;
 
-                          // ✅ [v2.6] defensive casts — لا crash
+                          // defensive casts — لا crash
                           final initialStopsRaw = extra['initialStops'];
                           final initialStops = initialStopsRaw is List
                               ? initialStopsRaw.whereType<TripStop>().toList()
@@ -159,7 +170,18 @@ GoRouter createAppRouter(AuthController auth) {
                       ),
                     ],
                   ),
-                  // [v2.4] Dynamic AFTER — /trips/:id
+
+                  // ✅ [v2.8] Wave 5.4 — Detailed (BEFORE :id)
+                  GoRoute(
+                    path: 'detailed/:id',
+                    name: RouteNames.tripDetailed,
+                    builder: (context, state) {
+                      final id = state.pathParameters['id'] ?? '';
+                      return TripDetailedScreen(tripId: id);
+                    },
+                  ),
+
+                  // ─── Dynamic LAST — /trips/:id ───
                   GoRoute(
                     path: ':id',
                     name: RouteNames.tripDetails,
@@ -173,7 +195,9 @@ GoRouter createAppRouter(AuthController auth) {
             ],
           ),
 
-          // ─── Branch 2: Profile + My Reviews + Favorites ───
+          // ═══════════════════════════════════════════════════════════
+          // Branch 2: Profile + My Reviews + Favorites
+          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -196,7 +220,9 @@ GoRouter createAppRouter(AuthController auth) {
             ],
           ),
 
-          // ─── Branch 3: Settings ───
+          // ═══════════════════════════════════════════════════════════
+          // Branch 3: Settings
+          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -209,7 +235,9 @@ GoRouter createAppRouter(AuthController auth) {
         ],
       ),
 
-      // ─── Auth routes — خارج الـ Shell ───
+      // ═══════════════════════════════════════════════════════════
+      // Auth routes — خارج الـ Shell
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.login,
         name: RouteNames.login,
@@ -226,14 +254,18 @@ GoRouter createAppRouter(AuthController auth) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-      // ─── البحث الحر — خارج الـ Shell ───
+      // ═══════════════════════════════════════════════════════════
+      // البحث الحر — خارج الـ Shell
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.search,
         name: RouteNames.search,
         builder: (context, state) => const ExploreScreen(),
       ),
 
-      // ─── المسار القديم للمفضلة — للتوافق الخلفي ───
+      // ═══════════════════════════════════════════════════════════
+      // المسار القديم للمفضلة — للتوافق الخلفي
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.favorites,
         name: RouteNames.favorites,

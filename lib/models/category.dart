@@ -1,14 +1,32 @@
-// models/category.dart
-// Firestore-backed Category model (مختلف عن PlaceCategory المرجعي للأيقونات).
+// lib/models/category.dart
+//
+// [v1.1 — 2026-10-18] — Robust icon lookup + Defensive Casting
+//   - FIX (CRITICAL): icon uses fallback chain
+//     byId → byLabelAr → byLabelEn → Icons.category
+//     → يعمل سواء كان iconKey في Firestore = 'مطعم' (قديم)
+//       أو 'restaurants' (جديد) أو 'Restaurants' (label)
+//   - FIX: createdAt/updatedAt defensive cast (is Timestamp)
+//   - NEW: ==, hashCode — للمقارنة في Sets/اختبارات
+//   - NEW: isVisible getter (isActive && placeCount > 0)
+//   - NOTE: يعتمد على PlaceCategories.byId + byLabelAr + byLabelEn
+//     → تأكد أن place_categories.dart يحتوي هذه الدوال
+//
+// [v1.0 — الأصل] — Firestore-backed Category model
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 import 'place_categories.dart';
 
 class Category {
   final String id;
   final String nameAr;
   final String nameEn;
-  final String iconKey;   // يطابق PlaceCategory.id للحصول على الأيقونة
+
+  /// يطابق إما `PlaceCategory.id` (English) أو `PlaceCategory.labelAr`
+  /// (Arabic) أو `PlaceCategory.labelEn` (English) — حسب ما تم تخزينه.
+  final String iconKey;
+
   final int order;
   final bool isActive;
   final int placeCount;
@@ -27,11 +45,49 @@ class Category {
     this.updatedAt,
   });
 
-  /// الأيقونة من المرجع المحلي (PlaceCategories)
-  IconData get icon =>
-      PlaceCategories.byId(iconKey)?.icon ?? Icons.category;
+  // ═══════════════════════════════════════════════════════════════
+  // ICON — fallback chain (defensive)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// الأيقونة من المرجع المحلي (`PlaceCategories`).
+  ///
+  /// **fallback chain:**
+  /// 1. `byId(iconKey)` — للـ English IDs الجديدة (`'restaurants'`).
+  /// 2. `byLabelAr(iconKey)` — للبيانات القديمة المخزّنة بالعربي (`'مطعم'` = labelAr قديم، أو `'مطاعم'` = labelAr جديد).
+  /// 3. `byLabelEn(iconKey)` — إذا كان iconKey = `'Restaurants'`.
+  /// 4. `Icons.category` — fallback أخير.
+  ///
+  /// **لماذا؟** لتفادي فقدان الأيقونات عند تغيير `PlaceCategories`
+  /// من Arabic IDs إلى English IDs (v1.0 → v2.0).
+  IconData get icon {
+    final byId = PlaceCategories.byId(iconKey);
+    if (byId != null) return byId.icon;
+
+    final byAr = PlaceCategories.byLabelAr(iconKey);
+    if (byAr != null) return byAr.icon;
+
+    final byEn = PlaceCategories.byLabelEn(iconKey);
+    if (byEn != null) return byEn.icon;
+
+    return Icons.category;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // GETTERS
+  // ═══════════════════════════════════════════════════════════════
+
+  /// هل التصنيف ظاهر للجمهور؟ (نشط + يحتوي أماكن).
+  bool get isVisible => isActive && placeCount > 0;
+
+  // ═══════════════════════════════════════════════════════════════
+  // PARSING
+  // ═══════════════════════════════════════════════════════════════
 
   factory Category.fromMap(String id, Map<String, dynamic> map) {
+    // defensive: createdAt/updatedAt
+    final rawCreated = map['createdAt'];
+    final rawUpdated = map['updatedAt'];
+
     return Category(
       id: id,
       nameAr: (map['nameAr'] as String?) ?? '',
@@ -40,10 +96,14 @@ class Category {
       order: (map['order'] as num?)?.toInt() ?? 0,
       isActive: (map['isActive'] as bool?) ?? true,
       placeCount: (map['placeCount'] as num?)?.toInt() ?? 0,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      createdAt: rawCreated is Timestamp ? rawCreated.toDate() : null,
+      updatedAt: rawUpdated is Timestamp ? rawUpdated.toDate() : null,
     );
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SERIALIZATION
+  // ═══════════════════════════════════════════════════════════════
 
   Map<String, dynamic> toMap() => {
         'nameAr': nameAr,
@@ -57,6 +117,10 @@ class Category {
             : FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
+
+  // ═══════════════════════════════════════════════════════════════
+  // COPY WITH
+  // ═══════════════════════════════════════════════════════════════
 
   Category copyWith({
     String? id,
@@ -79,6 +143,33 @@ class Category {
         placeCount: placeCount ?? this.placeCount,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+      );
+
+  // ═══════════════════════════════════════════════════════════════
+  // EQUALITY
+  // ═══════════════════════════════════════════════════════════════
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Category &&
+          other.id == id &&
+          other.nameAr == nameAr &&
+          other.nameEn == nameEn &&
+          other.iconKey == iconKey &&
+          other.order == order &&
+          other.isActive == isActive &&
+          other.placeCount == placeCount;
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        nameAr,
+        nameEn,
+        iconKey,
+        order,
+        isActive,
+        placeCount,
       );
 
   @override

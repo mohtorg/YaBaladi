@@ -1,17 +1,28 @@
 // lib/features/trip/screens/trip_overview_screen.dart
 //
-// [v1.3 — 2026-10-18] — CRITICAL FIX: import day_program_screen.dart
-//   - FIX: كان import 'day_program_screen.dart' مفقوداً → compile error
-//   - VERIFIED: كل الـ imports موجودة
-import 'package:flutter/material.dart';
+// [v1.3.2 — 2026-10-19] — Wave 5.5.1: إصلاح dead null-checks + off-by-one
+//   - FIX [71:35]: plan.title غير nullable ⇒ استبدال ?? بـ isEmpty check
+//   - FIX [107:50]: plan.stopsByDay[i] غير nullable ⇒ إزالة ?? const []
+//   - FIX منطقي (خطير): stopsByDay 0-indexed، safeDay 1-indexed
+//          ⇒ dayIndex = safeDay - 1 (كان يعرض اليوم الخطأ أو يرمي RangeError)
+//   - ADD: حماية totalDays == 0 (clamp(1, 0) يرمي ArgumentError)
+//   - ADD: حماية stopsByDay.isEmpty (Empty State + تجنب RangeError)
+//   - ADD: حماية dayIndex ضد stopsByDay.length < totalDays
+//   - KEPT: زر "عرض التفاصيل" في AppBar + FAB + Day selector
+//
+// [v1.3.1 — 2026-10-19] — import path + TimelineView signature
+// [v1.3   — 2026-10-19] — Wave 5.5.1: زر "عرض التفاصيل"
 
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/router/route_paths.dart';
 import '../../../models/trip_plan.dart';
-import '../../../models/trip_progress.dart';
-import '../../../services/trip_progress_service.dart';
-import 'day_program_screen.dart'; // ✅ هذا هو السطر المفقود
+import '../widgets/timeline/timeline_view.dart';
 
 class TripOverviewScreen extends StatefulWidget {
   final TripPlan plan;
+
   const TripOverviewScreen({super.key, required this.plan});
 
   @override
@@ -19,240 +30,163 @@ class TripOverviewScreen extends StatefulWidget {
 }
 
 class _TripOverviewScreenState extends State<TripOverviewScreen> {
-  TripProgress? _progress;
+  /// اليوم المختار — **1-indexed** (يوم 1، يوم 2، ...)
+  /// يُقابل `stopsByDay[safeDay - 1]` (0-indexed)
+  int _selectedDay = 1;
 
-  int get _numberOfDays =>
-      widget.plan.durationType == TripDurationType.weekend ? 2 : 1;
-
-  List<List<TripStop>> get _stopsByDay {
-    if (_numberOfDays == 1) return [widget.plan.stops];
-    final perDay = (widget.plan.stops.length / _numberOfDays).ceil();
-    return [
-      widget.plan.stops.take(perDay).toList(),
-      widget.plan.stops.skip(perDay).toList(),
-    ];
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProgress();
-  }
-
-  Future<void> _loadProgress() async {
-    final p = await TripProgressService.load(widget.plan.id);
-    if (!mounted) return;
-    setState(() => _progress = p);
-  }
-
-  Future<void> _openDay(int i, List<TripStop> dayStops) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => DayProgramScreen(
-          plan: widget.plan,
-          dayIndex: i,
-          dayStops: dayStops,
+  // ── الانتقال إلى الشاشة التفصيلية ──
+  void _openDetailed() {
+    final id = widget.plan.id;
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يمكن عرض التفاصيل: معرف الرحلة غير متوفر'),
         ),
-      ),
-    );
-    // بعد العودة من اليوم، أعد تحميل التقدم
-    await _loadProgress();
-  }
-
-  int _visitedInDay(List<TripStop> dayStops) {
-    if (_progress == null) return 0;
-    return dayStops.where((s) => _progress!.isVisited(s.placeId)).length;
+      );
+      return;
+    }
+    // context.push → Future<T?> لكن fire-and-forget مقبول:
+    // المستخدم ينتقل فورًا؛ لا حاجة لانتظار اكتمال التنقل.
+    context.push(RoutePaths.tripDetailedPath(id));
   }
 
   @override
   Widget build(BuildContext context) {
+    final plan = widget.plan;
     final theme = Theme.of(context);
-    final stopsByDay = _stopsByDay;
+
+    // ── محددات آمنة ──
+    final totalDays = plan.totalDays;
+    final hasStops = plan.stopsByDay.isNotEmpty;
+
+    // [v1.3.2] clamp(1, 0) يرمي ArgumentError ⇒ guard totalDays > 0
+    final safeDay = totalDays > 0 ? _selectedDay.clamp(1, totalDays) : 1;
+
+    // [v1.3.2] stopsByDay 0-indexed، safeDay 1-indexed ⇒ dayIndex = safeDay - 1
+    //          + حماية ضد stopsByDay.length < totalDays
+    final dayIndex =
+        hasStops ? (safeDay - 1).clamp(0, plan.stopsByDay.length - 1) : 0;
+
+    // [v1.3.2] title غير nullable ⇒ isEmpty بدل ??
+    final displayTitle = plan.title.isEmpty ? 'رحلتي إلى بورسعيد' : plan.title;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'رحلتك',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
+        title: const Text('ملخص الرحلة'),
+        actions: [
+          // ← زر "عرض التفاصيل" (Wave 5.5.1)
+          IconButton(
+            tooltip: 'عرض التفاصيل',
+            icon: const Icon(Icons.article_outlined),
+            onPressed: _openDetailed,
+          ),
+        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: Column(
         children: [
-          // ─── بطاقة الرحلة ───
-          Card(
-            color: theme.colorScheme.primaryContainer,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.plan.title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 24),
-                      const SizedBox(width: 8),
-                      Text(
-                        widget.plan.governorateNameAr,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_month, size: 24),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$_numberOfDays ${_numberOfDays == 1 ? "يوم" : "أيام"}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            'اختر اليوم لبدء البرنامج:',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-
-          // ─── بطاقات الأيام ───
-          ...List.generate(stopsByDay.length, (i) {
-            final dayStops = stopsByDay[i];
-            final totalMin = dayStops.fold<int>(
-              0,
-              (sum, s) => sum + (s.plannedDurationMin ?? 0),
-            );
-            final hours = (totalMin / 60).toStringAsFixed(1);
-            final visited = _visitedInDay(dayStops);
-            final isDayComplete = visited == dayStops.length;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => _openDay(i, dayStops),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDayComplete ? Colors.green : theme.dividerColor,
-                      width: isDayComplete ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              color: isDayComplete
-                                  ? Colors.green
-                                  : theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: isDayComplete
-                                  ? const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.white,
-                                      size: 36,
-                                    )
-                                  : Text(
-                                      '${i + 1}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'اليوم ${i + 1}',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${dayStops.length} محطات • ~$hours ساعات',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ],
-                      ),
-                      if (visited > 0) ...[
-                        const SizedBox(height: 16),
-                        LinearProgressIndicator(
-                          value: visited / dayStops.length,
-                          minHeight: 6,
-                          backgroundColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                        ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            isDayComplete
-                                ? '✅ مكتمل'
-                                : '$visited / ${dayStops.length} مزار',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDayComplete
-                                  ? Colors.green
-                                  : theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+          // ── Header: عنوان + عدد الأيام ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    displayTitle,
+                    style: theme.textTheme.titleLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  '$totalDays أيام',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+
+          // ── Day selector (فقط إذا > 1 يوم + توجد محطات) ──
+          if (totalDays > 1 && hasStops)
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: totalDays,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final day = i + 1;
+                  final selected = day == safeDay;
+                  return ChoiceChip(
+                    label: Text('اليوم $day'),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _selectedDay = day),
+                  );
+                },
               ),
-            );
-          }),
+            ),
+
+          // ── Timeline أو Empty State ──
+          Expanded(
+            child: hasStops
+                ? TimelineView(
+                    stops: plan.stopsByDay[dayIndex],
+                    transportMode: plan.transportMode,
+                  )
+                : _EmptyStopsView(theme: theme),
+          ),
         ],
+      ),
+
+      // ← زر عائم بديل للوصول السريع (Wave 5.5.1)
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openDetailed,
+        icon: const Icon(Icons.timeline),
+        label: const Text('عرض التفاصيل'),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMPTY STATE — رحلة بلا محطات
+// ═══════════════════════════════════════════════════════════════
+
+class _EmptyStopsView extends StatelessWidget {
+  const _EmptyStopsView({required this.theme});
+
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.map_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد محطات في هذه الرحلة',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'قد تكون الخطة فارغة أو لم تُحفظ بعد',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

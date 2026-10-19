@@ -1,77 +1,72 @@
 // lib/core/location/browsing_location_controller.dart
 //
-// [v1.1 — 2026-10-14] — G4.2-c-4: Nominatim integration
-//   - NEW: reverse geocoding عند setPhysicalLocation
-//   - NEW: physicalAddress — AddressInfo من Nominatim
-//   - NEW: browsingShortLabel — "بورسعيد - الشرق"
-//   - CHANGE: _resolvePhysicalAddress fire-and-forget
-//   - CHANGE: _safeNotify — حماية من notifyListeners بعد dispose
-//
-// [v1.0 — 2026-10-14] — G4.2-b: BrowsingLocationController
+// [v1.2 — 2026-10-19] — Wave 5.5c: On-Demand metadata (ADR-4)
+//   - ADD: _physicalPlaceName (اسم GPS الدقيق)
+//   - ADD: _lastSource (من أين جاء الموقع)
+//   - ADD: _lastUpdatedAt (متى تم التحديث)
+//   - CHANGE: setPhysicalLocation يقبل {placeName, source}
+//   - KEPT: _resolvePhysicalAddress (fallback إذا لم يُمرَّر placeName)
 
 import 'package:flutter/foundation.dart';
 
 import '../../models/address_info.dart';
+import '../../services/location_service.dart';
 import 'egypt_governorates.dart';
+import 'location_source.dart';
 import 'reverse_geocoding_service.dart';
 
-/// يدير "المحافظة المُتصفَّحة حالياً" — منفصلة عن موقع المستخدم الفعلي.
-///
-/// - الفعلي: من GPS (physicalLocation).
-/// - المُتصفَّح: من اختيار المستخدم أو مطابق للفعلي افتراضياً.
 class BrowsingLocationController extends ChangeNotifier {
   String? _browsingId;
   String? _physicalId;
   bool _isUsingPhysical = true;
 
-  /// [v1.1] العنوان الفعلي المُستخرَج من Nominatim.
   AddressInfo? _physicalAddress;
-
-  /// [v1.1] هل تم التدمير؟
   bool _disposed = false;
 
+  // ─── [v1.2] Wave 5.5c ───
+  String? _physicalPlaceName;
+  LocationSource? _lastSource;
+  DateTime? _lastUpdatedAt;
+
   // ═══════════════════════════════════════════════════════════════
-  // GETTERS — الأساسية
+  // GETTERS
   // ═══════════════════════════════════════════════════════════════
 
-  /// المحافظة المُتصفَّحة حالياً.
   EgyptGovernorate get browsing {
     return governorateById(_browsingId) ??
         governorateById(_physicalId) ??
         kDefaultGovernorate;
   }
 
-  /// المحافظة الفعلية (من GPS).
   EgyptGovernorate? get physical => governorateById(_physicalId);
-
-  /// هل المُتصفَّح = الفعلي؟
   bool get isUsingPhysical => _isUsingPhysical;
-
-  /// هل يوجد موقع فعلي (GPS)؟
   bool get hasPhysicalLocation => _physicalId != null;
 
-  /// هل هناك فرق بين المُتصفَّح والفعلي؟
   bool get isBrowsingOtherGovernorate {
     if (_physicalId == null) return false;
     return _browsingId != null && _browsingId != _physicalId;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // GETTERS — [v1.1] العنوان
-  // ═══════════════════════════════════════════════════════════════
-
-  /// العنوان الفعلي — من Nominatim (قد يكون null إذا فشل).
   AddressInfo? get physicalAddress => _physicalAddress;
-
-  /// اسم الحي الفعلي — مثلاً "الشرق".
   String? get physicalDistrictName => _physicalAddress?.district;
 
-  /// تسمية مختصرة للمحافظة المُتصفَّحة:
-  /// - إذا نستعرض الفعلي → "بورسعيد - الشرق"
-  /// - إذا نستعرض محافظة أخرى → "الإسكندرية"
+  /// [v1.2] اسم المكان الدقيق (GPS/بحث/يدوي)
+  String? get physicalPlaceName => _physicalPlaceName;
+
+  /// [v1.2] المصدر الأخير
+  LocationSource? get lastSource => _lastSource;
+
+  /// [v1.2] آخر تحديث
+  DateTime? get lastUpdatedAt => _lastUpdatedAt;
+
   String get browsingShortLabel {
-    if (isUsingPhysical && _physicalAddress != null) {
-      return _physicalAddress!.shortLabel;
+    if (isUsingPhysical) {
+      if (_physicalPlaceName != null && _physicalPlaceName!.isNotEmpty) {
+        return _physicalPlaceName!;
+      }
+      if (_physicalAddress != null) {
+        return _physicalAddress!.shortLabel;
+      }
     }
     return browsing.nameAr;
   }
@@ -80,8 +75,13 @@ class BrowsingLocationController extends ChangeNotifier {
   // MUTATIONS
   // ═══════════════════════════════════════════════════════════════
 
-  /// يُحدِّث الموقع الفعلي (من GPS) + يبدأ reverse geocoding.
-  void setPhysicalLocation(double lat, double lng) {
+  /// [v1.2] يقبل الآن placeName + source (اختياري)
+  void setPhysicalLocation(
+    double lat,
+    double lng, {
+    String? placeName,
+    LocationSource? source,
+  }) {
     final gov = nearestGovernorate(lat, lng);
     final changed = _physicalId != gov.id;
     _physicalId = gov.id;
@@ -91,10 +91,17 @@ class BrowsingLocationController extends ChangeNotifier {
       _isUsingPhysical = true;
     }
 
+    // [v1.2] تحديث metadata
+    _lastSource = source;
+    _lastUpdatedAt = DateTime.now();
+    if (placeName != null) _physicalPlaceName = placeName;
+
     if (changed) _safeNotify();
 
-    // ابدأ Reverse Geocoding — fire-and-forget
-    _resolvePhysicalAddress(lat, lng);
+    // Reverse geocode فقط إذا لم يأتِ placeName من الخارج
+    if (placeName == null) {
+      _resolvePhysicalAddress(lat, lng);
+    }
   }
 
   Future<void> _resolvePhysicalAddress(double lat, double lng) async {
@@ -106,11 +113,6 @@ class BrowsingLocationController extends ChangeNotifier {
     _safeNotify();
   }
 
-  /// يُحدِّد المحافظة المُتصفَّحة يدوياً.
-  ///
-  /// - إن كان [governorateId] = الفعلي → يُفعِّل `isUsingPhysical`.
-  /// - وإلا → يُلغي `isUsingPhysical`.
-  /// - `null` أو نص فارغ → يعود للفعلي.
   void setBrowsingGovernorate(String? governorateId) {
     if (governorateId == null || governorateId.isEmpty) {
       resetToPhysical();
@@ -131,7 +133,6 @@ class BrowsingLocationController extends ChangeNotifier {
     if (changed) _safeNotify();
   }
 
-  /// يعود لاستخدام الموقع الفعلي.
   void resetToPhysical() {
     if (_physicalId == null) return;
     final changed = _browsingId != _physicalId || !_isUsingPhysical;
@@ -140,18 +141,16 @@ class BrowsingLocationController extends ChangeNotifier {
     if (changed) _safeNotify();
   }
 
-  /// يُصفِّر الحالة بالكامل — يُستخدَم عند signOut أو مسح البيانات.
   void clear() {
     _browsingId = null;
     _physicalId = null;
     _isUsingPhysical = true;
     _physicalAddress = null;
+    _physicalPlaceName = null;
+    _lastSource = null;
+    _lastUpdatedAt = null;
     _safeNotify();
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════════════════════════════
 
   void _safeNotify() {
     if (!_disposed) notifyListeners();

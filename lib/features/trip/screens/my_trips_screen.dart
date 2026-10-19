@@ -1,11 +1,18 @@
 // lib/features/trip/screens/my_trips_screen.dart
 //
+// [v1.1 — 2026-10-18] — Wave 5.4: Route to Trip Detailed
+//   - CHANGED: _openTrip → context.push('/trips/detailed/:id')
+//   - KEPT: fallback إلى Overview/Summary عند غياب id (نادر)
+//   - NEW: import go_router + route_paths + dart:async
+//
 // [v1.0 — 2026-10-18] — Wave 3.1: My Trips Screen
-//   - يستخدم TripPlansController.load(userId) (Stream-based)
-//   - يستخدم ctrl.plans / activePlans / completedPlans
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../models/trip_plan.dart';
 import '../controllers/trip_plans_controller.dart';
@@ -34,13 +41,19 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
   }
 
   void _openTrip(TripPlan trip) {
+    // ✅ Wave 5.4: افتح الشاشة التفصيلية (Timeline بالساعات)
+    if (trip.id.isNotEmpty) {
+      unawaited(context.push(RoutePaths.tripDetailedPath(trip.id)));
+      return;
+    }
+
+    // fallback نادر — عند غياب id
     final targetScreen = trip.status == TripStatus.completed
         ? TripSummaryScreen(plan: trip)
         : TripOverviewScreen(plan: trip);
-
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => targetScreen,
+    unawaited(
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => targetScreen),
       ),
     );
   }

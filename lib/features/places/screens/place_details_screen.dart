@@ -1,18 +1,18 @@
 // lib/features/places/screens/place_details_screen.dart
 //
+// [v2.3 — 2026-10-18] — Lint fixes for Wave 4.1
+//   - FIX: catch (e) → on Exception catch (e) in _FavoriteButton
+//   - FIX: عرض رسالة الخطأ الفعلية بدل نص ثابت
+//   - NOTE: reviews نظام مكتمل عبر AddReviewSheet + ReviewsSection + ReviewsController
+//          لا حاجة لـ AddReviewScreen (full screen)
+//
 // [v2.2 — 2026-10-15] — Removed url_launcher dependency
 //   - FIX: إزالة import url_launcher
 //   - CHANGE: _launchCall/_launchWhatsApp/_openInMaps → SnackBar مؤقت
 //   - CLEANUP: إزالة kIsWeb + defaultTargetPlatform + TargetPlatform
 //
 // [v2.1 — _ReviewsBlock StatefulWidget]
-//   - FIX: تحويل _ReviewsBlock إلى StatefulWidget
-//
 // [v2.0 — F2.4: Reviews integration]
-//   - NEW: ChangeNotifierProvider<ReviewsController> حول الشاشة
-//   - NEW: استدعاء load(placeId) في initState
-//   - NEW: استبدال "المراجعات قادمة قريبًا" بـ <ReviewsSection>
-//   - NEW: _handleAddReview — guest + already-reviewed + sheet
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -467,11 +467,15 @@ class _FavoriteButton extends StatelessWidget {
             duration: const Duration(seconds: 2),
           ),
         );
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ التصويب: on Exception + عرض الخطأ
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('تعذّر تحديث المفضلة')),
+          SnackBar(
+            content: Text('تعذّر تحديث المفضلة: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
         );
     }
   }
@@ -479,7 +483,7 @@ class _FavoriteButton extends StatelessWidget {
 
 // ═══════════════════════════════════════════════════════════════
 // ACTION BUTTONS
-// [v2.2] الإجراءات الخارجية معطَّلة مؤقتاً — url_launcher cache مكسور
+// [v2.2] الإجراءات الخارجية معطَّلة مؤقتاً
 // ═══════════════════════════════════════════════════════════════
 
 class _ActionButtons extends StatelessWidget {
@@ -524,7 +528,6 @@ class _ActionButtons extends StatelessWidget {
     );
   }
 
-  /// [v2.2] SnackBar مؤقت — سيُستخدَم url_launcher عند إعادته.
   Future<void> _launchCall(BuildContext context, String phone) async {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -536,7 +539,6 @@ class _ActionButtons extends StatelessWidget {
       );
   }
 
-  /// [v2.2] SnackBar مؤقت.
   Future<void> _launchWhatsApp(BuildContext context, String phone) async {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -548,7 +550,6 @@ class _ActionButtons extends StatelessWidget {
       );
   }
 
-  /// [v2.2] SnackBar مؤقت — نفس الرسالة في كل المنصات.
   Future<void> _openInMaps(BuildContext context, Place place) async {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

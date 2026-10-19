@@ -1,9 +1,10 @@
 // lib/features/trip/screens/trip_place_picker_screen.dart
 //
-// [v1.1 — 2026-10-17] — Fix analyzer errors (missing import + types)
-//   - ADDED: import '../../../models/trip_draft.dart'
-//   - FIX: catch (e) → on Exception catch (e)
-//   - FIX: const constructors & trailing commas
+// [v1.2 — 2026-10-19] — Map integration + coordinate validation
+//   - FIX: _addPlace يرفض الأماكن بدون إحداثيات صالحة (لا مزيد من (0,0))
+//   - NEW: _buildMapTab يستخدم TripMapView الحقيقي (بدل placeholder)
+//   - NEW: banner تحذيري في top عند وجود أماكن بدون إحداثيات
+//   - FIX: trailing commas + imports
 
 import 'dart:async';
 
@@ -11,12 +12,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/place.dart';
-import '../../../models/trip_draft.dart'; // ✅ FIX: Missing import
+import '../../../models/trip_draft.dart';
 import '../../../models/trip_plan.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/ya_app_bar.dart';
 import '../../places/controllers/places_controller.dart';
 import '../../../services/trip_draft_service.dart';
+import '../widgets/trip_map_view.dart'; // [v1.2] Map integration
 
 class TripPlacePickerScreen extends StatefulWidget {
   const TripPlacePickerScreen({
@@ -45,7 +47,6 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
 
   String _searchQuery = '';
   String? _selectedCategory;
-
   Timer? _saveDebounce;
 
   @override
@@ -78,8 +79,36 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
   bool _isSelected(String placeId) =>
       _selectedStops.any((s) => s.placeId == placeId);
 
+  /// [v1.2] التحقق من إحداثيات المكان
+  bool _hasValidCoords(Place p) {
+    final lat = p.location?.latitude;
+    final lng = p.location?.longitude;
+    if (lat == null || lng == null) return false;
+    if (!lat.isFinite || !lng.isFinite) return false;
+    if (lat == 0 && lng == 0) return false;
+    if (lat.abs() > 90 || lng.abs() > 180) return false;
+    return true;
+  }
+
   void _addPlace(Place place) {
     if (_isSelected(place.id)) return;
+
+    // [v1.2] حماية: رفض الأماكن بدون إحداثيات صالحة
+    if (!_hasValidCoords(place)) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚠️ "${place.nameAr}" لا يحتوي على إحداثيات صالحة للخريطة',
+            ),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      return;
+    }
+
     if (_selectedStops.length >= widget.maxStops) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -99,10 +128,9 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
       placeId: place.id,
       placeNameAr: place.nameAr,
       placeNameEn: place.nameEn,
-      placeImageUrl:
-          place.imageUrls.isNotEmpty ? place.imageUrls.first : null,
-      lat: place.location?.latitude ?? 0,
-      lng: place.location?.longitude ?? 0,
+      placeImageUrl: place.imageUrls.isNotEmpty ? place.imageUrls.first : null,
+      lat: place.location!.latitude,
+      lng: place.location!.longitude,
       categoryId: place.categoryId,
       rating: place.averageRating,
       reviewCount: place.reviewCount,
@@ -160,7 +188,6 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
 
   Future<void> _saveNow() async {
     try {
-      // ✅ FIX: الآن existing نوعه TripDraft (بفضل الاستيراد)
       final existing = await TripDraftService.load(widget.userId) ??
           TripDraft.empty(widget.userId);
 
@@ -190,9 +217,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     }
   }
 
-  String _encodePlan(TripPlan plan) {
-    return _manualJsonEncode(plan);
-  }
+  String _encodePlan(TripPlan plan) => _manualJsonEncode(plan);
 
   String _manualJsonEncode(TripPlan plan) {
     return '{"stops":${_stopsToJson(plan.stops)},"title":"${_escape(plan.title)}","governorateId":"${plan.governorateId}","governorateNameAr":"${_escape(plan.governorateNameAr)}"}';
@@ -232,6 +257,14 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     return list;
   }
 
+  /// [v1.2] عدّ الأماكن بدون إحداثيات (للتحذير)
+  int _invalidCoordsCount(PlacesController ctrl) {
+    return ctrl.allPlacesRaw
+        .where((p) => p.governorate == widget.governorateNameAr)
+        .where((p) => !_hasValidCoords(p))
+        .length;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Build
   // ═══════════════════════════════════════════════════════════════
@@ -255,6 +288,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
       body: Column(
         children: [
           _buildCounterBar(),
+          _buildInvalidBanner(placesCtrl), // [v1.2]
           _buildTabBar(),
           Expanded(
             child: isLoading && placesCtrl.allPlacesRaw.isEmpty
@@ -263,7 +297,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
                     controller: _tabController,
                     children: [
                       _buildCardsTab(placesCtrl),
-                      _buildMapTab(),
+                      _buildMapTab(), // [v1.2] Map حقيقي
                       _buildSelectedTab(),
                     ],
                   ),
@@ -294,9 +328,8 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               const SizedBox(width: 6),
               Text(
                 '${_selectedStops.length} من ${widget.maxStops}',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               if (isOver)
@@ -318,6 +351,35 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation(
                 isOver ? Colors.orange : theme.colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [v1.2] بانر تحذيري إذا وُجدت أماكن بدون إحداثيات
+  Widget _buildInvalidBanner(PlacesController ctrl) {
+    if (ctrl.allPlacesRaw.isEmpty) return const SizedBox.shrink();
+    final invalid = _invalidCoordsCount(ctrl);
+    if (invalid == 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.amber.shade100,
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded,
+              color: Colors.amber.shade900, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$invalid مكان بدون إحداثيات صالحة — لن يظهر على الخريطة',
+              style: TextStyle(
+                color: Colors.amber.shade900,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -362,6 +424,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
                   itemBuilder: (_, i) => _PlaceCard(
                     place: places[i],
                     isSelected: _isSelected(places[i].id),
+                    hasValidCoords: _hasValidCoords(places[i]),
                     onAdd: () => _addPlace(places[i]),
                   ),
                 ),
@@ -461,32 +524,38 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     );
   }
 
+  /// [v1.2] خريطة حقيقية بدل placeholder
   Widget _buildMapTab() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.map_outlined,
-              size: 72,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'الخريطة التفاعلية',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'قادمة في التحديث القادم',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+    if (_selectedStops.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.map_outlined,
+                size: 72,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'أضف أماكن لعرضها على الخريطة',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'اذهب لتبويب "بطاقات" واضغط "أضف"',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
+
+    return TripMapView(stops: _selectedStops);
   }
 
   Widget _buildSelectedTab() {
@@ -544,11 +613,13 @@ class _PlaceCard extends StatelessWidget {
   const _PlaceCard({
     required this.place,
     required this.isSelected,
+    required this.hasValidCoords,
     required this.onAdd,
   });
 
   final Place place;
   final bool isSelected;
+  final bool hasValidCoords;
   final VoidCallback onAdd;
 
   @override
@@ -565,12 +636,16 @@ class _PlaceCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
+                color: hasValidCoords
+                    ? theme.colorScheme.primaryContainer
+                    : theme.colorScheme.errorContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.place,
-                color: theme.colorScheme.onPrimaryContainer,
+                hasValidCoords ? Icons.place : Icons.location_off,
+                color: hasValidCoords
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onErrorContainer,
               ),
             ),
             const SizedBox(width: 12),
@@ -589,20 +664,28 @@ class _PlaceCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.star,
-                          size: 12, color: Colors.amber.shade700),
+                      Icon(Icons.star, size: 12, color: Colors.amber.shade700),
                       const SizedBox(width: 2),
                       Text(
                         place.averageRating.toStringAsFixed(1),
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        place.categoryId,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      if (!hasValidCoords)
+                        Text(
+                          '⚠️ بدون إحداثيات',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      else
+                        Text(
+                          place.categoryId,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -610,12 +693,16 @@ class _PlaceCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             FilledButton.tonalIcon(
-              onPressed: isSelected ? null : onAdd,
+              onPressed: (isSelected || !hasValidCoords) ? null : onAdd,
               icon: Icon(
-                isSelected ? Icons.check : Icons.add,
+                isSelected
+                    ? Icons.check
+                    : (!hasValidCoords ? Icons.block : Icons.add),
                 size: 16,
               ),
-              label: Text(isSelected ? 'مضاف' : 'أضف'),
+              label: Text(
+                isSelected ? 'مضاف' : (!hasValidCoords ? 'غير متاح' : 'أضف'),
+              ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,

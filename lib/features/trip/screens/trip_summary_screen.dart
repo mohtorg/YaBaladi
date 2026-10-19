@@ -1,11 +1,11 @@
 // lib/features/trip/screens/trip_summary_screen.dart
 //
-// [v2.0 — 2026-10-18] — Clipboard-based URL sharing
-//   - CHANGED: dart:html → Clipboard (works everywhere: Web + Mobile + Tests)
-//   - FIX: flutter test لا يفشل بعد الآن
-//   - KEPT: auto-mark trip as completed
-//   - KEPT: trip stats (stops/distance/duration)
-//   - KEPT: "العودة إلى رحلاتي" uses context.go('/trips')
+// [v2.2 — 2026-10-19] — UI Polish: Replaced emoji with Material Icon.
+//   - FIX: Replaced '🎉' with Icons.celebration to avoid Noto Font warnings.
+//   - KEPT: v2.1 features (Outline button, unawaited, clipboard).
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +31,7 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _markTripCompleted();
+      unawaited(_markTripCompleted());
     });
   }
 
@@ -98,6 +98,17 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
     context.go(RoutePaths.trips);
   }
 
+  void _openDetailed() {
+    final id = widget.plan.id;
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('معرف الرحلة غير متوفر')),
+      );
+      return;
+    }
+    context.push(RoutePaths.tripDetailedPath(id));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -125,13 +136,23 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
                   color: Colors.amber,
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  '🎉 رحلة رائعة!',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+
+                // ✅ استبدال الإيموجي بأيقونة
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.celebration, size: 36, color: Colors.amber),
+                    SizedBox(width: 12),
+                    Text(
+                      'رحلة رائعة!',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
+
                 const SizedBox(height: 16),
                 Text(
                   'لقد أكملت رحلتك إلى ${plan.governorateNameAr} بنجاح.',
@@ -167,6 +188,23 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
                   ),
                 ),
                 const SizedBox(height: 48),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _openDetailed,
+                    icon: const Icon(Icons.timeline, size: 22),
+                    label: const Text(
+                      'عرض التفاصيل',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -192,6 +230,7 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(

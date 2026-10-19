@@ -1,5 +1,9 @@
 // lib/features/reviews/controllers/reviews_controller.dart
 //
+// [v1.1 — 2026-10-18] — Lint fixes
+//   - FIX: catch (e) → on Exception catch (e) (3 أماكن)
+//   - ADD: dispose() override (safety — يُستدعى تلقائياً عند إغلاق الشاشة)
+//
 // [v1.0.1 — 2026-10-14] — Removed unnecessary dispose() override
 // [v1.0 — 2026-10-14] — F2.1: Initial ReviewsController
 
@@ -79,7 +83,8 @@ class ReviewsController extends ChangeNotifier {
 
       _reviews = list;
       _status = ReviewsStatus.loaded;
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ التصويب: on Exception
       if (myGen != _loadGeneration) return;
       _error = e.toString();
       _status = ReviewsStatus.error;
@@ -104,7 +109,8 @@ class ReviewsController extends ChangeNotifier {
       _error = null;
       notifyListeners();
       return true;
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ التصويب: on Exception
       _error = e.toString();
       debugPrint('ReviewsController.submit error: $e');
       notifyListeners();
@@ -139,7 +145,8 @@ class ReviewsController extends ChangeNotifier {
       _error = null;
       notifyListeners();
       return true;
-    } catch (e) {
+    } on Exception catch (e) {
+      // ✅ التصويب: on Exception
       _error = e.toString();
       debugPrint('ReviewsController.remove error: $e');
       notifyListeners();

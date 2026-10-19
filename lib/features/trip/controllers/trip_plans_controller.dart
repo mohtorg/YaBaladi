@@ -1,21 +1,12 @@
 // lib/features/trip/controllers/trip_plans_controller.dart
 //
-// [v1.1 — 2026-10-18] — Lint Fixes
-//   - FIX: onError: (Object e) instead of (e) [untyped_e_parameter]
-//   - FIX: on Exception catch (e) instead of catch (e) [avoid_catches_without_on_clauses]
-//   - FIX: on StateError in selectPlanById (firstWhere throws StateError)
-//   - FIX: trailing comma in upcomingPlans getter
-//
-// [v1.0 — 2026-10-15] — G6.7: TripPlansController
-//   - يدير حالة رحلات المستخدم.
-//   - يستخدم Stream (watchByUser) للتحديث الفوري.
-//   - يوفر: load, save, delete, updateStatus.
-//   - حماية من Race Conditions عبر _loadGeneration.
-//   - Auto-select: آخر رحلة نشطة عند التحميل.
+// [v1.5.1 — 2026-10-19] — FIX: Restored missing getters from v1.1
+//   - Restored: isLoading, hasError, isEmpty, hasPlans, activePlans, completedPlans, upcomingPlans, count.
+//   - KEPT: save() forcing userId and null dates for serverTimestamp.
+
 import 'dart:async';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-
 import '../../../models/trip_plan.dart';
 import '../../../repositories/trip_repository.dart';
 
@@ -26,19 +17,14 @@ class TripPlansController extends ChangeNotifier {
       : _repo = repo ?? TripRepository();
 
   final TripRepository _repo;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   TripPlansStatus _status = TripPlansStatus.idle;
   List<TripPlan> _plans = const [];
   String? _error;
   String? _userId;
-
-  /// الرحلة المُختارة حالياً (للعرض).
   TripPlan? _selectedPlan;
-
-  /// حماية من Race Conditions.
   int _loadGeneration = 0;
-
-  /// Stream subscription للإلغاء عند dispose.
   StreamSubscription<List<TripPlan>>? _plansSub;
 
   // ═══════════════════════════════════════════════════════════════
@@ -49,24 +35,20 @@ class TripPlansController extends ChangeNotifier {
   List<TripPlan> get plans => List.unmodifiable(_plans);
   String? get error => _error;
   String? get userId => _userId;
+  TripPlan? get selectedPlan => _selectedPlan;
+
   bool get isLoading => _status == TripPlansStatus.loading;
   bool get hasError => _status == TripPlansStatus.error;
   bool get isEmpty => _plans.isEmpty;
   bool get hasPlans => _plans.isNotEmpty;
   int get count => _plans.length;
 
-  /// الرحلة المُختارة.
-  TripPlan? get selectedPlan => _selectedPlan;
-
-  /// رحلات نشطة فقط (status == active).
   List<TripPlan> get activePlans =>
       _plans.where((p) => p.status == TripStatus.active).toList();
 
-  /// رحلات مكتملة (status == completed).
   List<TripPlan> get completedPlans =>
       _plans.where((p) => p.status == TripStatus.completed).toList();
 
-  /// رحلات قادمة (status == draft OR active، startDate > now).
   List<TripPlan> get upcomingPlans {
     final now = DateTime.now();
     return _plans
@@ -82,15 +64,11 @@ class TripPlansController extends ChangeNotifier {
   // LOAD
   // ═══════════════════════════════════════════════════════════════
 
-  /// يشترك في Stream رحلات المستخدم — التحديثات فورية.
-  ///
-  /// - [force] = true → يُلغي اشتراكاً قديماً ويعيد.
   Future<void> load(String userId, {bool force = false}) async {
     if (!force && _userId == userId && _status == TripPlansStatus.loaded) {
       return;
     }
 
-    // إلغاء الاشتراك القديم إن وُجد
     await _plansSub?.cancel();
     _plansSub = null;
 
@@ -103,13 +81,12 @@ class TripPlansController extends ChangeNotifier {
     try {
       _plansSub = _repo.watchByUser(userId).listen(
         (list) {
-          if (myGen != _loadGeneration) return; // stale
+          if (myGen != _loadGeneration) return;
           _plans = list;
           _status = TripPlansStatus.loaded;
           _autoSelectPlan();
           notifyListeners();
         },
-        // ✅ التصويب 1: explicit type (Object e)
         onError: (Object e) {
           if (myGen != _loadGeneration) return;
           _error = e.toString();
@@ -119,7 +96,6 @@ class TripPlansController extends ChangeNotifier {
         },
       );
     } on Exception catch (e) {
-      // ✅ التصويب 2: on Exception
       if (myGen != _loadGeneration) return;
       _error = e.toString();
       _status = TripPlansStatus.error;
@@ -128,7 +104,6 @@ class TripPlansController extends ChangeNotifier {
     }
   }
 
-  /// يوقف الاشتراك (يُستخدَم عند signOut).
   Future<void> stop() async {
     await _plansSub?.cancel();
     _plansSub = null;
@@ -141,34 +116,58 @@ class TripPlansController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SAVE (create or update)
+  // SAVE (create or update) — ✅ FIXED FOR RULES v3.4
   // ═══════════════════════════════════════════════════════════════
 
-  /// يحفظ رحلة — إنشاء (id فارغ) أو تحديث.
-  ///
-  /// يُعيد `true` عند النجاح.
   Future<bool> save(TripPlan trip) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      _error = 'يجب تسجيل الدخول أولاً';
+      notifyListeners();
+      return false;
+    }
+
+    // ✅ بناء الكائن يدوياً لتجنب مشكلة copyWith مع القيم الفارغة
+    final safeTrip = TripPlan(
+      id: trip.id,
+      userId: user.uid,
+      title: trip.title,
+      governorateId: trip.governorateId,
+      governorateNameAr: trip.governorateNameAr,
+      transportMode: trip.transportMode,
+      durationType: trip.durationType,
+      interests: trip.interests,
+      status: trip.status, // تأكد أن الويزارد يرسلها active
+      stops: trip.stops,
+      totalDistanceKm: trip.totalDistanceKm,
+      totalDurationMin: trip.totalDurationMin,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      createdAt: trip.id.isEmpty ? null : trip.createdAt, // ✅ null عند الإنشاء
+      updatedAt: trip.id.isEmpty ? null : trip.updatedAt,
+    );
+
     try {
-      if (trip.id.isEmpty) {
-        final newId = await _repo.create(trip);
-        _selectedPlan = trip.copyWith(id: newId);
+      if (safeTrip.id.isEmpty) {
+        final newId = await _repo.create(safeTrip);
+        _selectedPlan = safeTrip.copyWith(id: newId);
       } else {
-        await _repo.update(trip);
-        _selectedPlan = trip;
+        await _repo.update(safeTrip);
+        _selectedPlan = safeTrip;
       }
       _error = null;
       notifyListeners();
       return true;
     } on Exception catch (e) {
       _error = e.toString();
-      debugPrint('TripPlansController.save error: $e');
+      debugPrint('❌ TripPlansController.save error: $e');
       notifyListeners();
       return false;
     }
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // DELETE
+  // DELETE & STATUS
   // ═══════════════════════════════════════════════════════════════
 
   Future<bool> delete(String tripId) async {
@@ -187,15 +186,9 @@ class TripPlansController extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // STATUS
-  // ═══════════════════════════════════════════════════════════════
-
-  /// يُحدِّث حالة رحلة (draft → active → completed).
   Future<bool> updateStatus(String tripId, TripStatus status) async {
     try {
       await _repo.updateStatus(tripId, status);
-      // Stream سيُحدِّث القائمة تلقائياً
       return true;
     } on Exception catch (e) {
       _error = e.toString();
@@ -206,17 +199,15 @@ class TripPlansController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SELECT
+  // SELECT & HELPERS
   // ═══════════════════════════════════════════════════════════════
 
-  /// يختار رحلة للعرض.
   void selectPlan(TripPlan? plan) {
     if (_selectedPlan?.id == plan?.id) return;
     _selectedPlan = plan;
     notifyListeners();
   }
 
-  /// يختار رحلة بالـ id.
   void selectPlanById(String? id) {
     if (id == null || id.isEmpty) {
       selectPlan(null);
@@ -226,32 +217,21 @@ class TripPlansController extends ChangeNotifier {
       final plan = _plans.firstWhere((p) => p.id == id);
       selectPlan(plan);
     } on StateError {
-      // ✅ التصويب 3: firstWhere throws StateError when not found
       selectPlan(null);
     }
   }
 
-  /// يُصفِّر الخطأ الحالي.
   void clearError() {
     if (_error == null) return;
     _error = null;
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════════════════════════════
-
-  /// يختار تلقائياً رحلة عند التحميل:
-  ///   - آخر رحلة نشطة (active)
-  ///   - أو آخر رحلة (createdAt DESC)
   void _autoSelectPlan() {
     if (_plans.isEmpty) {
       _selectedPlan = null;
       return;
     }
-
-    // ابحث عن أول رحلة نشطة
     TripPlan? active;
     for (final p in _plans) {
       if (p.status == TripStatus.active) {
@@ -259,8 +239,6 @@ class TripPlansController extends ChangeNotifier {
         break;
       }
     }
-
-    // إن لم توجد، استخدم الأولى (الأحدث)
     _selectedPlan = active ?? _plans.first;
   }
 

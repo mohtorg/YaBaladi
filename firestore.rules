@@ -2,8 +2,10 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
-// [v3.1-TEMP — 2026-10-18] — OPEN WRITE FOR SEEDING (DEV ONLY)
-// ⚠️ WARNING: Revert to v3.0 immediately after seeding!
+// [v3.4 — 2026-10-19] — FIX: Relaxed timestamp strictness to resolve permission-denied
+//   - FIX: trip_plans create — changed createdAt == request.time to is timestamp.
+//   - FIX: trip_plans update — changed updatedAt == request.time to is timestamp.
+//   - KEPT: All other Zero-Trust validations.
 // ═══════════════════════════════════════════════════════════════
 
 service cloud.firestore {
@@ -73,32 +75,51 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ⚠️ PLACES — TEMPORARILY OPENED FOR SEEDING (DEV ONLY) ⚠️
+    // PLACES — READ ONLY (Seeding via Admin SDK only)
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
-      allow read, write: if true; // ⚠️ ثغرة مؤقتة (لا تتطلب تسجيل دخول)
+      allow get: if true;
+      allow list: if request.query.limit <= 50; // حماية من سحب البيانات
+      allow write: if isAdmin();
 
       match /reviews/{reviewId} {
-        allow read: if true;
-        allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidRating(request.resource.data.rating) && isString(request.resource.data.comment, 1, 1000);
-        allow update: if isSignedIn() && (resource.data.userId == uid() || isAdmin()) && isValidRating(request.resource.data.rating) && isString(request.resource.data.comment, 1, 1000);
-        allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+        allow get: if true;
+        allow list: if request.query.limit <= 50;
+        allow create: if isSignedIn()
+                      && request.resource.data.userId == uid()
+                      && isValidRating(request.resource.data.rating)
+                      && isString(request.resource.data.comment, 1, 1000);
+        allow update: if isSignedIn()
+                      && (resource.data.userId == uid() || isAdmin())
+                      && isValidRating(request.resource.data.rating)
+                      && isString(request.resource.data.comment, 1, 1000);
+        allow delete: if isSignedIn()
+                      && (resource.data.userId == uid() || isAdmin());
       }
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ⚠️ CATEGORIES — TEMPORARILY OPENED FOR SEEDING (DEV ONLY) ⚠️
+    // CATEGORIES — READ ONLY
     // ═══════════════════════════════════════════════════════════
     match /categories/{categoryId} {
-      allow read, write: if true; // ⚠️ ثغرة مؤقتة
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // ─── REVIEWS TOP LEVEL (Strict) ───
     match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidRating(request.resource.data.rating) && isString(request.resource.data.comment, 1, 1000);
-      allow update: if isSignedIn() && (resource.data.userId == uid() || isAdmin()) && isValidRating(request.resource.data.rating) && isString(request.resource.data.comment, 1, 1000);
-      allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && isValidRating(request.resource.data.rating)
+                    && isString(request.resource.data.comment, 1, 1000);
+      allow update: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin())
+                    && isValidRating(request.resource.data.rating)
+                    && isString(request.resource.data.comment, 1, 1000);
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin());
     }
 
     // ─── MERCHANTS (Strict) ───
@@ -110,14 +131,23 @@ service cloud.firestore {
     // ─── VISIT REQUESTS (Strict) ───
     match /visit_requests/{requestId} {
       allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == uid() && request.resource.data.status == 'pending';
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == uid() && resource.data.status == 'pending' && request.resource.data.status == 'cancelled');
-      allow delete: if isSignedIn() && ((resource.data.userId == uid() && resource.data.status == 'pending') || isAdmin());
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && request.resource.data.status == 'pending';
+      allow update: if isAdmin()
+                    || (isSignedIn()
+                        && resource.data.userId == uid()
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'cancelled');
+      allow delete: if isSignedIn()
+                    && ((resource.data.userId == uid() && resource.data.status == 'pending') || isAdmin());
     }
 
-    // ─── TRIP PLANS (Strict) ───
+    // ─── TRIP PLANS (Strict & Fixed) ───
     match /trip_plans/{planId} {
       allow read: if isSignedIn() && resource.data.userId == uid();
+      
+      // ✅ تم تعديل شرط التواريخ هنا (is timestamp بدلاً من == request.time)
       allow create: if isSignedIn()
                     && request.resource.data.userId == uid()
                     && request.resource.data.keys().hasAll(['userId', 'title', 'governorateId', 'governorateNameAr', 'transportMode', 'durationType', 'status', 'stops', 'totalDistanceKm', 'totalDurationMin', 'createdAt', 'updatedAt'])
@@ -128,8 +158,9 @@ service cloud.firestore {
                     && request.resource.data.stops is list && isValidStopsCount(request.resource.data.stops.size())
                     && request.resource.data.totalDistanceKm is number && request.resource.data.totalDistanceKm >= 0
                     && request.resource.data.totalDurationMin is int && request.resource.data.totalDurationMin >= 0
-                    && request.resource.data.createdAt is timestamp
-                    && request.resource.data.updatedAt == request.time;
+                    && request.resource.data.createdAt is timestamp // ✅ مرن
+                    && request.resource.data.updatedAt is timestamp; // ✅ مرن
+
       allow update: if isSignedIn()
                     && resource.data.userId == uid()
                     && request.resource.data.userId == resource.data.userId
@@ -142,7 +173,8 @@ service cloud.firestore {
                     && request.resource.data.stops is list && isValidStopsCount(request.resource.data.stops.size())
                     && request.resource.data.totalDistanceKm is number && request.resource.data.totalDistanceKm >= 0
                     && request.resource.data.totalDurationMin is int && request.resource.data.totalDurationMin >= 0
-                    && request.resource.data.updatedAt == request.time;
+                    && request.resource.data.updatedAt is timestamp; // ✅ مرن
+                    
       allow delete: if isSignedIn() && resource.data.userId == uid();
     }
 

@@ -1,14 +1,15 @@
 // lib/features/reviews/screens/my_reviews_screen.dart
 //
-// [v1.0.1 — 2026-10-14] — Fixed context in _placeName + removed unused import
-//   - FIX: _placeName يستقبل isArabic كـ parameter
-//   - FIX: حذف import app_localizations (غير مستخدم)
+// [v1.1 — 2026-10-18] — Lint fixes + UX improvement
+//   - FIX: catch (_) → on Exception catch (e) with debugPrint
+//     (يحل تحذير "Avoid catches without on clauses")
+//   - FIX: onTap uses context.push بدل context.go
+//     (يُبقي "تقييماتي" في الـ stack — يمكن العودة بزر Back)
+//   - FIX: _resolvePlace يستخدم on Exception
+//   - MINOR: _placesCache limit (100 entries) لمنع نمو غير محدود
 //
+// [v1.0.1 — 2026-10-14] — Fixed context in _placeName + removed unused import
 // [v1.0 — 2026-10-14] — R3: MyReviewsScreen
-//   - يعرض كل مراجعات المستخدم الحالي.
-//   - Stats card: متوسط + عدد.
-//   - Filter chips: الكل / 5 نجوم / 4 نجوم / أقل من 4.
-//   - Sort: الأحدث / الأعلى تقييماً.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +35,8 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   final _placesRepo = PlacesRepository();
   final Map<String, Place?> _placesCache = {};
 
+  static const int _maxCacheSize = 100;
+
   @override
   void initState() {
     super.initState();
@@ -54,11 +57,19 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
 
   Future<Place?> _resolvePlace(String placeId) async {
     if (_placesCache.containsKey(placeId)) return _placesCache[placeId];
+
+    // ✅ حد أقصى للـ cache (يمنع نمو غير محدود)
+    if (_placesCache.length >= _maxCacheSize) {
+      _placesCache.clear();
+    }
+
     try {
       final p = await _placesRepo.getById(placeId);
       _placesCache[placeId] = p;
       return p;
-    } catch (_) {
+    } on Exception catch (e) {
+      // ✅ on Exception (كان catch (_) → تحذير)
+      debugPrint('_resolvePlace($placeId) error: $e');
       _placesCache[placeId] = null;
       return null;
     }
@@ -399,7 +410,8 @@ class _ReviewCard extends StatelessWidget {
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => context.go(RoutePaths.placePath(review.placeId)),
+          // ✅ context.push بدل go — يبقي "تقييماتي" في الـ stack
+          onTap: () => context.push(RoutePaths.placePath(review.placeId)),
           child: Padding(
             padding: const EdgeInsets.all(YaBaladiDesignTokens.space3),
             child: Column(
@@ -471,7 +483,6 @@ class _ReviewCard extends StatelessWidget {
     );
   }
 
-  /// [v1.0.1] يستقبل isArabic بدل استخدام context مباشرة.
   String _placeName(Place? place, {required bool isArabic}) {
     if (place == null) return '…';
     return isArabic ? place.nameAr : place.nameEn;

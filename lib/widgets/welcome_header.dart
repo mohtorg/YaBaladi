@@ -1,22 +1,9 @@
 // lib/widgets/welcome_header.dart
 //
-// [v2.0.4 — 2026-10-17] — Lint fixes + async safety
-//   - FIX: unawaited(_fetchLocation()) في initState (unawaited_futures)
-//   - FIX: unawaited() في Retry button (نفس التحذير)
-//   - FIX: التقاط BrowsingLocationController قبل await
-//          (يمنع use_build_context_synchronously)
-//   - ADD: import 'dart:async' لـ unawaited()
-//   - NOTE: RegExp deprecation متفق على تجاهله (SDK warning)
-//
-// [v2.0.3 — 2026-10-14] — Nominatim integration
-//   - CHANGE: _GovernorateButton يستقبل `label` بدل `browsing`
-//   - CHANGE: يعرض "بورسعيد - الشرق" عبر browsingShortLabel
-//   - FIX: إزالة `_location` (غير مستخدم)
-//   - CLEANUP: إزالة import egypt_governorates
-//
-// [v2.0.1 — 2026-10-14] — Type-safety fix
-// [v2.0 — 2026-10-14] — G4.2-c-3: Governorate Switcher
-// [v1.1 — 2026-10-13] — PostFrame deferral
+// [v3.0 — 2026-10-19] — Wave 5.5c: Location on Demand (ADR-6)
+//   - NO auto-fetch in initState
+//   - Reads cache via LocationCacheService
+//   - Opens LocationSourceSheet on tap
 
 import 'dart:async';
 
@@ -24,12 +11,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/location/browsing_location_controller.dart';
-import '../core/location/governorate_picker_sheet.dart';
+import '../core/location/location_source_sheet.dart';
 import '../features/auth/controllers/auth_controller.dart';
+import '../services/location_cache_service.dart';
 import '../services/location_service.dart';
 import '../theme/design_tokens.dart';
 
-/// Header ترحيبي للشاشة الرئيسية.
 class WelcomeHeader extends StatefulWidget {
   const WelcomeHeader({
     super.key,
@@ -48,7 +35,9 @@ class WelcomeHeader extends StatefulWidget {
 
 class _WelcomeHeaderState extends State<WelcomeHeader>
     with SingleTickerProviderStateMixin {
-  _LocState _state = _LocState.loading;
+  _LocState _state = _LocState.idle;
+  String? _gpsPlaceName;
+  LocationData? _lastLocation;
 
   late final AnimationController _waveController;
   late final Animation<double> _waveAnim;
@@ -71,10 +60,10 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
     );
 
+    // ⭐ [v3.0] يقرأ cache فقط
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // ✅ [v2.0.4] unawaited — fire-and-forget مُعلَن صراحةً
-      unawaited(_fetchLocation());
+      unawaited(_loadCachedLocation());
     });
   }
 
@@ -84,37 +73,66 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     super.dispose();
   }
 
-  /// [v2.0.4] — نلتقط Controller **قبل** await لتجنب
-  /// use_build_context_synchronously.
-  Future<void> _fetchLocation({bool forceRefresh = false}) async {
+  Future<void> _loadCachedLocation() async {
     if (!mounted) return;
-
-    if (_state != _LocState.loading) {
-      setState(() => _state = _LocState.loading);
-    }
-
-    // ✅ التقاط Controller مبكراً
     final browsingCtrl = context.read<BrowsingLocationController>();
 
-    if (forceRefresh) {
-      await LocationService.clearCache();
-    }
+    try {
+      final cached = await LocationCacheService.load();
+      if (!mounted) return;
 
-    final loc = await LocationService.getCurrentLocation(
-      forceRefresh: forceRefresh,
+      if (cached != null) {
+        setState(() {
+          _gpsPlaceName = cached.nameAr;
+          _lastLocation = cached;
+          _state = _LocState.loaded;
+        });
+        browsingCtrl.setPhysicalLocation(
+          cached.latitude,
+          cached.longitude,
+          placeName: cached.nameAr,
+        );
+      } else {
+        setState(() => _state = _LocState.idle);
+      }
+    } on Exception catch (e) {
+      debugPrint('loadCachedLocation failed: $e');
+      if (!mounted) return;
+      setState(() => _state = _LocState.idle);
+    }
+  }
+
+  Future<void> _openLocationSourceSheet(
+    BrowsingLocationController ctrl,
+  ) async {
+    final loc = await LocationSourceSheet.show(
+      context,
+      controller: ctrl,
+      currentLocation: _lastLocation,
     );
+
     if (!mounted) return;
 
-    setState(() {
-      _state = loc == null ? _LocState.denied : _LocState.loaded;
-    });
-
     if (loc != null) {
-      browsingCtrl.setPhysicalLocation(
-        loc.latitude,
-        loc.longitude,
-      );
-      _waveController.forward();
+      await LocationCacheService.save(loc);
+      if (!mounted) return;
+      setState(() {
+        _gpsPlaceName = loc.nameAr;
+        _lastLocation = loc;
+        _state = _LocState.loaded;
+      });
+      unawaited(_waveController.forward());
+    }
+  }
+
+  String get _buttonLabel {
+    switch (_state) {
+      case _LocState.idle:
+        return 'اختر موقعك';
+      case _LocState.loading:
+        return 'جارٍ التحديد…';
+      case _LocState.loaded:
+        return context.read<BrowsingLocationController>().browsingShortLabel;
     }
   }
 
@@ -183,41 +201,18 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                       ],
                     ),
                     const SizedBox(height: 4),
-                    // ─── زر تبديل المحافظة ───
-                    if (_state == _LocState.denied)
-                      TextButton.icon(
-                        // ✅ [v2.0.4] unawaited — صريح
-                        onPressed: () => unawaited(
-                          _fetchLocation(forceRefresh: true),
-                        ),
-                        icon: const Icon(
-                          Icons.location_off_outlined,
-                          size: 14,
-                        ),
-                        label: const Text(
-                          'تفعيل الموقع',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          minimumSize: const Size(0, 20),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      )
-                    else
-                      _GovernorateButton(
-                        label: browsingCtrl.browsingShortLabel,
-                        isLoading: _state == _LocState.loading,
-                        onTap: () => GovernoratePickerSheet.show(
-                          context,
-                          controller: browsingCtrl,
-                        ),
-                      ),
-                    // ─── شارة "أنت في" ───
+                    _GovernorateButton(
+                      label: _buttonLabel,
+                      isLoading: _state == _LocState.loading,
+                      isIdle: _state == _LocState.idle,
+                      onTap: () => _openLocationSourceSheet(browsingCtrl),
+                    ),
                     if (browsingCtrl.isBrowsingOtherGovernorate) ...[
                       const SizedBox(height: 4),
                       _PhysicalBadge(
-                        physicalName: browsingCtrl.physical?.nameAr ?? '',
+                        physicalName: _gpsPlaceName ??
+                            browsingCtrl.physical?.nameAr ??
+                            '',
                       ),
                     ],
                   ],
@@ -241,8 +236,9 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.5,
+                  ),
                 ),
               ),
               child: Row(
@@ -271,7 +267,7 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
   }
 }
 
-enum _LocState { loading, loaded, denied }
+enum _LocState { idle, loaded, loading }
 
 // ═══════════════════════════════════════════════════════════════
 // GOVERNORATE BUTTON
@@ -281,60 +277,54 @@ class _GovernorateButton extends StatelessWidget {
   const _GovernorateButton({
     required this.label,
     required this.isLoading,
+    required this.isIdle,
     required this.onTap,
   });
 
-  /// نص جاهز من `BrowsingLocationController.browsingShortLabel`
-  /// مثال: "بورسعيد - الشرق" أو "الإسكندرية".
   final String label;
   final bool isLoading;
+  final bool isIdle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final Color color =
+        isIdle ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary;
+    final IconData icon = isLoading
+        ? Icons.location_searching
+        : (isIdle ? Icons.add_location_alt_outlined : Icons.location_on);
+
     return InkWell(
-      onTap: isLoading ? null : onTap,
+      onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.location_on,
-              size: 14,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                isLoading ? 'جارٍ التحديد…' : label,
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
+                  color: color,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.arrow_drop_down, size: 16, color: color),
           ],
         ),
       ),
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// PHYSICAL BADGE
-// ═══════════════════════════════════════════════════════════════
 
 class _PhysicalBadge extends StatelessWidget {
   const _PhysicalBadge({required this.physicalName});
@@ -344,6 +334,7 @@ class _PhysicalBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (physicalName.isEmpty) return const SizedBox.shrink();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -354,20 +345,20 @@ class _PhysicalBadge extends StatelessWidget {
           color: theme.colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: 4),
-        Text(
-          'أنت في: $physicalName',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        Flexible(
+          child: Text(
+            'أنت في: $physicalName',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// SMART AVATAR
-// ═══════════════════════════════════════════════════════════════
 
 class _SmartAvatar extends StatelessWidget {
   const _SmartAvatar({
@@ -444,9 +435,9 @@ class _SmartAvatar extends StatelessWidget {
     );
   }
 
-  /// ⚠️ RegExp deprecation — متفق على تجاهله (SDK warning).
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '؟';
+    // ignore: deprecated_member_use
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();

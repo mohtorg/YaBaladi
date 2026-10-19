@@ -1,14 +1,25 @@
 // lib/repositories/trip_repository.dart
 //
+// [v1.2 — 2026-10-18] — Cold-start robustness (source.server + timeout)
+//   - FIX: getById uses Source.server (cold-start accuracy, FlutLab)
+//          → بدونها، بعد Hot Restart، /trips/detailed/{id} قد يعرض
+//            "الرحلة غير موجودة" رغم وجودها (cache فارغ)
+//   - NEW: timeout 15s في getById — يمنع تعليق UI
+//   - NEW: catch TimeoutException صراحةً
+//   - NEW: debugPrint للتشخيص
+//   - KEPT: buildUpdateMap (R1 fix) — createdAt محفوظ
+//
 // [v1.1 — 2026-10-16] — G6.7 Wave 1a: R1 fix
 //   - FIX: update() كان يستبدل createdAt عند كل تحديث
-//     الآن: نحذف createdAt من data قبل الحفظ (يبقى كما هو)
 //   - NEW: buildUpdateMap() static — قابلة للاختبار بدون Firestore
 //   - FIX: getById catch → on FirebaseException (تنظيف lint)
 //
 // [v1.0 — 2026-10-15] — G6.7: Trip Repository
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/trip_plan.dart';
 
@@ -18,6 +29,9 @@ class TripRepository {
 
   final FirebaseFirestore _firestore;
   static const String collection = 'trip_plans';
+
+  /// مهلة قراءة الرحلة الواحدة — يغطي cold start في FlutLab.
+  static const Duration _timeout = Duration(seconds: 15);
 
   CollectionReference<Map<String, dynamic>> get _ref =>
       _firestore.collection(collection);
@@ -65,13 +79,34 @@ class TripRepository {
   }
 
   /// يجلب رحلة واحدة بمعرّفها.
-  /// [v1.1] catch مُقيَّد بـ FirebaseException (تنظيف lint).
+  ///
+  /// **✅ التصويب (v1.2):** `Source.server` + timeout + catch TimeoutException.
+  ///
+  /// **لماذا `Source.server`؟**
+  ///   على FlutLab Web، بعد Hot Restart، الكاش فارغ. بدون `Source.server`،
+  ///   `.get()` يستخدم `serverAndCache` افتراضياً → يُعيد null عند cold start
+  ///   → `TripDetailedScreen` يعرض "الرحلة غير موجودة" رغم وجودها.
+  ///   نفس المشكلة حُلَّت في `PlacesRepository` v2.1.
   Future<TripPlan?> getById(String id) async {
+    if (id.isEmpty) return null;
+
     try {
-      final doc = await _ref.doc(id).get();
+      final doc = await _ref
+          .doc(id)
+          .get(const GetOptions(source: Source.server))
+          .timeout(_timeout);
+
       if (!doc.exists) return null;
       return TripPlan.fromMap(doc.id, doc.data()!);
-    } on FirebaseException {
+    } on TimeoutException {
+      debugPrint('⏱️ TripRepository.getById timeout: $id');
+      return null;
+    } on FirebaseException catch (e) {
+      debugPrint('❌ TripRepository.getById error: $e');
+      return null;
+    } on ArgumentError catch (e) {
+      // بيانات firestore مشوهة → fromMap throws ArgumentError
+      debugPrint('❌ TripRepository.getById data error: $e');
       return null;
     }
   }

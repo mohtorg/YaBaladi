@@ -1,4 +1,6 @@
-// models/place.dart
+// lib/models/place.dart
+// (نفس الكود الخاص بك، مع إضافة fromFirestore)
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Place {
@@ -70,36 +72,39 @@ class Place {
     this.updatedAt,
   });
 
-  factory Place.fromMap(String id, Map<String, dynamic> map) {
-    List<String> parsedCategories = [];
-    if (map['categories'] != null) {
-      // ✅ التصويب: تحويل صريح للنوع لتجنب خطأ dynamic
-      parsedCategories = List<String>.from(map['categories'] as List);
-    } else if (map['categoryId'] != null &&
-        (map['categoryId'] as String).isNotEmpty) {
-      parsedCategories = [map['categoryId'] as String];
+  static List<String> _parseStringList(dynamic raw) {
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList(growable: false);
     }
+    return const [];
+  }
 
-    final parsedCategoryId = (map['categoryId'] as String?) ??
-        (parsedCategories.isNotEmpty ? parsedCategories.first : '');
+  factory Place.fromMap(String id, Map<String, dynamic> map) {
+    final parsedCategories = _parseStringList(map['categories']);
+    final rawCategoryId = map['categoryId'];
+    final categoryIdFromMap =
+        rawCategoryId is String ? rawCategoryId.trim() : '';
+    final resolvedCategoryId = categoryIdFromMap.isNotEmpty
+        ? categoryIdFromMap
+        : (parsedCategories.isNotEmpty ? parsedCategories.first : '');
 
     return Place(
       id: id,
       nameAr: (map['nameAr'] as String?) ?? '',
       nameEn: (map['nameEn'] as String?) ?? '',
       description: (map['description'] as String?) ?? '',
-      categoryId: parsedCategoryId,
+      categoryId: resolvedCategoryId,
       categories: parsedCategories,
       ownerId: (map['ownerId'] as String?) ?? '',
-      location: map['location'] as GeoPoint?,
+      location:
+          map['location'] is GeoPoint ? map['location'] as GeoPoint : null,
       address: (map['address'] as String?) ?? '',
       city: (map['city'] as String?) ?? '',
       governorate: (map['governorate'] as String?) ?? '',
       phone: (map['phone'] as String?) ?? '',
       whatsapp: (map['whatsapp'] as String?) ?? '',
-      // ✅ التصويب: تحويل صريح للنوع لتجنب خطأ dynamic
-      imageUrls: List<String>.from(map['imageUrls'] as List? ?? const []),
-      tags: List<String>.from(map['tags'] as List? ?? const []),
+      imageUrls: _parseStringList(map['imageUrls']),
+      tags: _parseStringList(map['tags']),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 0,
@@ -112,13 +117,17 @@ class Place {
       hasDelivery: (map['hasDelivery'] as bool?) ?? false,
       hasReservation: (map['hasReservation'] as bool?) ?? false,
       hasOffers: (map['hasOffers'] as bool?) ?? false,
-      paymentMethods:
-          List<String>.from(map['paymentMethods'] as List? ?? const []),
+      paymentMethods: _parseStringList(map['paymentMethods']),
       isApproved: (map['isApproved'] as bool?) ?? false,
       isActive: (map['isActive'] as bool?) ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
+  }
+
+  // ✅ [جديد] دالة fromFirestore لتعمل مع الترقيم
+  factory Place.fromFirestore(DocumentSnapshot doc) {
+    return Place.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }
 
   Map<String, dynamic> toMap() => {

@@ -1,5 +1,11 @@
 // lib/core/router/route_paths.dart
 //
+// [v1.8 — 2026-10-18] — Wave 5.4: Trip Detailed Route
+//   - NEW: tripDetailed = '/trips/detailed/:id' (pattern)
+//   - NEW: tripDetailedPath(id) helper
+//   - NOTE: يجب تسجيله في app_router قبل /trips/:id
+//           (وإلا "detailed" يُطابق كـ :id)
+//
 // [v1.7 — 2026-10-17] — Polish + safety
 //   - NEW: assert(id.isNotEmpty) في helpers (يمنع URLs مشوهة)
 //   - NEW: tripPlannerPath() helper (للمستقبل — query params)
@@ -18,6 +24,7 @@
 /// **قاعدة ترتيب:**
 ///   - كل **static** path يجب أن يُسجَّل **قبل** dynamic path في `app_router.dart`
 ///   - مثال: `/trips/planner` (static) قبل `/trips/:id` (dynamic)
+///   - مثال: `/trips/detailed/:id` قبل `/trips/:id` (dynamic بادئة)
 class RoutePaths {
   RoutePaths._(); // منع الإنشاء
 
@@ -63,8 +70,10 @@ class RoutePaths {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // TRIPS (G6.7 + Wave 1c)
+  // TRIPS (G6.7 + Wave 1c + Wave 5.4)
   // ═══════════════════════════════════════════════════════════════
+
+  /// Root trips route — يعرض قائمة الرحلات (MyTripsScreen).
   static const String trips = '/trips';
 
   /// Static — يجب أن يُسجَّل **قبل** `tripDetails` في app_router.
@@ -80,8 +89,32 @@ class RoutePaths {
   /// [v1.6] Static — شاشة اختيار الأماكن يدوياً (Wave 1c).
   static const String tripPlacePicker = '/trips/planner/picker';
 
+  // ─────────────────────────────────────────────────────────────
+  // [v1.8] Wave 5.4 — Detailed Trip View
+  // ─────────────────────────────────────────────────────────────
+
+  /// **Route pattern** (dynamic بـ prefix) — الشاشة التفصيلية.
+  ///
+  /// ⚠️ يجب تسجيله في `app_router.dart` **قبل** `/trips/:id`.
+  /// وإلا، `/trips/detailed` سيُطابق `:id = "detailed"` (خطأ).
+  ///
+  /// الاستخدام: `context.push(RoutePaths.tripDetailedPath(id))`.
+  static const String tripDetailed = '/trips/detailed/:id';
+
+  static String tripDetailedPath(String id) {
+    assert(id.isNotEmpty, 'tripDetailedPath: id must not be empty');
+    return '/trips/detailed/$id';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Legacy — Trip Details (القديم)
+  // ─────────────────────────────────────────────────────────────
+
   /// **Route pattern** (dynamic) — استخدم `tripDetailsPath(id)` للـ navigation.
   /// ⚠️ لا تستخدمها في `context.go()` مباشرة.
+  ///
+  /// **الغرض القديم:** تفاصيل رحلة (TripDetailsScreen — v2.x)
+  /// **الغرض الجديد:** للشاشة التفصيلية، استخدم `tripDetailedPath`.
   static const String tripDetails = '/trips/:id';
 
   static String tripDetailsPath(String id) {

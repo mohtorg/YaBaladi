@@ -1,6 +1,11 @@
 // lib/models/trip_plan.dart
 //
-// [v1.1.2 — 2026-10-18] — FIX: Strict cast for interests list
+// [v1.2 — 2026-10-18] — Wave 5.1: Geographic Day Split
+//   - NEW: stopsByDay getter (يوزع المحطات جغرافياً على الأيام)
+//   - NEW: totalDays getter (عدد الأيام للـ Tabs الديناميكية)
+//   - NOTE: backward-compatible — لا تغيير في الواجهة العامة
+
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -329,6 +334,35 @@ class TripPlan {
     return '$s → ${_formatDate(endDate!)}';
   }
 
+  int get totalDays => durationType == TripDurationType.weekend ? 2 : 1;
+
+  List<List<TripStop>> get stopsByDay {
+    final days = totalDays;
+    if (days <= 1 || stops.isEmpty) return [stops];
+
+    final lats = stops.map((s) => s.lat).toList()..sort();
+    final lngs = stops.map((s) => s.lng).toList()..sort();
+    final latRange = lats.last - lats.first;
+    final lngRange = lngs.last - lngs.first;
+
+    final sorted = List<TripStop>.from(stops);
+    if (latRange > lngRange) {
+      sorted.sort((a, b) => a.lat.compareTo(b.lat));
+    } else {
+      sorted.sort((a, b) => a.lng.compareTo(b.lng));
+    }
+
+    final perDay = (sorted.length / days).ceil();
+    final result = <List<TripStop>>[];
+    for (var i = 0; i < days; i++) {
+      final start = i * perDay;
+      final end = (start + perDay).clamp(0, sorted.length);
+      if (start >= sorted.length) break;
+      result.add(sorted.sublist(start, end));
+    }
+    return result;
+  }
+
   factory TripPlan.fromMap(String id, Map<String, dynamic> map) {
     final stopsRaw = (map['stops'] as List<dynamic>?) ?? const [];
     final stops = stopsRaw
@@ -343,7 +377,6 @@ class TripPlan {
       governorateNameAr: (map['governorateNameAr'] as String?) ?? '',
       transportMode: tripTransportFromCode(map['transportMode'] as String?),
       durationType: tripDurationFromCode(map['durationType'] as String?),
-      // ✅ التصويب: تحويل صريح إلى List? لتجنب خطأ dynamic
       interests: List<String>.from(map['interests'] as List? ?? const []),
       status: tripStatusFromCode(map['status'] as String?),
       stops: stops,
