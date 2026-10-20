@@ -74,3 +74,4 @@ _recovery/
 *.hprof
 *.swo
 *.bundle
+serviceAccountKey.json 

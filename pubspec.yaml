@@ -51,7 +51,7 @@ dependencies:
 
   # ─── External Links (Google Maps Navigation) ───
   url_launcher: ^6.3.1
-
+  dart_firebase_admin: ^0.4.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
