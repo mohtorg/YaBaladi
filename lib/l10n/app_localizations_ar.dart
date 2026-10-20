@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -374,8 +373,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get or => 'أو';
 
   @override
-  String get guestNote =>
-      'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.';
+  String get guestNote => 'يمكنك تصفح التطبيق كزائر. بعض الميزات تتطلب تسجيل الدخول.';
 
   @override
   String get searchHint => 'ابحث عن مكان...';
@@ -483,4 +481,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get googleSignInFailed => 'فشل تسجيل الدخول بـ Google';
+
+  @override
+  String get tripsTitle => 'رحلتي';
 }

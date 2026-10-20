@@ -29,7 +29,7 @@ dependencies:
   provider: ^6.1.5+1
 
   # ─── HTTP client (Nominatim + BigDataCloud) ───
-  http: ^1.2.0
+  http: ^1.6.0
 
   # ─── Force fresh download — pinned exact versions ───
   file: 7.0.1

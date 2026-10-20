@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -235,8 +234,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteAccountWarning => 'This action cannot be undone';
 
   @override
-  String get deleteAccountConfirm =>
-      'Do you want to delete your account permanently?';
+  String get deleteAccountConfirm => 'Do you want to delete your account permanently?';
 
   @override
   String get deleteAccountButton => 'Delete my account';
@@ -287,8 +285,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPasswordTitle => 'Reset Password';
 
   @override
-  String get forgotPasswordSubtitle =>
-      'Enter your email to receive a reset link';
+  String get forgotPasswordSubtitle => 'Enter your email to receive a reset link';
 
   @override
   String get displayName => 'Full Name';
@@ -342,8 +339,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoritesEmptyTitle => 'No favorites yet';
 
   @override
-  String get favoritesEmptySubtitle =>
-      'Start exploring places and save what you like';
+  String get favoritesEmptySubtitle => 'Start exploring places and save what you like';
 
   @override
   String get discoverPlaces => 'Discover Places';
@@ -377,8 +373,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get or => 'or';
 
   @override
-  String get guestNote =>
-      'You can browse as a guest. Some features require sign-in.';
+  String get guestNote => 'You can browse as a guest. Some features require sign-in.';
 
   @override
   String get searchHint => 'Search for a place...';
@@ -476,8 +471,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recenter => 'Recenter';
 
   @override
-  String get noCoordinates =>
-      'No coordinates available to show this place on the map';
+  String get noCoordinates => 'No coordinates available to show this place on the map';
 
   @override
   String get continueWithGoogle => 'Continue with Google';
@@ -487,4 +481,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get googleSignInFailed => 'Google sign-in failed';
+
+  @override
+  String get tripsTitle => 'My Trips';
 }
