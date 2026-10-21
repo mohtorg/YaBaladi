@@ -1,0 +1,106 @@
+{
+  "project_info": {
+    "project_number": "231838490815",
+    "project_id": "ya-baladi",
+    "storage_bucket": "ya-baladi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231838490815:android:c17a4f42bda43a3c36e60a",
+        "android_client_info": {
+          "package_name": "com.egypt.yabaladi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231838490815-mph40vhao5duumvt3bh4imnntgjj8gsi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egypt.yabaladi",
+            "certificate_hash": "53111940468db6d33ded0c0985bb39251069bcbb"
+          }
+        },
+        {
+          "client_id": "231838490815-qqrir5j8nub2hj9hvvcegsvfr88rpu1g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egypt.yabaladi",
+            "certificate_hash": "2fe04883c47c118f8a2964e5cb1643dc355bdcb2"
+          }
+        },
+        {
+          "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231838490815-n3t3qiv2sm3de8diuttgtqrmr0ksrjui.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.yaBaladi"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231838490815:android:2d5e39e5d244672236e60a",
+        "android_client_info": {
+          "package_name": "com.egypt.yabaladi_rebuild"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231838490815-j4j8omranvjvf017g4mlssv57digkhlo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egypt.yabaladi_rebuild",
+            "certificate_hash": "2fe04883c47c118f8a2964e5cb1643dc355bdcb2"
+          }
+        },
+        {
+          "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231838490815-n3t3qiv2sm3de8diuttgtqrmr0ksrjui.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.yaBaladi"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
