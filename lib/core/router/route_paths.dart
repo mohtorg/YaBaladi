@@ -1,19 +1,12 @@
 // lib/core/router/route_paths.dart
 //
+// [v1.9 — 2026-10-20] — Zero Internal Maps: Removed categoryMap & placeMap.
+//   - REMOVED: categoryMap, categoryMapPath, placeMap, placeMapPath.
+//
 // [v1.8 — 2026-10-18] — Wave 5.4: Trip Detailed Route
 //   - NEW: tripDetailed = '/trips/detailed/:id' (pattern)
 //   - NEW: tripDetailedPath(id) helper
 //   - NOTE: يجب تسجيله في app_router قبل /trips/:id
-//           (وإلا "detailed" يُطابق كـ :id)
-//
-// [v1.7 — 2026-10-17] — Polish + safety
-//   - NEW: assert(id.isNotEmpty) في helpers (يمنع URLs مشوهة)
-//   - NEW: tripPlannerPath() helper (للمستقبل — query params)
-//   - DOC: توضيح أن tripDetails/categoryMap/placeMap هي "patterns"
-//
-// [v1.6 — 2026-10-17] — Wave 1c: TripPlacePicker route
-// [v1.5 — 2026-10-15] — G6.7: Trip planner + details paths
-// [v1.4 — 2026-10-15] — Routes + Bottom Nav (4 tabs)
 
 /// ثوابت مسارات التطبيق
 ///
@@ -43,14 +36,6 @@ class RoutePaths {
     return '/home/category/$id';
   }
 
-  /// **Route pattern** — استخدم `categoryMapPath(id)` للـ navigation.
-  static const String categoryMap = '/home/category/:id/map';
-
-  static String categoryMapPath(String id) {
-    assert(id.isNotEmpty, 'categoryMapPath: id must not be empty');
-    return '/home/category/$id/map';
-  }
-
   // ═══════════════════════════════════════════════════════════════
   // PLACE
   // ═══════════════════════════════════════════════════════════════
@@ -59,14 +44,6 @@ class RoutePaths {
   static String placePath(String id) {
     assert(id.isNotEmpty, 'placePath: id must not be empty');
     return '/home/place/$id';
-  }
-
-  /// **Route pattern** — استخدم `placeMapPath(id)` للـ navigation.
-  static const String placeMap = '/home/place/:id/map';
-
-  static String placeMapPath(String id) {
-    assert(id.isNotEmpty, 'placeMapPath: id must not be empty');
-    return '/home/place/$id/map';
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -80,7 +57,6 @@ class RoutePaths {
   static const String tripPlanner = '/trips/planner';
 
   /// Helper — يبني `/trips/planner` مع query params اختيارية.
-  /// مفيد للمستقبل (مثلاً: resume من deep link على step معين).
   static String tripPlannerPath({int? initialStep}) {
     if (initialStep == null) return tripPlanner;
     return '$tripPlanner?step=$initialStep';
@@ -94,11 +70,6 @@ class RoutePaths {
   // ─────────────────────────────────────────────────────────────
 
   /// **Route pattern** (dynamic بـ prefix) — الشاشة التفصيلية.
-  ///
-  /// ⚠️ يجب تسجيله في `app_router.dart` **قبل** `/trips/:id`.
-  /// وإلا، `/trips/detailed` سيُطابق `:id = "detailed"` (خطأ).
-  ///
-  /// الاستخدام: `context.push(RoutePaths.tripDetailedPath(id))`.
   static const String tripDetailed = '/trips/detailed/:id';
 
   static String tripDetailedPath(String id) {
@@ -111,10 +82,6 @@ class RoutePaths {
   // ─────────────────────────────────────────────────────────────
 
   /// **Route pattern** (dynamic) — استخدم `tripDetailsPath(id)` للـ navigation.
-  /// ⚠️ لا تستخدمها في `context.go()` مباشرة.
-  ///
-  /// **الغرض القديم:** تفاصيل رحلة (TripDetailsScreen — v2.x)
-  /// **الغرض الجديد:** للشاشة التفصيلية، استخدم `tripDetailedPath`.
   static const String tripDetails = '/trips/:id';
 
   static String tripDetailsPath(String id) {

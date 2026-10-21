@@ -1,19 +1,15 @@
 // lib/features/trip/screens/trip_summary_screen.dart
-//
-// [v2.2 — 2026-10-19] — UI Polish: Replaced emoji with Material Icon.
-//   - FIX: Replaced '🎉' with Icons.celebration to avoid Noto Font warnings.
-//   - KEPT: v2.1 features (Outline button, unawaited, clipboard).
-
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../models/trip_plan.dart';
 import '../controllers/trip_plans_controller.dart';
+// ملاحظة: هنا نحتاج إحداثيات المنزل. إذا لم تكن متوفرة، نترك النسخ كخيار بديل.
+// import '../../../services/map_service.dart';
+// import '../../../core/location/browsing_location_controller.dart';
 
 class TripSummaryScreen extends StatefulWidget {
   final TripPlan plan;
@@ -24,7 +20,6 @@ class TripSummaryScreen extends StatefulWidget {
 }
 
 class _TripSummaryScreenState extends State<TripSummaryScreen> {
-  bool _copying = false;
   bool _goingToTrips = false;
 
   @override
@@ -46,54 +41,10 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
     }
   }
 
-  Future<void> _copyHomeLink() async {
-    if (_copying) return;
-    setState(() => _copying = true);
-
-    try {
-      await Clipboard.setData(
-        const ClipboardData(
-          text: 'https://www.google.com/maps/dir/?api=1&destination=home',
-        ),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'تم نسخ رابط العودة للمنزل — الصقه في المتصفح',
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _copying = false);
-    }
-  }
-
   Future<void> _backToMyTrips() async {
     if (_goingToTrips) return;
     setState(() => _goingToTrips = true);
-
     await _markTripCompleted();
-
     if (!mounted) return;
     context.go(RoutePaths.trips);
   }
@@ -101,9 +52,8 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
   void _openDetailed() {
     final id = widget.plan.id;
     if (id.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('معرف الرحلة غير متوفر')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('معرف الرحلة غير متوفر')));
       return;
     }
     context.push(RoutePaths.tripDetailedPath(id));
@@ -116,13 +66,9 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'نهاية الرحلة',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-      ),
+          title: const Text('نهاية الرحلة'),
+          centerTitle: true,
+          automaticallyImplyLeading: false),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -130,107 +76,60 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.emoji_events,
-                  size: 120,
-                  color: Colors.amber,
-                ),
+                const Icon(Icons.emoji_events, size: 120, color: Colors.amber),
                 const SizedBox(height: 24),
-
-                // ✅ استبدال الإيموجي بأيقونة
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.celebration, size: 36, color: Colors.amber),
                     SizedBox(width: 12),
-                    Text(
-                      'رحلة رائعة!',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text('رحلة رائعة!',
+                        style: TextStyle(
+                            fontSize: 32, fontWeight: FontWeight.bold)),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-                Text(
-                  'لقد أكملت رحلتك إلى ${plan.governorateNameAr} بنجاح.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20, color: Colors.grey),
-                ),
+                Text('لقد أكملت رحلتك إلى ${plan.governorateNameAr} بنجاح.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, color: Colors.grey)),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(16)),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _StatColumn(
-                        icon: Icons.place_outlined,
-                        label: 'محطات',
-                        value: '${plan.stopCount}',
-                      ),
+                          icon: Icons.place_outlined,
+                          label: 'محطات',
+                          value: '${plan.stopCount}'),
                       _StatColumn(
-                        icon: Icons.route_outlined,
-                        label: 'مسافة',
-                        value: '${plan.totalDistanceKm.toStringAsFixed(0)} كم',
-                      ),
+                          icon: Icons.route_outlined,
+                          label: 'مسافة',
+                          value:
+                              '${plan.totalDistanceKm.toStringAsFixed(0)} كم'),
                       _StatColumn(
-                        icon: Icons.schedule,
-                        label: 'مدة',
-                        value: plan.durationLabel,
-                      ),
+                          icon: Icons.schedule,
+                          label: 'مدة',
+                          value: plan.durationLabel),
                     ],
                   ),
                 ),
                 const SizedBox(height: 48),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _openDetailed,
                     icon: const Icon(Icons.timeline, size: 22),
-                    label: const Text(
-                      'عرض التفاصيل',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    label: const Text('عرض التفاصيل',
+                        style: TextStyle(fontSize: 16)),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _copying ? null : _copyHomeLink,
-                    icon: _copying
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.home, size: 24),
-                    label: Text(
-                      _copying ? 'جارٍ النسخ…' : 'انسخ رابط العودة للمنزل',
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -239,16 +138,12 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.list_alt, size: 20),
-                    label: Text(
-                      _goingToTrips ? 'جارٍ…' : 'العودة إلى رحلاتي',
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    label: Text(_goingToTrips ? 'جارٍ…' : 'العودة إلى رحلاتي',
+                        style: const TextStyle(fontSize: 16)),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
                   ),
                 ),
               ],
@@ -261,12 +156,8 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
 }
 
 class _StatColumn extends StatelessWidget {
-  const _StatColumn({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
+  const _StatColumn(
+      {required this.icon, required this.label, required this.value});
   final IconData icon;
   final String label;
   final String value;
@@ -274,24 +165,18 @@ class _StatColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Column(
       children: [
         Icon(icon, color: theme.colorScheme.primary, size: 26),
         const SizedBox(height: 6),
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-          ),
-        ),
+        Text(value,
+            style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onPrimaryContainer)),
+        Text(label,
+            style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer
+                    .withValues(alpha: 0.8))),
       ],
     );
   }

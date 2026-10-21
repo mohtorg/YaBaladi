@@ -1,243 +1,126 @@
 // lib/features/trip/screens/active_stop_screen.dart
-//
-// [v2.0 — 2026-10-18] — Clipboard-based URL sharing
-//   - CHANGED: dart:html → Clipboard (works on Web, Mobile, and Tests)
-//   - FIX: flutter test لا يفشل بعد الآن
-//   - NOTE: in production, replace with url_launcher after pub get
+// [v1.4 — 2026-10-20] — Beautiful single-button design.
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-
 import '../../../models/trip_plan.dart';
+import '../../../widgets/location_actions.dart';
 
-class ActiveStopScreen extends StatefulWidget {
+class ActiveStopScreen extends StatelessWidget {
   final TripStop stop;
   const ActiveStopScreen({super.key, required this.stop});
 
   @override
-  State<ActiveStopScreen> createState() => _ActiveStopScreenState();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(stop.placeNameAr, overflow: TextOverflow.ellipsis),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              stop.placeNameAr,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              stop.placeNameEn,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _InfoChip(
+                  icon: Icons.star,
+                  label:
+                      '${stop.rating.toStringAsFixed(1)} (${stop.reviewCount})',
+                  color: Colors.amber.shade700,
+                ),
+                const SizedBox(width: 8),
+                _InfoChip(
+                  icon: Icons.category,
+                  label: stop.categoryId,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 24),
+            Text(
+              'ملاحظات المحطة',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                stop.notes?.isNotEmpty == true
+                    ? stop.notes!
+                    : 'لا توجد ملاحظات إضافية لهذه المحطة.',
+                style: theme.textTheme.bodyLarge,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // ✅ زر أنيق (دبوس خريطة) - كبير نسبياً لشاشة التفاصيل
+            Center(
+              child: LocationActions(
+                lat: stop.lat,
+                lng: stop.lng,
+                large: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _ActiveStopScreenState extends State<ActiveStopScreen> {
-  bool _copying = false;
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
 
-  Future<void> _copyMapsLink() async {
-    if (_copying) return;
-    setState(() => _copying = true);
-
-    final stop = widget.stop;
-    final url =
-        'https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}';
-
-    try {
-      await Clipboard.setData(ClipboardData(text: url));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'تم نسخ رابط Google Maps — الصقه في المتصفح',
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _copying = false);
-    }
-  }
-
-  Future<void> _copyOsmLink() async {
-    try {
-      await Clipboard.setData(
-        const ClipboardData(
-          text: 'https://www.openstreetmap.org/copyright',
-        ),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم نسخ رابط OpenStreetMap'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } on Exception {
-      // الصامت — لا نريد إزعاج المستخدم
-    }
-  }
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final stop = widget.stop;
-    final point = LatLng(stop.lat, stop.lng);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'أنت في الطريق',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
       ),
-      body: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            flex: 3,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: point,
-                initialZoom: 15,
-                minZoom: 10,
-                maxZoom: 18,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                ),
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.mohtorg.yabaladi',
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: point,
-                      width: 60,
-                      height: 60,
-                      child: const Icon(
-                        Icons.location_on,
-                        color: Colors.red,
-                        size: 50,
-                      ),
-                    ),
-                  ],
-                ),
-                RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution(
-                      'OpenStreetMap contributors',
-                      onTap: _copyOsmLink,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(30),
-                ),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black12, blurRadius: 10),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        stop.placeNameAr,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (stop.plannedDurationMin != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.schedule,
-                              size: 18,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${stop.plannedDurationMin} دقيقة',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _copying ? null : _copyMapsLink,
-                          icon: _copying
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.navigation, size: 28),
-                          label: Text(
-                            _copying
-                                ? 'جارٍ النسخ…'
-                                : 'انسخ رابط التوجيه (Google Maps)',
-                            style: const TextStyle(fontSize: 18),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            backgroundColor: Colors.blue.shade700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => Navigator.pop(context, true),
-                          icon: const Icon(Icons.check_circle, size: 28),
-                          label: const Text(
-                            'لقد وصلت للمكان',
-                            style: TextStyle(fontSize: 20),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            backgroundColor: Colors.green.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],

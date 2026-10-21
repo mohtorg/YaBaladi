@@ -1,6 +1,4 @@
 // lib/models/place.dart
-// (نفس الكود الخاص بك، مع إضافة fromFirestore)
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Place {
@@ -79,30 +77,55 @@ class Place {
     return const [];
   }
 
+  static String _parseString(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is String) return raw;
+    if (raw is num) {
+      return raw.toString();
+    }
+    return '';
+  }
+
   factory Place.fromMap(String id, Map<String, dynamic> map) {
     final parsedCategories = _parseStringList(map['categories']);
-    final rawCategoryId = map['categoryId'];
-    final categoryIdFromMap =
-        rawCategoryId is String ? rawCategoryId.trim() : '';
+
+    // ✅ دعم حقول OSM (category) وحقل التطبيق (categoryId)
+    final rawCategoryId = map['categoryId'] ?? map['category'];
+    final categoryIdFromMap = _parseString(rawCategoryId).trim();
     final resolvedCategoryId = categoryIdFromMap.isNotEmpty
         ? categoryIdFromMap
         : (parsedCategories.isNotEmpty ? parsedCategories.first : '');
 
+    // ✅ دعم إحداثيات OSM (latitude/longitude) وتحويلها إلى GeoPoint
+    GeoPoint? resolvedLocation;
+    if (map['location'] is GeoPoint) {
+      resolvedLocation = map['location'] as GeoPoint;
+    } else if (map['latitude'] is num && map['longitude'] is num) {
+      resolvedLocation = GeoPoint(
+        (map['latitude'] as num).toDouble(),
+        (map['longitude'] as num).toDouble(),
+      );
+    }
+
+    // ✅ دعم اسم OSM (name) واسم التطبيق (nameAr)
+    final resolvedNameAr = _parseString(map['nameAr'] ?? map['name']);
+    final resolvedNameEn =
+        _parseString(map['nameEn'] ?? map['name_en'] ?? resolvedNameAr);
+
     return Place(
       id: id,
-      nameAr: (map['nameAr'] as String?) ?? '',
-      nameEn: (map['nameEn'] as String?) ?? '',
-      description: (map['description'] as String?) ?? '',
+      nameAr: resolvedNameAr,
+      nameEn: resolvedNameEn,
+      description: _parseString(map['description']),
       categoryId: resolvedCategoryId,
       categories: parsedCategories,
-      ownerId: (map['ownerId'] as String?) ?? '',
-      location:
-          map['location'] is GeoPoint ? map['location'] as GeoPoint : null,
-      address: (map['address'] as String?) ?? '',
-      city: (map['city'] as String?) ?? '',
-      governorate: (map['governorate'] as String?) ?? '',
-      phone: (map['phone'] as String?) ?? '',
-      whatsapp: (map['whatsapp'] as String?) ?? '',
+      ownerId: _parseString(map['ownerId']),
+      location: resolvedLocation,
+      address: _parseString(map['address']),
+      city: _parseString(map['city']),
+      governorate: _parseString(map['governorate']),
+      phone: _parseString(map['phone']),
+      whatsapp: _parseString(map['whatsapp']),
       imageUrls: _parseStringList(map['imageUrls']),
       tags: _parseStringList(map['tags']),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
@@ -125,7 +148,6 @@ class Place {
     );
   }
 
-  // ✅ [جديد] دالة fromFirestore لتعمل مع الترقيم
   factory Place.fromFirestore(DocumentSnapshot doc) {
     return Place.fromMap(doc.id, doc.data() as Map<String, dynamic>);
   }

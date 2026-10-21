@@ -1,109 +1,83 @@
+// lib/theme/app_theme.dart
+//
+// [v3.0 — 2026-10-20] — Uses YaBaladiTypography (not AppTypography).
+//   - Compatible with `app_typography.dart` v3.1 (separate file).
+//   - All Material 3 components configured.
+//   - light + dark themes.
+//   - Depends on: YaBaladiDesignTokens (existing file).
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_typography.dart';
 import 'design_tokens.dart';
 
-/// Central ThemeData for Ya Baladi.
-///
-/// Uses:
-/// - YaBaladiDesignTokens for colors and spacing
-/// - YaBaladiTypography for text styles
-/// - Cairo font family
-/// - Material 3
-///
-/// Two themes are provided:
-/// - AppTheme.light
-/// - AppTheme.dark
 abstract final class AppTheme {
   AppTheme._();
 
   // ============================================================
   // LIGHT THEME
   // ============================================================
-
   static ThemeData get light {
     const colorScheme = ColorScheme.light(
       primary: YaBaladiDesignTokens.primaryBlue,
       onPrimary: YaBaladiDesignTokens.white,
       primaryContainer: YaBaladiDesignTokens.primaryBlue,
       onPrimaryContainer: YaBaladiDesignTokens.white,
-
       secondary: YaBaladiDesignTokens.accentOrange,
       onSecondary: YaBaladiDesignTokens.white,
-
       tertiary: YaBaladiDesignTokens.navy,
       onTertiary: YaBaladiDesignTokens.white,
-
       error: YaBaladiDesignTokens.error,
       onError: YaBaladiDesignTokens.white,
-
       surface: YaBaladiDesignTokens.surface,
       onSurface: YaBaladiDesignTokens.textPrimary,
       surfaceContainerHighest: YaBaladiDesignTokens.surfaceVariant,
-
       outline: YaBaladiDesignTokens.border,
       outlineVariant: YaBaladiDesignTokens.divider,
-
       shadow: YaBaladiDesignTokens.grey900,
       scrim: YaBaladiDesignTokens.grey900,
-
       inverseSurface: YaBaladiDesignTokens.navy,
       onInverseSurface: YaBaladiDesignTokens.white,
       inversePrimary: YaBaladiDesignTokens.accentOrange,
     );
 
-    return _buildTheme(
-      colorScheme: colorScheme,
-      isLight: true,
-    );
+    return _buildTheme(colorScheme: colorScheme, isLight: true);
   }
 
   // ============================================================
   // DARK THEME
   // ============================================================
-
   static ThemeData get dark {
     const colorScheme = ColorScheme.dark(
       primary: YaBaladiDesignTokens.primaryBlue,
       onPrimary: YaBaladiDesignTokens.white,
       primaryContainer: YaBaladiDesignTokens.navy,
       onPrimaryContainer: YaBaladiDesignTokens.white,
-
       secondary: YaBaladiDesignTokens.accentOrange,
       onSecondary: YaBaladiDesignTokens.white,
-
       tertiary: YaBaladiDesignTokens.gold,
       onTertiary: YaBaladiDesignTokens.grey900,
-
       error: YaBaladiDesignTokens.error,
       onError: YaBaladiDesignTokens.white,
-
       surface: YaBaladiDesignTokens.surfaceDark,
       onSurface: YaBaladiDesignTokens.textPrimaryDark,
       surfaceContainerHighest: YaBaladiDesignTokens.surfaceVariantDark,
-
       outline: YaBaladiDesignTokens.borderDark,
       outlineVariant: YaBaladiDesignTokens.dividerDark,
-
       shadow: YaBaladiDesignTokens.grey900,
       scrim: YaBaladiDesignTokens.grey900,
-
       inverseSurface: YaBaladiDesignTokens.white,
       onInverseSurface: YaBaladiDesignTokens.grey900,
       inversePrimary: YaBaladiDesignTokens.navy,
     );
 
-    return _buildTheme(
-      colorScheme: colorScheme,
-      isLight: false,
-    );
+    return _buildTheme(colorScheme: colorScheme, isLight: false);
   }
 
   // ============================================================
   // SHARED THEME BUILDER
   // ============================================================
-
   static ThemeData _buildTheme({
     required ColorScheme colorScheme,
     required bool isLight,
@@ -115,8 +89,6 @@ abstract final class AppTheme {
       colorScheme: colorScheme,
       textTheme: textTheme,
       fontFamily: YaBaladiTypography.fontFamily,
-
-      // === AppBar ===
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
@@ -125,17 +97,12 @@ abstract final class AppTheme {
         titleTextStyle: YaBaladiTypography.headingSection.copyWith(
           color: colorScheme.onSurface,
         ),
-        systemOverlayStyle: isLight
-            ? SystemUiOverlayStyle.dark
-            : SystemUiOverlayStyle.light,
+        systemOverlayStyle:
+            isLight ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       ),
-
-      // === Scaffold ===
       scaffoldBackgroundColor: isLight
           ? YaBaladiDesignTokens.background
           : YaBaladiDesignTokens.backgroundDark,
-
-      // === Card ===
       cardTheme: CardThemeData(
         color: colorScheme.surface,
         elevation: YaBaladiDesignTokens.elevation1,
@@ -147,8 +114,6 @@ abstract final class AppTheme {
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
       ),
-
-      // === NavigationBar (Bottom Nav) ===
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colorScheme.surface,
         indicatorColor: colorScheme.primaryContainer.withValues(alpha: 0.15),
@@ -168,19 +133,11 @@ abstract final class AppTheme {
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(
-              color: colorScheme.primary,
-              size: 26,
-            );
+            return IconThemeData(color: colorScheme.primary, size: 26);
           }
-          return IconThemeData(
-            color: colorScheme.onSurfaceVariant,
-            size: 24,
-          );
+          return IconThemeData(color: colorScheme.onSurfaceVariant, size: 24);
         }),
       ),
-
-      // === FilledButton (Primary) ===
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: colorScheme.primary,
@@ -201,8 +158,6 @@ abstract final class AppTheme {
           elevation: YaBaladiDesignTokens.elevation0,
         ),
       ),
-
-      // === OutlinedButton ===
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: colorScheme.primary,
@@ -222,8 +177,6 @@ abstract final class AppTheme {
           textStyle: YaBaladiTypography.labelLarge,
         ),
       ),
-
-      // === TextButton ===
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: colorScheme.primary,
@@ -243,8 +196,6 @@ abstract final class AppTheme {
           textStyle: YaBaladiTypography.labelLarge,
         ),
       ),
-
-      // === IconButton ===
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           minimumSize: const Size(
@@ -253,8 +204,6 @@ abstract final class AppTheme {
           ),
         ),
       ),
-
-      // === Input (TextField, TextFormField) ===
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest,
@@ -296,8 +245,6 @@ abstract final class AppTheme {
           color: colorScheme.error,
         ),
       ),
-
-      // === Chip ===
       chipTheme: ChipThemeData(
         backgroundColor: colorScheme.surfaceContainerHighest,
         labelStyle: YaBaladiTypography.labelMedium.copyWith(
@@ -310,8 +257,6 @@ abstract final class AppTheme {
           vertical: YaBaladiDesignTokens.space1,
         ),
       ),
-
-      // === Dialog ===
       dialogTheme: DialogThemeData(
         backgroundColor: colorScheme.surface,
         elevation: YaBaladiDesignTokens.elevation4,
@@ -327,8 +272,6 @@ abstract final class AppTheme {
           color: colorScheme.onSurfaceVariant,
         ),
       ),
-
-      // === BottomSheet ===
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surface,
         elevation: YaBaladiDesignTokens.elevation4,
@@ -339,8 +282,6 @@ abstract final class AppTheme {
         ),
         showDragHandle: true,
       ),
-
-      // === ListTile ===
       listTileTheme: ListTileThemeData(
         contentPadding: const EdgeInsets.symmetric(
           horizontal: YaBaladiDesignTokens.space4,
@@ -361,15 +302,11 @@ abstract final class AppTheme {
           ),
         ),
       ),
-
-      // === Divider ===
       dividerTheme: DividerThemeData(
         color: colorScheme.outlineVariant,
         thickness: 1,
         space: 1,
       ),
-
-      // === Snackbar ===
       snackBarTheme: SnackBarThemeData(
         backgroundColor: colorScheme.inverseSurface,
         contentTextStyle: YaBaladiTypography.bodyMedium.copyWith(
@@ -382,16 +319,13 @@ abstract final class AppTheme {
           ),
         ),
       ),
-
-      // === Visual Density ===
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );
   }
 
   // ============================================================
-  // TEXT THEME (Map YaBaladi typography to Material textTheme)
+  // TEXT THEME
   // ============================================================
-
   static TextTheme _buildTextTheme(ColorScheme colorScheme) {
     return TextTheme(
       displayLarge: YaBaladiTypography.display.copyWith(
@@ -403,7 +337,6 @@ abstract final class AppTheme {
       displaySmall: YaBaladiTypography.display.copyWith(
         color: colorScheme.onSurface,
       ),
-
       headlineLarge: YaBaladiTypography.headingScreen.copyWith(
         color: colorScheme.onSurface,
       ),
@@ -413,7 +346,6 @@ abstract final class AppTheme {
       headlineSmall: YaBaladiTypography.headingSection.copyWith(
         color: colorScheme.onSurface,
       ),
-
       titleLarge: YaBaladiTypography.headingSection.copyWith(
         color: colorScheme.onSurface,
       ),
@@ -423,7 +355,6 @@ abstract final class AppTheme {
       titleSmall: YaBaladiTypography.headingLabel.copyWith(
         color: colorScheme.onSurface,
       ),
-
       bodyLarge: YaBaladiTypography.bodyLarge.copyWith(
         color: colorScheme.onSurface,
       ),
@@ -433,7 +364,6 @@ abstract final class AppTheme {
       bodySmall: YaBaladiTypography.bodySmall.copyWith(
         color: colorScheme.onSurfaceVariant,
       ),
-
       labelLarge: YaBaladiTypography.labelLarge.copyWith(
         color: colorScheme.onSurface,
       ),

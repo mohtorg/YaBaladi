@@ -9,7 +9,6 @@ import '../../../repositories/categories_repository.dart';
 
 enum CategoriesStatus { idle, loading, loaded, error }
 
-/// يغلّف CategoriesRepository + Stream (defensive ضد Firebase غير المُهيَّأ).
 class CategoriesController extends ChangeNotifier {
   CategoriesController({FirebaseFirestore? firestore})
       : _injectedFirestore = firestore {
@@ -39,7 +38,6 @@ class CategoriesController extends ChangeNotifier {
   String? get error => _error;
   bool get isLoading => _status == CategoriesStatus.loading;
 
-  /// ابدأ الاستماع المباشر. آمن للاستدعاء أكثر من مرة.
   void start() {
     if (!_firebaseAvailable || _repo == null) return;
     _status = CategoriesStatus.loading;

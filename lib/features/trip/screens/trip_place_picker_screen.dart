@@ -1,10 +1,9 @@
 // lib/features/trip/screens/trip_place_picker_screen.dart
 //
-// [v1.2 — 2026-10-19] — Map integration + coordinate validation
-//   - FIX: _addPlace يرفض الأماكن بدون إحداثيات صالحة (لا مزيد من (0,0))
-//   - NEW: _buildMapTab يستخدم TripMapView الحقيقي (بدل placeholder)
-//   - NEW: banner تحذيري في top عند وجود أماكن بدون إحداثيات
-//   - FIX: trailing commas + imports
+// [v1.3 — 2026-10-19] — Zero Internal Maps: Removed TripMapView.
+//   - FIX: Removed import of deleted trip_map_view.dart.
+//   - NEW: _buildMapTab now uses MapService to open external Google Maps.
+//   - FIX: trailing commas + const where needed.
 
 import 'dart:async';
 
@@ -16,9 +15,9 @@ import '../../../models/trip_draft.dart';
 import '../../../models/trip_plan.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/ya_app_bar.dart';
+import '../../../services/map_service.dart'; // ✅ استدعاء خدمة الخرائط
 import '../../places/controllers/places_controller.dart';
 import '../../../services/trip_draft_service.dart';
-import '../widgets/trip_map_view.dart'; // [v1.2] Map integration
 
 class TripPlacePickerScreen extends StatefulWidget {
   const TripPlacePickerScreen({
@@ -93,7 +92,6 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
   void _addPlace(Place place) {
     if (_isSelected(place.id)) return;
 
-    // [v1.2] حماية: رفض الأماكن بدون إحداثيات صالحة
     if (!_hasValidCoords(place)) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -257,7 +255,6 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     return list;
   }
 
-  /// [v1.2] عدّ الأماكن بدون إحداثيات (للتحذير)
   int _invalidCoordsCount(PlacesController ctrl) {
     return ctrl.allPlacesRaw
         .where((p) => p.governorate == widget.governorateNameAr)
@@ -288,7 +285,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
       body: Column(
         children: [
           _buildCounterBar(),
-          _buildInvalidBanner(placesCtrl), // [v1.2]
+          _buildInvalidBanner(placesCtrl),
           _buildTabBar(),
           Expanded(
             child: isLoading && placesCtrl.allPlacesRaw.isEmpty
@@ -297,7 +294,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
                     controller: _tabController,
                     children: [
                       _buildCardsTab(placesCtrl),
-                      _buildMapTab(), // [v1.2] Map حقيقي
+                      _buildMapTab(), // ✅ تم تحديثها
                       _buildSelectedTab(),
                     ],
                   ),
@@ -359,7 +356,6 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     );
   }
 
-  /// [v1.2] بانر تحذيري إذا وُجدت أماكن بدون إحداثيات
   Widget _buildInvalidBanner(PlacesController ctrl) {
     if (ctrl.allPlacesRaw.isEmpty) return const SizedBox.shrink();
     final invalid = _invalidCoordsCount(ctrl);
@@ -524,7 +520,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     );
   }
 
-  /// [v1.2] خريطة حقيقية بدل placeholder
+  /// ✅ [v1.3] تبويب الخريطة (نظام الصفر الداخلي)
   Widget _buildMapTab() {
     if (_selectedStops.isEmpty) {
       return Center(
@@ -540,7 +536,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'أضف أماكن لعرضها على الخريطة',
+                'أضف أماكن لعرض المسار عليها',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -555,7 +551,30 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
       );
     }
 
-    return TripMapView(stops: _selectedStops);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.map, size: 80, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 16),
+            Text('أنت اخترت ${_selectedStops.length} مكان', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 24),
+            // ✅ فتح المسار في تطبيق خارجي
+            ElevatedButton.icon(
+              onPressed: () {
+                if (_selectedStops.isNotEmpty) {
+                   MapService.openDirections(_selectedStops.first.lat, _selectedStops.first.lng);
+                }
+              },
+              icon: const Icon(Icons.navigation),
+              label: const Text('ابدأ التوجيه إلى أول مكان'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSelectedTab() {

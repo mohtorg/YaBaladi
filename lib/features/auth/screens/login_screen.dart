@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+// lib/features/auth/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +7,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/design_tokens.dart';
 import '../controllers/auth_controller.dart';
-import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_scaffold.dart';
-import '../widgets/auth_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,232 +17,120 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final auth = context.read<AuthController>();
-    final result = await auth.signIn(
-      email: _emailCtrl.text,
-      password: _passwordCtrl.text,
-    );
-
-    if (!mounted) return;
-
-    if (!result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'حدث خطأ')),
-      );
-    }
-    // النجاح: authGuard هيعمل redirect تلقائي إلى /home
-  }
+  bool _isLoading = false;
 
   Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
     final auth = context.read<AuthController>();
     final result = await auth.signInWithGoogle();
 
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
-    if (!result.isSuccess) {
+    if (!result.isSuccess && !result.isCancelled) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'فشل تسجيل الدخول')),
+        SnackBar(
+          content: Text(result.error ?? 'فشل تسجيل الدخول'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
 
-  /// ✅ يدخل الوضع الزائر وينتقل فوراً إلى Home
   void _continueAsGuest() {
     final auth = context.read<AuthController>();
     auth.continueAsGuest();
-
-    // ✅ ننتقل صراحةً بدل الاعتماد على redirect التلقائي
-    // (GoRouter لا يعيد التقييم تلقائياً عند تغيّر isGuest
-    //  لأن الموقع الحالي /login نفسه في _authOnlyRoutes)
-    if (mounted) {
-      context.go(RoutePaths.home);
-    }
+    if (mounted) context.go(RoutePaths.home);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final auth = context.watch<AuthController>();
     final theme = Theme.of(context);
 
     return AuthScaffold(
       title: l10n.loginTitle,
       subtitle: l10n.loginSubtitle,
       showBackButton: false,
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ═══════════ حقول Email/Password ═══════════
-            AuthTextField(
-              controller: _emailCtrl,
-              label: l10n.email,
-              icon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return l10n.errorEmailRequired;
-                }
-                if (!v.contains('@')) return l10n.errorEmailInvalid;
-                return null;
-              },
-            ),
-            AuthTextField(
-              controller: _passwordCtrl,
-              label: l10n.password,
-              icon: Icons.lock_outline,
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) {
-                  return l10n.errorPasswordRequired;
-                }
-                if (v.length < 6) return l10n.errorPasswordShort;
-                return null;
-              },
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: YaBaladiDesignTokens.space6),
 
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: () => context.go(RoutePaths.forgotPassword),
-                child: Text(l10n.forgotPassword),
-              ),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _signInWithGoogle,
+            icon: const Icon(Icons.g_mobiledata, size: 32, color: Colors.blue),
+            label: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      l10n.continueWithGoogle,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
             ),
-            const SizedBox(height: YaBaladiDesignTokens.space2),
-
-            // ═══════════ زر الدخول الرئيسي ═══════════
-            AuthPrimaryButton(
-              label: l10n.login,
-              isLoading: auth.isLoading,
-              onPressed: _submit,
-            ),
-            const SizedBox(height: YaBaladiDesignTokens.space5),
-
-            // ═══════════ بطاقة تسجيل واضحة ═══════════
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 4,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                  width: 1.2,
-                ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: theme.colorScheme.outline),
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.noAccountYet,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => context.go(RoutePaths.register),
-                    icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: Text(
-                      l10n.registerCta,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
               ),
             ),
+          ),
 
-            const SizedBox(height: YaBaladiDesignTokens.space5),
+          const SizedBox(height: YaBaladiDesignTokens.space4),
 
-            // ═══════════════════════════════════════════════════
-            // Google Sign-In — يظهر على Android/iOS فقط
-            // ⚠️ معطّل على الويب بسبب deprecation في google_sign_in
-            // ═══════════════════════════════════════════════════
-            if (!kIsWeb) ...[
-              // ─── فاصل "أو" ───
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      l10n.or,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(l10n.or, style: theme.textTheme.bodySmall),
               ),
-
-              const SizedBox(height: YaBaladiDesignTokens.space4),
-
-              // ─── زر Google ───
-              OutlinedButton.icon(
-                onPressed: auth.isLoading ? null : _signInWithGoogle,
-                icon: const Icon(Icons.g_mobiledata, size: 28),
-                label: Text(l10n.continueWithGoogle),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: theme.colorScheme.outline),
-                ),
-              ),
-
-              const SizedBox(height: YaBaladiDesignTokens.space4),
+              const Expanded(child: Divider()),
             ],
+          ),
 
-            // ═══════════ زر Guest ═══════════
-            OutlinedButton.icon(
-              onPressed: _continueAsGuest,
-              icon: const Icon(Icons.person_outline),
-              label: Text(l10n.continueAsGuest),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: BorderSide(color: theme.colorScheme.outline),
-              ),
-            ),
+          const SizedBox(height: YaBaladiDesignTokens.space4),
 
-            const SizedBox(height: YaBaladiDesignTokens.space2),
-
-            Center(
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _continueAsGuest,
+            icon: const Icon(Icons.person_outline),
+            label: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                l10n.guestNote,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                l10n.continueAsGuest,
+                style: const TextStyle(fontSize: 16),
               ),
             ),
-          ],
-        ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: theme.colorScheme.outline),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: YaBaladiDesignTokens.space5),
+
+          Center(
+            child: Text(
+              l10n.guestNote,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          // ✅ التصحيح: استبدال Spacer بـ SizedBox آمن
+          const SizedBox(height: YaBaladiDesignTokens.space6),
+        ],
       ),
     );
   }

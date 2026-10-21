@@ -1,12 +1,4 @@
 // lib/features/profile/profile_screen.dart
-//
-// [v2.0 — 2026-10-18] — Production Cleanup
-//   - REMOVED: TEMPORARY Seed Button (development only, done)
-//   - REMOVED: _TempSeedCard class and import of port_said_seed_service
-//   - PRODUCTION READY: no dev tools in profile screen
-//
-// [v1.4 — 2026-10-14] — G4.1-d: Role Badge
-// [v1.3 — 2026-10-14] — Favorites drill-down
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -21,9 +13,6 @@ import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
 
-/// شاشة حسابي:
-/// - Guest → بطاقة ترقية الحساب + خروج من الوضع الزائر
-/// - User → بيانات + إحصائيات + بطاقات مستقبلية + خروج
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -55,7 +44,7 @@ class ProfileScreen extends StatelessWidget {
     // ═══════════════════════════════════════════════════════════
     // مستخدم مسجّل
     // ═══════════════════════════════════════════════════════════
-    final displayName = auth.displayName ?? '—';
+    final displayName = auth.displayName; // ✅ غير nullable الآن
 
     return Scaffold(
       appBar: YaAppBar(title: l10n.profile),
@@ -64,33 +53,20 @@ class ProfileScreen extends StatelessWidget {
           vertical: YaBaladiDesignTokens.space4,
         ),
         children: [
-          // ─── Profile Header (Avatar + Greeting) ───
           _ProfileHeader(
             name: displayName,
             initials: _initials(displayName),
           ),
-
-          // [v1.4 — G4.1-d] Role Badge — يظهر للأدوار المرتفعة فقط
           const SizedBox(height: 8),
-          _RoleBadge(role: auth.currentRole),
-
+          _RoleBadge(role: auth.currentRole), // ✅ متوافق مع UserRole
           const SizedBox(height: YaBaladiDesignTokens.space5),
           const Divider(height: 1),
-
-          // ─── Stats Grid (مفضلة + تقييمات) ───
           const _StatsSection(),
           const Divider(height: 1),
-
-          // ─── نقاط الولاء (قريبًا) ───
           const _LoyaltyComingSoonCard(),
-
-          // ─── دعوة صديق (قريبًا) ───
           const _ReferralComingSoonCard(),
-
           const SizedBox(height: YaBaladiDesignTokens.space4),
           const Divider(height: 1),
-
-          // ─── Logout ───
           ListTile(
             leading: Icon(Icons.logout, color: theme.colorScheme.error),
             title: Text(
@@ -99,7 +75,6 @@ class ProfileScreen extends StatelessWidget {
             ),
             onTap: () => _confirmLogout(context, auth),
           ),
-
           const SizedBox(height: YaBaladiDesignTokens.space4),
         ],
       ),
@@ -133,10 +108,13 @@ class ProfileScreen extends StatelessWidget {
 
     if (confirmed == true) {
       await auth.signOut();
+      // ✅ التصحيح: إجبار التوجيه لشاشة الدخول
+      if (context.mounted) {
+        context.go(RoutePaths.login);
+      }
     }
   }
 
-  /// تأكيد الخروج من الوضع الزائر.
   Future<void> _confirmExitGuest(
     BuildContext context,
     AuthController auth,
@@ -152,12 +130,16 @@ class ProfileScreen extends StatelessWidget {
 
     if (confirmed == true) {
       await auth.signOut();
+      // ✅ التصحيح: إجبار التوجيه لشاشة الدخول
+      if (context.mounted) {
+        context.go(RoutePaths.login);
+      }
     }
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ROLE BADGE  [v1.4 — G4.1-d]
+// ROLE BADGE
 // ═══════════════════════════════════════════════════════════════
 
 class _RoleBadge extends StatelessWidget {
@@ -167,7 +149,6 @@ class _RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // عضو عادي أو زائر — لا شارة
     if (role == UserRole.member || role == UserRole.visitor) {
       return const SizedBox.shrink();
     }
@@ -306,8 +287,6 @@ class _GuestUpgradeCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
-
-          // ═══════════ زر الخروج من الوضع الزائر ═══════════
           const SizedBox(height: YaBaladiDesignTokens.space5),
           const Divider(),
           const SizedBox(height: YaBaladiDesignTokens.space2),
@@ -364,10 +343,6 @@ class _BenefitRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PROFILE HEADER
-// ═══════════════════════════════════════════════════════════════
-
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.name,
@@ -413,10 +388,6 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// STATS SECTION
-// ═══════════════════════════════════════════════════════════════
-
 class _StatsSection extends StatefulWidget {
   const _StatsSection();
 
@@ -434,7 +405,8 @@ class _StatsSectionState extends State<_StatsSection> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final uid = context.read<AuthController>().uid;
-      if (uid != null) {
+      // ✅ تصحيح: التحقق من أن المستخدم ليس زائراً
+      if (uid != 'guest') {
         setState(() {
           _reviewsCountFuture = _reviewsRepo.getCountByUser(uid);
         });
@@ -550,10 +522,6 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// LOYALTY COMING SOON CARD
-// ═══════════════════════════════════════════════════════════════
 
 class _LoyaltyComingSoonCard extends StatelessWidget {
   const _LoyaltyComingSoonCard();
@@ -720,10 +688,6 @@ class _LoyaltyRuleRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// REFERRAL COMING SOON CARD
-// ═══════════════════════════════════════════════════════════════
-
 class _ReferralComingSoonCard extends StatelessWidget {
   const _ReferralComingSoonCard();
 
@@ -816,10 +780,6 @@ class _ReferralComingSoonCard extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// LOGIN REQUIRED
-// ═══════════════════════════════════════════════════════════════
 
 class _LoginRequired extends StatelessWidget {
   const _LoginRequired({

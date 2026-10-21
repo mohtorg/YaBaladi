@@ -1,23 +1,4 @@
 // lib/core/router/app_router.dart
-//
-// [v2.8 — 2026-10-18] — Wave 5.4: Trip Detailed Route
-//   - NEW: GoRoute for /trips/detailed/:id → TripDetailedScreen
-//   - NEW: import '../../features/trip/screens/trip_detailed_screen.dart'
-//   - ORDER: detailed/:id BEFORE :id (وإلا "detailed" يُطابق كـ :id)
-//
-// [v2.7 — 2026-10-18] — Wave 5.3 Integration
-//   - REPLACED: TripPlannerScreen → WizardContainerScreen
-//
-// [v2.6 — 2026-10-17] — Wave 1c hardening
-//   - FIX: sort imports alphabetically
-//   - FIX: defensive extra handling (redirect if null, safe cast)
-//   - NEW: redirect to /trips/planner if picker opened without extra
-//
-// [v2.5 — 2026-10-17] — Wave 1c: TripPlacePicker route
-// [v2.4.2 — 2026-10-15] — FIX: /trips/planner كان يُطابق :id خطأً
-// [v2.4 — 2026-10-15] — Trip details route /trips/:id
-// [v2.3 — 2026-10-15] — G6.7: Trip Planner routes
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,38 +8,85 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
-import '../../features/places/screens/place_map_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reviews/screens/my_reviews_screen.dart';
 import '../../features/search/screens/explore_screen.dart';
 import '../../features/trip/screens/trip_detailed_screen.dart';
 import '../../features/trip/screens/trip_details_screen.dart';
-import '../../features/trip/screens/trip_plans_screen.dart';
 import '../../features/trip/screens/trip_place_picker_screen.dart';
+import '../../features/trip/screens/trip_plans_screen.dart';
 import '../../features/trip/screens/wizard/wizard_container_screen.dart';
 import '../../models/trip_plan.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../screens/settings_screen.dart';
-import 'route_guards.dart';
+import '../../features/admin/screens/admin_dashboard_screen.dart';
+import '../../core/auth/role.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
-/// إنشاء GoRouter مع AuthController مُمرَّر
 GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
-    initialLocation: RoutePaths.home,
+    // ✅ التصحيح: البدء من شاشة الدخول لتجنب تعارض الـ Shell
+    initialLocation: RoutePaths.login,
     debugLogDiagnostics: true,
     refreshListenable: auth,
-    redirect: (context, state) => authGuard(auth: auth, state: state),
+    redirect: (context, state) {
+      final status = auth.status;
+      final role = auth.role;
+      final isLoggingIn = state.matchedLocation == RoutePaths.login;
+      final isRegistering = state.matchedLocation == RoutePaths.register;
+      final isAdminRoute = state.matchedLocation.startsWith('/admin');
+
+      if (status == AuthStatus.loading) {
+        return null;
+      }
+
+      if (status == AuthStatus.unauthenticated) {
+        if (isAdminRoute) return RoutePaths.login;
+        if (isLoggingIn || isRegistering) return null;
+
+        if (!auth.isGuest) return RoutePaths.login;
+
+        return null;
+      }
+
+      if (status == AuthStatus.authenticated) {
+        if (role == UserRole.admin || role == UserRole.moderator) {
+          if (!isAdminRoute) return '/admin';
+        } else {
+          if (isAdminRoute) return RoutePaths.home;
+          if (isLoggingIn) return RoutePaths.home;
+        }
+      }
+
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/admin',
+        name: 'adminDashboard',
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.login,
+        name: RouteNames.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.register,
+        name: RouteNames.register,
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.forgotPassword,
+        name: RouteNames.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
         branches: [
-          // ═══════════════════════════════════════════════════════════
-          // Branch 0: Home + Category + Place
-          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -73,16 +101,6 @@ GoRouter createAppRouter(AuthController auth) {
                       final id = state.pathParameters['id'] ?? '';
                       return ExploreScreen(categoryId: id);
                     },
-                    routes: [
-                      GoRoute(
-                        path: 'map',
-                        name: RouteNames.categoryMap,
-                        builder: (context, state) {
-                          final id = state.pathParameters['id'] ?? '';
-                          return PlaceMapScreen(categoryId: id);
-                        },
-                      ),
-                    ],
                   ),
                   GoRoute(
                     path: 'place/:id',
@@ -91,25 +109,11 @@ GoRouter createAppRouter(AuthController auth) {
                       final id = state.pathParameters['id'] ?? '';
                       return PlaceDetailsScreen(placeId: id);
                     },
-                    routes: [
-                      GoRoute(
-                        path: 'map',
-                        name: RouteNames.placeMap,
-                        builder: (context, state) {
-                          final id = state.pathParameters['id'] ?? '';
-                          return PlaceMapScreen(placeId: id);
-                        },
-                      ),
-                    ],
                   ),
                 ],
               ),
             ],
           ),
-
-          // ═══════════════════════════════════════════════════════════
-          // Branch 1: Trips (Trips + Planner + Picker + Detailed + Details)
-          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -117,44 +121,35 @@ GoRouter createAppRouter(AuthController auth) {
                 name: RouteNames.trips,
                 builder: (context, state) => const TripPlansScreen(),
                 routes: [
-                  // ─── Static FIRST — يحل تعارض /trips/planner ───
                   GoRoute(
                     path: 'planner',
                     name: RouteNames.tripPlanner,
                     builder: (context, state) => const WizardContainerScreen(),
                     routes: [
-                      // Wave 1c — Picker (Static child of planner)
                       GoRoute(
                         path: 'picker',
                         name: RouteNames.tripPlacePicker,
                         redirect: (context, state) {
                           final extra = state.extra;
                           if (extra is! Map<String, dynamic>) {
-                            // دخول مباشر بدون بيانات → ارجع للـ planner
                             return RoutePaths.tripPlanner;
                           }
                           return null;
                         },
                         builder: (context, state) {
                           final extra = state.extra as Map<String, dynamic>;
-
-                          // defensive casts — لا crash
                           final initialStopsRaw = extra['initialStops'];
                           final initialStops = initialStopsRaw is List
                               ? initialStopsRaw.whereType<TripStop>().toList()
                               : <TripStop>[];
-
                           final govIdRaw = extra['governorateId'];
                           final governorateId =
                               govIdRaw is String ? govIdRaw : '';
-
                           final govNameRaw = extra['governorateNameAr'];
                           final governorateNameAr =
                               govNameRaw is String ? govNameRaw : '';
-
                           final maxStopsRaw = extra['maxStops'];
                           final maxStops = maxStopsRaw is int ? maxStopsRaw : 8;
-
                           final userIdRaw = extra['userId'];
                           final userId =
                               userIdRaw is String ? userIdRaw : 'guest';
@@ -170,8 +165,6 @@ GoRouter createAppRouter(AuthController auth) {
                       ),
                     ],
                   ),
-
-                  // ✅ [v2.8] Wave 5.4 — Detailed (BEFORE :id)
                   GoRoute(
                     path: 'detailed/:id',
                     name: RouteNames.tripDetailed,
@@ -180,8 +173,6 @@ GoRouter createAppRouter(AuthController auth) {
                       return TripDetailedScreen(tripId: id);
                     },
                   ),
-
-                  // ─── Dynamic LAST — /trips/:id ───
                   GoRoute(
                     path: ':id',
                     name: RouteNames.tripDetails,
@@ -194,10 +185,6 @@ GoRouter createAppRouter(AuthController auth) {
               ),
             ],
           ),
-
-          // ═══════════════════════════════════════════════════════════
-          // Branch 2: Profile + My Reviews + Favorites
-          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -219,10 +206,6 @@ GoRouter createAppRouter(AuthController auth) {
               ),
             ],
           ),
-
-          // ═══════════════════════════════════════════════════════════
-          // Branch 3: Settings
-          // ═══════════════════════════════════════════════════════════
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -234,38 +217,11 @@ GoRouter createAppRouter(AuthController auth) {
           ),
         ],
       ),
-
-      // ═══════════════════════════════════════════════════════════
-      // Auth routes — خارج الـ Shell
-      // ═══════════════════════════════════════════════════════════
-      GoRoute(
-        path: RoutePaths.login,
-        name: RouteNames.login,
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.register,
-        name: RouteNames.register,
-        builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.forgotPassword,
-        name: RouteNames.forgotPassword,
-        builder: (context, state) => const ForgotPasswordScreen(),
-      ),
-
-      // ═══════════════════════════════════════════════════════════
-      // البحث الحر — خارج الـ Shell
-      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.search,
         name: RouteNames.search,
         builder: (context, state) => const ExploreScreen(),
       ),
-
-      // ═══════════════════════════════════════════════════════════
-      // المسار القديم للمفضلة — للتوافق الخلفي
-      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: RoutePaths.favorites,
         name: RouteNames.favorites,

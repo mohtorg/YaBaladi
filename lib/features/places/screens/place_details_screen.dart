@@ -1,22 +1,15 @@
 // lib/features/places/screens/place_details_screen.dart
 //
-// [v2.3 — 2026-10-18] — Lint fixes for Wave 4.1
-//   - FIX: catch (e) → on Exception catch (e) in _FavoriteButton
-//   - FIX: عرض رسالة الخطأ الفعلية بدل نص ثابت
-//   - NOTE: reviews نظام مكتمل عبر AddReviewSheet + ReviewsSection + ReviewsController
-//          لا حاجة لـ AddReviewScreen (full screen)
-//
-// [v2.2 — 2026-10-15] — Removed url_launcher dependency
-//   - FIX: إزالة import url_launcher
-//   - CHANGE: _launchCall/_launchWhatsApp/_openInMaps → SnackBar مؤقت
-//   - CLEANUP: إزالة kIsWeb + defaultTargetPlatform + TargetPlatform
-//
-// [v2.1 — _ReviewsBlock StatefulWidget]
-// [v2.0 — F2.4: Reviews integration]
+// [v2.4 — 2026-10-20] — Zero Internal Maps + Real External Actions
+//   - FIX: Removed placeMapPath (fixed 404 error).
+//   - FIX: Removed duplicate Directions button.
+//   - NEW: Integrated LocationActions widget for the map.
+//   - NEW: Enabled Phone & WhatsApp using url_launcher.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
@@ -28,12 +21,11 @@ import '../../../l10n/app_localizations.dart';
 import '../../../models/place.dart';
 import '../../../repositories/places_repository.dart';
 import '../../../theme/design_tokens.dart';
+import '../../../widgets/location_actions.dart'; // ✅ استدعاء الزر الأنيق
 import '../../../widgets/login_required_dialog.dart';
 
-/// شاشة تفاصيل المكان.
 class PlaceDetailsScreen extends StatefulWidget {
   const PlaceDetailsScreen({super.key, required this.placeId});
-
   final String placeId;
 
   @override
@@ -53,12 +45,10 @@ class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
       final uid = context.read<AuthController>().uid;
       if (uid != null) {
         context.read<FavoritesController>().load(uid, widget.placeId);
       }
-
       _reviewsCtrl.load(widget.placeId);
     });
   }
@@ -116,7 +106,6 @@ class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
 
 class _PlaceBody extends StatelessWidget {
   const _PlaceBody({required this.place});
-
   final Place place;
 
   @override
@@ -207,7 +196,6 @@ class _PlaceBody extends StatelessWidget {
 
 class _ReviewsBlock extends StatefulWidget {
   const _ReviewsBlock({required this.place});
-
   final Place place;
 
   @override
@@ -220,7 +208,6 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
     final ctrl = context.read<ReviewsController>();
     final messenger = ScaffoldMessenger.of(context);
 
-    // ── Guest guard ──
     if (auth.uid == null) {
       await showLoginRequiredDialog(context, featureName: 'المراجعات');
       return;
@@ -228,7 +215,6 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
 
     if (!mounted) return;
 
-    // ── Already reviewed guard ──
     if (ctrl.hasReviewed(auth.uid!)) {
       messenger
         ..hideCurrentSnackBar()
@@ -241,7 +227,6 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
       return;
     }
 
-    // ── Open sheet ──
     final submitted = await AddReviewSheet.show(
       context,
       controller: ctrl,
@@ -282,7 +267,6 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
 
 class _HeaderImage extends StatelessWidget {
   const _HeaderImage({required this.imageUrls});
-
   final List<String> imageUrls;
 
   @override
@@ -332,7 +316,6 @@ class _HeaderImage extends StatelessWidget {
 
 class _RatingRow extends StatelessWidget {
   const _RatingRow({required this.rating, required this.count});
-
   final double rating;
   final int count;
 
@@ -420,7 +403,6 @@ class _InfoTile extends StatelessWidget {
 
 class _FavoriteButton extends StatelessWidget {
   const _FavoriteButton({required this.placeId});
-
   final String placeId;
 
   @override
@@ -468,7 +450,6 @@ class _FavoriteButton extends StatelessWidget {
           ),
         );
     } on Exception catch (e) {
-      // ✅ التصويب: on Exception + عرض الخطأ
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -482,13 +463,11 @@ class _FavoriteButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ACTION BUTTONS
-// [v2.2] الإجراءات الخارجية معطَّلة مؤقتاً
+// ACTION BUTTONS (Clean & Functional)
 // ═══════════════════════════════════════════════════════════════
 
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.place});
-
   final Place place;
 
   @override
@@ -500,65 +479,49 @@ class _ActionButtons extends StatelessWidget {
         if (place.phone.isNotEmpty)
           FilledButton.icon(
             onPressed: () => _launchCall(context, place.phone),
-            icon: const Icon(Icons.phone),
+            icon: const Icon(Icons.phone, size: 18),
             label: const Text('اتصال'),
           ),
         if (place.whatsapp.isNotEmpty)
           FilledButton.icon(
             onPressed: () => _launchWhatsApp(context, place.whatsapp),
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: const Icon(Icons.chat_bubble_outline, size: 18),
             label: const Text('واتساب'),
             style: FilledButton.styleFrom(
               backgroundColor: Colors.green.shade600,
             ),
           ),
-        if (place.location != null) ...[
-          FilledButton.icon(
-            onPressed: () => context.go(RoutePaths.placeMapPath(place.id)),
-            icon: const Icon(Icons.map_outlined),
-            label: const Text('عرض على الخريطة'),
+        // ✅ زر الخريطة الأنيق (الوحيد)
+        if (place.location != null)
+          LocationActions(
+            lat: place.location!.latitude,
+            lng: place.location!.longitude,
+            large: true,
           ),
-          OutlinedButton.icon(
-            onPressed: () => _openInMaps(context, place),
-            icon: const Icon(Icons.directions_outlined),
-            label: const Text('الاتجاهات'),
-          ),
-        ],
       ],
     );
   }
 
   Future<void> _launchCall(BuildContext context, String phone) async {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('الاتصال — قيد الإصلاح'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    final uri = Uri.parse('tel:$phone');
+    if (!await launchUrl(uri)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح تطبيق الهاتف')),
+        );
+      }
+    }
   }
 
   Future<void> _launchWhatsApp(BuildContext context, String phone) async {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('واتساب — قيد الإصلاح'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
-  Future<void> _openInMaps(BuildContext context, Place place) async {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('الاتجاهات — قيد الإصلاح'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    final uri = Uri.parse('https://wa.me/$phone');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح واتساب')),
+        );
+      }
+    }
   }
 }
 
@@ -577,7 +540,6 @@ class _EmptyView extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message});
-
   final String message;
 
   @override

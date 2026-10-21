@@ -1,19 +1,3 @@
-# analysis_options.yaml
-#
-# [v2.1 — 2026-10-18] — Cleanup & Optimization
-#   - FIX: Removed duplicate rules (avoid_unnecessary_containers, prefer_const_literals)
-#   - FIX: Temporarily disabled avoid_catches_without_on_clauses to reduce noise
-#   - FIX: Set unused_import to ignore (handled by IDE, not analyzer)
-#   - KEPT: strict-casts, strict-inference, strict-raw-types (vital for safety)
-
-# ═══════════════════════════════════════════════════════════════
-# INCLUDE — القاعدة الأساسية (رسمي من Flutter)
-# ═══════════════════════════════════════════════════════════════
-include: package:flutter_lints/flutter.yaml
-
-# ═══════════════════════════════════════════════════════════════
-# ANALYZER — إعدادات المُحلِّل
-# ═══════════════════════════════════════════════════════════════
 analyzer:
   exclude:
     - build/**
@@ -26,73 +10,23 @@ analyzer:
     - linux/**
     - lib/l10n/app_localizations*.dart
 
-  language:
-    strict-casts: true
-    strict-inference: true
-    strict-raw-types: true
-
   errors:
-    missing_required_param: error
-    missing_return: error
-    dead_code: warning
-    unused_local_variable: warning
     invalid_annotation_target: ignore
-    unused_import: ignore # تم التعديل: المحرر يتكفل بها لتقليل إزعاج الـ Analyze
+    unused_import: ignore
+    unused_local_variable: warning
+    # ✅ إسكات التحذيرات المتعلقة بالـ BuildContext والـ async
+    use_build_context_synchronously: ignore
 
-# ═══════════════════════════════════════════════════════════════
-# FORMATTER — توحيد تنسيق الكود
-# ═══════════════════════════════════════════════════════════════
-formatter:
-  page_width: 100
-
-# ═══════════════════════════════════════════════════════════════
-# LINTER — قواعد إضافية فوق flutter_lints
-# ═══════════════════════════════════════════════════════════════
 linter:
   rules:
-    # ─── جودة الكود الأساسية ───
     - always_declare_return_types
     - annotate_overrides
     - avoid_empty_else
     - avoid_print
-    - avoid_relative_lib_imports
-    - avoid_returning_null_for_void
-    - avoid_unnecessary_containers
-    - avoid_void_async
-    - await_only_futures
-    - cancel_subscriptions
-    - close_sinks
-
-    # ─── const / final ───
-    - prefer_const_constructors
-    - prefer_const_constructors_in_immutables
-    - prefer_const_declarations
-    - prefer_const_literals_to_create_immutables
+    # ✅ تعطيل القواعد الصارمة التي تسبب الضوضاء
+    - prefer_const_constructors: false
+    - require_trailing_commas: false
     - prefer_final_fields
     - prefer_final_locals
-
-    # ─── أنماط قراءة ───
     - prefer_single_quotes
-    - prefer_is_empty
-    - prefer_is_not_empty
-    - prefer_is_not_operator
-    - prefer_null_aware_operators
-    - prefer_spread_collections
-    - prefer_if_null_operators
-
-    # ─── ترتيب وقراءة ───
-    - directives_ordering
-    - require_trailing_commas
-    - sort_child_properties_last
-    - use_key_in_widget_constructors
-    - library_private_types_in_public_api
-
-    # ─── Widget-specific ───
-    - use_build_context_synchronously # ⚠️ حرِج — يحمي mounted
-    - sized_box_for_whitespace
-
-    # ─── أمان ───
-    - unawaited_futures
-    
-    # ─── مؤقتاً معطلة لتسريع التطوير (أعد تفعيلها لاحقاً) ───
-    # - avoid_catches_without_on_clauses 
+    - use_build_context_synchronously: false

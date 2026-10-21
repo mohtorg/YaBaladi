@@ -1,5 +1,4 @@
 // lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,6 +25,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  debugPrint('📩 Background message: ${message.messageId}');
 }
 
 Future<void> main() async {
@@ -50,21 +50,29 @@ class YaBaladiApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<LocaleController>(
-            create: (_) => LocaleController()..load()),
+          create: (_) => LocaleController()..load(),
+        ),
         ChangeNotifierProvider<ThemeController>(
-            create: (_) => ThemeController()..load()),
-        ChangeNotifierProvider<AuthController>(create: (_) => AuthController()),
+          create: (_) => ThemeController()..load(),
+        ),
+        ChangeNotifierProvider<AuthController>(
+          create: (_) => AuthController(),
+        ),
         ChangeNotifierProvider<CategoriesController>(
-            create: (_) => CategoriesController()..start()),
-        // ✅ بدون ..load() لكي لا يجلب أماكن عشوائية عند الإقلاع
+          create: (_) => CategoriesController()..start(),
+        ),
         ChangeNotifierProvider<PlacesController>(
-            create: (_) => PlacesController()),
+          create: (_) => PlacesController(),
+        ),
         ChangeNotifierProvider<FavoritesController>(
-            create: (_) => FavoritesController()),
+          create: (_) => FavoritesController(),
+        ),
         ChangeNotifierProvider<BrowsingLocationController>(
-            create: (_) => BrowsingLocationController()),
+          create: (_) => BrowsingLocationController(),
+        ),
         ChangeNotifierProvider<TripPlansController>(
-            create: (_) => TripPlansController()),
+          create: (_) => TripPlansController(),
+        ),
       ],
       child: const _AppRoot(),
     );
@@ -73,6 +81,7 @@ class YaBaladiApp extends StatelessWidget {
 
 class _AppRoot extends StatefulWidget {
   const _AppRoot();
+
   @override
   State<_AppRoot> createState() => _AppRootState();
 }
@@ -95,6 +104,14 @@ class _AppRootState extends State<_AppRoot> {
   Widget build(BuildContext context) {
     final locale = context.watch<LocaleController>();
     final theme = context.watch<ThemeController>();
+
+    if (_router == null) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,

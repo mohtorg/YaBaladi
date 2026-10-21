@@ -1,12 +1,10 @@
 // lib/core/router/route_names.dart
 //
+// [v1.9 — 2026-10-20] — Zero Internal Maps: Removed categoryMap & placeMap.
+//   - REMOVED: categoryMap, placeMap.
+//
 // [v1.8 — 2026-10-18] — Wave 5.4: tripDetailed
 //   - NEW: tripDetailed — '/trips/detailed/:id'
-//   - KEPT: tripDetails (legacy) — '/trips/:id'
-//
-// [v1.7 — 2026-10-17] — Wave 1c: tripPlacePicker
-// [v1.6 — 2026-10-15] — G6.7: tripPlanner + tripDetails
-// [v1.5 — 2026-10-15] — Routes + Bottom Nav
 
 /// أسماء المسارات — للاستخدام مع `context.goNamed()` / `goNamed()`
 ///
@@ -23,13 +21,11 @@ class RouteNames {
   // CATEGORY
   // ═══════════════════════════════════════════════════════════════
   static const String category = 'category';
-  static const String categoryMap = 'categoryMap';
 
   // ═══════════════════════════════════════════════════════════════
   // PLACE
   // ═══════════════════════════════════════════════════════════════
   static const String place = 'place';
-  static const String placeMap = 'placeMap';
 
   // ═══════════════════════════════════════════════════════════════
   // TRIPS
