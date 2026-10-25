@@ -1,4 +1,12 @@
 // lib/screens/home_screen.dart
+//
+// [v1.2 — 2026-10-23] — i18n of hard-coded texts
+//   - FIX: نصوص البطاقتين وعنوان «الأعلى تقييماً» وبانر الزائر صارت
+//          ثنائية اللغة (pending_strings.dart + l10n.login / l10n.register).
+//   - FIX: اسم المحافظة يتبع لغة التطبيق (nameAr / nameEn).
+//
+// [v1.1 — 2026-10-23] — async safety
+//   - FIX: _refresh لا تستخدم context بعد await (التقاط المتحكمات مسبقاً).
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +17,7 @@ import '../features/auth/controllers/auth_controller.dart';
 import '../features/categories/controllers/categories_controller.dart';
 import '../features/places/controllers/places_controller.dart';
 import '../l10n/app_localizations.dart';
+import '../l10n/pending_strings.dart';
 import '../models/category.dart';
 import '../models/place.dart';
 import '../services/location_service.dart';
@@ -43,14 +52,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    await context.read<CategoriesController>().reload();
-    await context.read<PlacesController>().refresh();
+    // ✅ نلتقط المتحكمات قبل أي await، فلا نستخدم context بعد فجوة async.
+    final categories = context.read<CategoriesController>();
+    final places = context.read<PlacesController>();
+
+    await categories.reload();
+    await places.refresh();
     await LocationService.clearCache();
+    if (!mounted) return;
     await _loadLocation();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final isArabic = l10n.localeName == 'ar';
     final categories = context.watch<CategoriesController>();
     final places = context.watch<PlacesController>();
     final auth = context.watch<AuthController>();
@@ -81,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                           child: _QuickActionCard(
                               icon: Icons.add_road,
-                              label: 'خطط رحلة',
+                              label: l10n.planTripAction,
                               color: Theme.of(context).colorScheme.primary,
                               onTap: () =>
                                   context.push(RoutePaths.tripPlanner))),
@@ -89,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                           child: _QuickActionCard(
                               icon: Icons.luggage,
-                              label: 'رحلاتي',
+                              label: l10n.myTripsAction,
                               color: Colors.orange.shade700,
                               onTap: () => context.push(RoutePaths.trips))),
                     ],
@@ -104,7 +120,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ✅ قسم الأعلى تقييماً فقط
                 SliverToBoxAdapter(
                   child: _HorizontalSection(
-                    title: '⭐ الأعلى تقييماً في ${browsing.nameAr}',
+                    title: l10n.topRatedIn(
+                        isArabic ? browsing.nameAr : browsing.nameEn),
                     places: _topRatedPlaces(placesInGovernorate, limit: 5),
                   ),
                 ),
@@ -127,7 +144,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ... (باقي الويدجت المساعدة _QuickActionCard, _CategoryGrid, _HorizontalSection, _PlaceMiniCard, _GuestBanner كما هي من الملف السابق، سأدرجها هنا للاكتمال) ...
+// ═══════════════════════════════════════════════════════════════
+// الويدجت المساعدة
+// ═══════════════════════════════════════════════════════════════
 
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
@@ -354,6 +373,7 @@ class _GuestBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       padding: const EdgeInsets.all(16),
@@ -371,7 +391,7 @@ class _GuestBanner extends StatelessWidget {
                   color: theme.colorScheme.primary, size: 24),
               const SizedBox(width: 10),
               Expanded(
-                  child: Text('سجّل دخولك للاستفادة من كل الميزات',
+                  child: Text(l10n.guestBannerTitle,
                       style: theme.textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.w600))),
             ],
@@ -382,12 +402,12 @@ class _GuestBanner extends StatelessWidget {
               Expanded(
                   child: FilledButton(
                       onPressed: () => context.go(RoutePaths.login),
-                      child: const Text('تسجيل الدخول'))),
+                      child: Text(l10n.login))),
               const SizedBox(width: 8),
               Expanded(
                   child: OutlinedButton(
                       onPressed: () => context.go(RoutePaths.register),
-                      child: const Text('إنشاء حساب'))),
+                      child: Text(l10n.register))),
             ],
           ),
         ],

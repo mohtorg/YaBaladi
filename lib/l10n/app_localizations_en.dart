@@ -487,4 +487,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get googleSignInFailed => 'Google sign-in failed';
+
+  @override
+  String get tripsTitle => 'My Trips';
 }

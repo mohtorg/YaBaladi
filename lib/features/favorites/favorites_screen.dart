@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/router/route_paths.dart';
-import '../../../features/auth/controllers/auth_controller.dart';
-import '../../../features/categories/controllers/categories_controller.dart';
-import '../../../features/favorites/controllers/favorites_controller.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../../models/category.dart';
-import '../../../models/favorite.dart';
-import '../../../models/place.dart';
-import '../../../repositories/places_repository.dart';
-import '../../../theme/design_tokens.dart';
+import '../../core/router/route_paths.dart';
+import '../../features/auth/controllers/auth_controller.dart';
+import '../../features/categories/controllers/categories_controller.dart';
+import '../../features/favorites/controllers/favorites_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/category.dart';
+import '../../models/favorite.dart';
+import '../../models/place.dart';
+import '../../repositories/places_repository.dart';
+import '../../theme/design_tokens.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -64,7 +64,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     FavoritesController favorites,
   ) {
     // ─── Guest → Empty state ───
-    if (auth.uid == null) {
+    // ✅ FIX: isLoggedIn بدلاً من uid == null
+    if (!auth.isLoggedIn) {
       return const _EmptyView(
         icon: Icons.lock_outline,
         title: 'تسجيل الدخول مطلوب',
@@ -145,9 +146,8 @@ class _GroupedFavoritesList extends StatelessWidget {
     // ─── التجميع حسب categoryId ───
     final grouped = <String, List<_FavItem>>{};
     for (final item in items) {
-      final catId = item.place.categoryId.isEmpty
-          ? '_unknown'
-          : item.place.categoryId;
+      final catId =
+          item.place.categoryId.isEmpty ? '_unknown' : item.place.categoryId;
       grouped.putIfAbsent(catId, () => []).add(item);
     }
 
@@ -365,10 +365,12 @@ class _FavoriteCard extends StatelessWidget {
                 iconSize: 20,
                 onPressed: () async {
                   final auth = context.read<AuthController>();
-                  if (auth.uid == null) return;
+                  // ✅ FIX: isLoggedIn بدلاً من uid == null
+                  if (!auth.isLoggedIn) return;
+                  // ✅ FIX: إزالة ! غير الضرورية
                   await context
                       .read<FavoritesController>()
-                      .toggle(auth.uid!, place.id);
+                      .toggle(auth.uid, place.id);
                 },
               ),
             ],

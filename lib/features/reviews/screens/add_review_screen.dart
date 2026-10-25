@@ -1,15 +1,8 @@
 // lib/features/reviews/screens/add_review_screen.dart
 //
-// [v1.1 — 2026-10-18] — Fix: create/update return types
-//   - FIX: create يُرجع String (id) — لا يمكن استخدامه كـ bool
-//   - FIX: update يُرجع void — نفس المشكلة
-//     → استخدام try/catch بدلاً من if (ok)
-//   - FIX: createdAt = null عند الإنشاء → serverTimestamp()
-//          (بدلاً من DateTime.now() من الجهاز)
-//   - FIX: الحفاظ على isVerified / visitId / verifiedAt عند التعديل
-//   - NEW: SnackBar يعرض رسالة أوضح
-//
-// [v1.0 — 2026-10-18] — Wave 4.1: Add Review Screen
+// [v1.2 — 2026-10-22] — Wave 2: Null-safety lint fixes
+//   - FIX: استخدام isLoggedIn بدلاً من uid == null
+//   - FIX: استخراج الاسم بأمان عبر auth.user?.displayName
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -60,8 +53,9 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     if (!_canSubmit) return;
 
     final auth = context.read<AuthController>();
-    final uid = auth.uid;
-    if (uid == null) {
+
+    // ✅ FIX: استخدام isLoggedIn
+    if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('يجب تسجيل الدخول لإضافة تقييم'),
@@ -75,25 +69,25 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
 
     final isEditing = widget.existingReview != null;
     final repo = ReviewsRepository();
+
+    // ✅ FIX: استخراج الاسم بأمان
+    final rawName = auth.user?.displayName.trim() ?? '';
+    final safeName = rawName.isEmpty ? 'مستخدم' : rawName;
+
     final review = Review(
       id: widget.existingReview?.id ?? '',
       placeId: widget.place.id,
-      userId: uid,
-      userName: auth.displayName ?? 'مستخدم',
+      userId: auth.uid, // ✅ لا حاجة لـ !
+      userName: safeName,
       rating: _rating.toDouble(),
       comment: _commentController.text.trim(),
-      // ✅ إنشاء: null → serverTimestamp (via toMap)
-      // ✅ تعديل: نحافظ على original createdAt
       createdAt: widget.existingReview?.createdAt,
-      // ✅ الحفاظ على الحقول المحمية عند التعديل
-      // (لا تُرسَل في update()، لكن نبقيها في الذاكرة)
       isVerified: widget.existingReview?.isVerified ?? false,
       visitId: widget.existingReview?.visitId,
       verifiedAt: widget.existingReview?.verifiedAt,
     );
 
     try {
-      // ✅ كلتاهما ترمي على الفشل (لا تحتاج if(ok))
       if (isEditing) {
         await repo.update(review);
       } else {
@@ -144,7 +138,6 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ─── اسم المكان ───
               Text(
                 widget.place.nameAr,
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -153,8 +146,6 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-
-              // ─── التقييم بالنجوم ───
               Text(
                 'تقييمك',
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -189,10 +180,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 32),
-
-              // ─── التعليق ───
               Row(
                 children: [
                   Text(
@@ -223,10 +211,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                   alignLabelWithHint: true,
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ─── زر الحفظ ───
               FilledButton.icon(
                 onPressed: _canSubmit ? _submit : null,
                 icon: _submitting

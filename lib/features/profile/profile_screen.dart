@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/auth/role.dart';
-import '../../../core/router/route_paths.dart';
-import '../../../features/favorites/controllers/favorites_controller.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../../repositories/reviews_repository.dart';
-import '../../../theme/design_tokens.dart';
-import '../../../widgets/confirm_dialog.dart';
-import '../../../widgets/ya_app_bar.dart';
+import '../../core/auth/role.dart';
+import '../../core/router/route_paths.dart';
+import '../../features/favorites/controllers/favorites_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../../repositories/reviews_repository.dart';
+import '../../theme/design_tokens.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/ya_app_bar.dart';
 import '../auth/controllers/auth_controller.dart';
 
 class ProfileScreen extends StatelessWidget {

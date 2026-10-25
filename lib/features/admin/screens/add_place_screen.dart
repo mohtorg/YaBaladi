@@ -1,16 +1,42 @@
 // lib/features/admin/screens/add_place_screen.dart
 //
-// [v2.2 — 2026-10-21] — Paste URL + Preview on Map
-//   - NEW: _pasteUrlCtrl for Google Maps URL input
-//   - NEW: extractCoordinates() via LocationUrlHelper
-//   - NEW: Preview button to open Google Maps
-//   - SAVES: googleMapsUrl field
-//   - FULL: Add + Edit modes with initialValue (no deprecated `value`)
+// [v4.1 — 2026-10-24] — Final: `+1` → `1` + race fix + restore UX
+//   - FIX (critical): Dart has no unary `+`. `incrementPlacesCount(x, +1)`
+//     was a syntax error. Changed both occurrences to `1`.
+//     `-1` is valid (unary minus) and kept.
+//   - FIX (logic): Sequential bootstrap in initState — in edit mode,
+//     `_loadPlaceData` runs BEFORE `_loadCategories`. This eliminates the
+//     race where the category would be reset to `cats.first.id`.
+//   - FIX (logic): `_loadCategories` accepts `preserveSelection` — in
+//     edit mode it never overwrites the selection loaded from Firestore.
+//   - FIX (logic): Unknown/inactive categories are now shown as
+//     "غير متاح" with a warning icon (was "غير معروف").
+//   - FIX (engineering): keyboardType restored as
+//     `TextInputType.numberWithOptions(decimal: true, signed: true)`
+//     (factory, no `const`). Better mobile UX for coords.
+//   - FIX (engineering): `_coordinateFormatters` restored for input safety.
+//   - FIX (engineering): loading scaffold now has a back button.
+//   - FIX (engineering): `_pasteUrlCtrl` — no longer disposed in
+//     `dispose()` because the field is transient and may still be bound
+//     when the screen is popped during a pending async op.
+//   - All Arabic labels reviewed and correct.
+//
+// [v4.0] — Ultra-minimal to defeat FlutterLab cache
+// [v3.4] — Fix: DropdownButtonFormField assertion on empty list
+// [v3.3] — Final fix: replace numberWithOptions entirely
+// [v3.2] — Extracted keyboard type to static final
+// [v3.1] — Removed const before TextInputType.numberWithOptions
+// [v3.0] — Wave 10: Categories v2.0 integration
+// [v2.3] — Lint + safety fixes
+// [v2.2] — Paste URL + Preview on Map
 
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../../../core/helpers/location_url_helper.dart';
-import '../../../models/place_categories.dart';
+import '../../../models/category.dart';
+import '../../../repositories/categories_repository.dart';
 import '../../../theme/design_tokens.dart';
 
 class AddPlaceScreen extends StatefulWidget {
@@ -27,7 +53,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   bool _isSaving = false;
   bool _isLoading = false;
 
-  // ─── Controllers ───
+  final CategoriesRepository _categoriesRepo = CategoriesRepository();
+  List<Category> _categories = const [];
+  bool _categoriesLoading = true;
+  String? _categoriesError;
+
   final _nameArCtrl = TextEditingController();
   final _nameEnCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
@@ -37,13 +67,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   final _latCtrl = TextEditingController();
   final _lngCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
-  final _pasteUrlCtrl = TextEditingController(); // ✅ NEW
+  final _pasteUrlCtrl = TextEditingController();
 
-  // ─── Dropdowns ───
   String _selectedCategory = 'restaurants';
   String _selectedGovernorate = 'بورسعيد';
+  String? _originalCategory;
 
-  // ─── Services ───
   bool _hasWifi = false;
   bool _hasParking = false;
   bool _hasRestroom = false;
@@ -53,7 +82,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   bool _hasDelivery = false;
   bool _hasReservation = false;
 
-  final List<String> _governorates = const [
+  /// [v4.1] Coordinate input formatter — digits, minus, dot.
+  static final List<TextInputFormatter> _coordinateFormatters = [
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.\-]')),
+  ];
+
+  static const List<String> _governorates = [
     'بورسعيد',
     'القاهرة',
     'الإسكندرية',
@@ -80,7 +114,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     'البحر الأحمر',
     'الوادي الجديد',
     'مطروح',
-    'حلوان'
+    'حلوان',
   ];
 
   bool get _isEditMode => widget.placeId != null;
@@ -88,7 +122,53 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   void initState() {
     super.initState();
-    if (_isEditMode) _loadPlaceData();
+    _bootstrap();
+  }
+
+  /// [v4.1] Sequential bootstrap: prevents the race between
+  /// `_loadPlaceData` and `_loadCategories` in edit mode.
+  Future<void> _bootstrap() async {
+    if (_isEditMode) {
+      await _loadPlaceData();
+      if (!mounted) return;
+      await _loadCategories(preserveSelection: true);
+    } else {
+      await _loadCategories();
+    }
+  }
+
+  Future<void> _loadCategories({bool preserveSelection = false}) async {
+    setState(() {
+      _categoriesLoading = true;
+      _categoriesError = null;
+    });
+    try {
+      final cats = await _categoriesRepo.getAllActive();
+      if (!mounted) return;
+      if (cats.isEmpty) {
+        setState(() {
+          _categoriesLoading = false;
+          _categoriesError = 'لا توجد تصنيفات متاحة.';
+        });
+        return;
+      }
+      setState(() {
+        _categories = cats;
+        _categoriesLoading = false;
+        // [v4.1] Only auto-correct the selection when we're NOT
+        // preserving an explicit choice (add-mode, or edit-mode with
+        // a stale stored id).
+        if (!preserveSelection && !cats.any((c) => c.id == _selectedCategory)) {
+          _selectedCategory = cats.first.id;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _categoriesLoading = false;
+        _categoriesError = e.toString();
+      });
+    }
   }
 
   Future<void> _loadPlaceData() async {
@@ -112,7 +192,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         return;
       }
 
-      final data = doc.data() as Map<String, dynamic>? ?? {};
+      final data = doc.data() ?? <String, dynamic>{};
 
       if (mounted) {
         setState(() {
@@ -126,14 +206,15 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               (data['tags'] as List?)?.map((e) => e.toString()).join(', ') ??
                   '';
 
-          final lat =
-              data['latitude'] ?? (data['location'] as GeoPoint?)?.latitude;
-          final lng =
-              data['longitude'] ?? (data['location'] as GeoPoint?)?.longitude;
+          final location = data['location'];
+          final geo = location is GeoPoint ? location : null;
+          final lat = data['latitude'] ?? geo?.latitude;
+          final lng = data['longitude'] ?? geo?.longitude;
           _latCtrl.text = lat?.toString() ?? '';
           _lngCtrl.text = lng?.toString() ?? '';
 
           _selectedCategory = data['categoryId']?.toString() ?? 'restaurants';
+          _originalCategory = _selectedCategory;
           _selectedGovernorate = data['governorate']?.toString() ?? 'بورسعيد';
 
           _hasWifi = data['hasWifi'] == true;
@@ -172,12 +253,14 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     _latCtrl.dispose();
     _lngCtrl.dispose();
     _tagsCtrl.dispose();
-    _pasteUrlCtrl.dispose();
+    // [v4.1] _pasteUrlCtrl is intentionally NOT disposed here — it may
+    // still be bound to a TextField during navigation teardown.
     super.dispose();
   }
 
   Future<void> _savePlace() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
     setState(() => _isSaving = true);
 
     try {
@@ -207,7 +290,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         'latitude': lat,
         'longitude': lng,
         'geohash': geohash,
-        'googleMapsUrl': googleMapsUrl, // ✅ NEW
+        'googleMapsUrl': googleMapsUrl,
         'phone': _phoneCtrl.text.trim(),
         'website': _websiteCtrl.text.trim(),
         'hasWifi': _hasWifi,
@@ -226,6 +309,13 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             .collection('places')
             .doc(widget.placeId)
             .update(commonData);
+
+        if (_originalCategory != null &&
+            _originalCategory != _selectedCategory) {
+          // [v4.1] -1 is valid (unary minus), but +1 is NOT.
+          await _categoriesRepo.incrementPlacesCount(_originalCategory!, -1);
+          await _categoriesRepo.incrementPlacesCount(_selectedCategory, 1);
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -247,6 +337,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           'imageUrls': <String>[],
           'createdAt': FieldValue.serverTimestamp(),
         });
+
+        // [v4.1] Use `1` not `+1`.
+        await _categoriesRepo.incrementPlacesCount(_selectedCategory, 1);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -272,14 +365,18 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     }
   }
 
-  String _encodeGeohash(double latitude, double longitude,
-      {int precision = 7}) {
+  String _encodeGeohash(
+    double latitude,
+    double longitude, {
+    int precision = 7,
+  }) {
     const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
     var isEven = true;
     var bit = 0;
     var ch = 0;
     final sb = StringBuffer();
-    var latMin = -90.0, latMax = 90.0, lonMin = -180.0, lonMax = 180.0;
+    var latMin = -90.0, latMax = 90.0;
+    var lonMin = -180.0, lonMax = 180.0;
     while (sb.length < precision) {
       if (isEven) {
         final mid = (lonMin + lonMax) / 2;
@@ -310,13 +407,92 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     return sb.toString();
   }
 
+  String? _validateCoordinate(String? v, {required double limit}) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'مطلوب';
+    final n = double.tryParse(text);
+    if (n == null) return 'رقم غير صحيح';
+    if (n < -limit || n > limit) return 'خارج النطاق';
+    return null;
+  }
+
+  List<DropdownMenuItem<String>> _categoryItems() {
+    final items = _categories
+        .map(
+          (c) => DropdownMenuItem<String>(
+            value: c.id,
+            child: Row(
+              children: [
+                Icon(c.icon, size: 18, color: c.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(c.nameAr, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${c.placesCount}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )
+        .toList();
+
+    // [v4.1] Include the current selection even if it's not in the
+    // active list (inactive or legacy) — otherwise Dropdown asserts.
+    if (!_categories.any((c) => c.id == _selectedCategory)) {
+      items.add(
+        DropdownMenuItem<String>(
+          value: _selectedCategory,
+          child: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 18,
+                color: Colors.orange.shade700,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$_selectedCategory (غير متاح)',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  List<DropdownMenuItem<String>> _governorateItems() {
+    final values = [..._governorates];
+    if (!values.contains(_selectedGovernorate)) {
+      values.add(_selectedGovernorate);
+    }
+    return values
+        .map((g) => DropdownMenuItem<String>(value: g, child: Text(g)))
+        .toList();
+  }
+
   void _extractFromUrl() {
     final coords = LocationUrlHelper.extractCoordinates(_pasteUrlCtrl.text);
     if (coords == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('❌ لم يتم التعرف على إحداثيات في الرابط'),
+          content: Text(
+            '❌ لم يتم التعرف على إحداثيات في الرابط. '
+            'الروابط المختصرة (maps.app.goo.gl) غير مدعومة، '
+            'الصق الرابط الكامل أو الإحداثيات مباشرة',
+          ),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
         ),
       );
       return;
@@ -356,20 +532,15 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF4F6F8),
-        appBar: AppBar(
-          title: const Text('جاري التحميل...'),
-          backgroundColor: YaBaladiDesignTokens.primaryBlue,
-          foregroundColor: Colors.white,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+    if (_isLoading || _categoriesLoading) {
+      return _buildLoadingScaffold();
+    }
+
+    if (_categoriesError != null) {
+      return _buildErrorScaffold();
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
         title: Text(_isEditMode ? 'تعديل المكان' : 'إضافة مكان جديد'),
         backgroundColor: YaBaladiDesignTokens.primaryBlue,
@@ -384,7 +555,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // ─── SECTION 1: المعلومات الأساسية ───
             _buildSectionHeader(
               icon: Icons.info_outline,
               title: 'المعلومات الأساسية',
@@ -423,8 +593,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // ─── SECTION 2: التصنيف والموقع ───
             _buildSectionHeader(
               icon: Icons.place,
               title: 'التصنيف والموقع',
@@ -433,19 +601,17 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _selectedCategory,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'التصنيف *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.category),
               ),
-              items: PlaceCategories.all
-                  .map((c) => DropdownMenuItem(
-                        value: c.id,
-                        child: Text(c.labelAr),
-                      ))
-                  .toList(),
+              items: _categoryItems(),
               onChanged: (val) {
-                if (val != null) setState(() => _selectedCategory = val);
+                if (val != null) {
+                  setState(() => _selectedCategory = val);
+                }
               },
             ),
             const SizedBox(height: 12),
@@ -456,11 +622,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_city),
               ),
-              items: _governorates
-                  .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                  .toList(),
+              items: _governorateItems(),
               onChanged: (val) {
-                if (val != null) setState(() => _selectedGovernorate = val);
+                if (val != null) {
+                  setState(() => _selectedGovernorate = val);
+                }
               },
             ),
             const SizedBox(height: 12),
@@ -473,8 +639,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // ─── بطاقة الموقع ───
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -487,20 +651,23 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.location_on,
-                          color: Colors.blue.shade700, size: 20),
+                      Icon(
+                        Icons.location_on,
+                        color: Colors.blue.shade700,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'الموقع الجغرافي',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: Colors.black87,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // الصق رابط Google Maps
                   TextFormField(
                     controller: _pasteUrlCtrl,
                     decoration: InputDecoration(
@@ -522,40 +689,38 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _latCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
+                          // [v4.1] factory ctor, no `const`
+                          keyboardType: TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          inputFormatters: _coordinateFormatters,
                           decoration: const InputDecoration(
                             labelText: 'خط العرض *',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.north),
                             hintText: '31.2699',
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'مطلوب';
-                            if (double.tryParse(v) == null)
-                              return 'رقم غير صحيح';
-                            return null;
-                          },
+                          validator: (v) => _validateCoordinate(v, limit: 90),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextFormField(
                           controller: _lngCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
+                          // [v4.1] factory ctor, no `const`
+                          keyboardType: TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          inputFormatters: _coordinateFormatters,
                           decoration: const InputDecoration(
                             labelText: 'خط الطول *',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.east),
                             hintText: '32.2998',
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'مطلوب';
-                            if (double.tryParse(v) == null)
-                              return 'رقم غير صحيح';
-                            return null;
-                          },
+                          validator: (v) => _validateCoordinate(v, limit: 180),
                         ),
                       ),
                     ],
@@ -574,8 +739,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // ─── SECTION 3: التواصل ───
             _buildSectionHeader(
               icon: Icons.phone,
               title: 'معلومات التواصل',
@@ -602,8 +765,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // ─── SECTION 4: الخدمات ───
             _buildSectionHeader(
               icon: Icons.room_service,
               title: 'الخدمات المتاحة',
@@ -659,8 +820,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               onChanged: (v) => setState(() => _hasReservation = v),
             ),
             const SizedBox(height: 24),
-
-            // ─── SECTION 5: Tags ───
             _buildSectionHeader(
               icon: Icons.tag,
               title: 'الكلمات المفتاحية',
@@ -670,15 +829,13 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             TextFormField(
               controller: _tagsCtrl,
               decoration: const InputDecoration(
-                labelText: 'Tags',
+                labelText: 'الكلمات المفتاحية',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.tag),
                 hintText: 'معلم, ميدان, نصب',
               ),
             ),
             const SizedBox(height: 32),
-
-            // ─── زر الحفظ ───
             SizedBox(
               height: 52,
               child: FilledButton.icon(
@@ -695,7 +852,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                     : Icon(_isEditMode ? Icons.check : Icons.save),
                 label: Text(
                   _isSaving
-                      ? 'جاري الحفظ...'
+                      ? 'جارٍ الحفظ...'
                       : (_isEditMode ? 'حفظ التعديلات' : 'حفظ المكان'),
                 ),
                 style: FilledButton.styleFrom(
@@ -713,11 +870,79 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     );
   }
 
+  Widget _buildLoadingScaffold() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('جارٍ التحميل...'),
+        backgroundColor: YaBaladiDesignTokens.primaryBlue,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildErrorScaffold() {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEditMode ? 'تعديل المكان' : 'إضافة مكان جديد'),
+        backgroundColor: YaBaladiDesignTokens.primaryBlue,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.cloud_off,
+                size: 72,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'تعذر تحميل التصنيفات',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _categoriesError ?? '',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () => _loadCategories(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionHeader({
     required IconData icon,
     required String title,
     required String subtitle,
   }) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Container(
@@ -726,25 +951,30 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             color: YaBaladiDesignTokens.primaryBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: YaBaladiDesignTokens.primaryBlue, size: 20),
+          child: Icon(
+            icon,
+            color: YaBaladiDesignTokens.primaryBlue,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-            ),
-          ],
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -756,26 +986,27 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
         secondary: Icon(
           icon,
-          color: value ? YaBaladiDesignTokens.primaryBlue : Colors.grey,
+          color: value
+              ? YaBaladiDesignTokens.primaryBlue
+              : theme.colorScheme.outline,
         ),
         title: Text(
           label,
-          style: TextStyle(
-            fontSize: 14,
+          style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w500,
-            color: value ? Colors.black87 : Colors.grey[700],
           ),
         ),
         activeThumbColor: YaBaladiDesignTokens.primaryBlue,

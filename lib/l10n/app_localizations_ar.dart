@@ -483,4 +483,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get googleSignInFailed => 'فشل تسجيل الدخول بـ Google';
+
+  @override
+  String get tripsTitle => 'رحلتي';
 }

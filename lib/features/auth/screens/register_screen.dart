@@ -1,3 +1,4 @@
+// lib/features/auth/screens/register_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -39,17 +40,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final auth = context.read<AuthController>();
-    final result = await auth.signUp(
-      email: _emailCtrl.text,
+    final result = await auth.signUpWithEmail(
+      email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
-      displayName: _nameCtrl.text,
+      displayName: _nameCtrl.text.trim(),
     );
 
     if (!mounted) return;
 
-    if (!result.isSuccess) {
+    if (result.isSuccess) {
+      context.go(RoutePaths.home);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'خطأ')),
+        SnackBar(
+          content: Text(result.error ?? 'تعذر إنشاء الحساب'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -58,6 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthController>();
+    final isLoading = auth.isLoading;
 
     return AuthScaffold(
       title: l10n.registerTitle,
@@ -67,6 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ─── الاسم ───
             AuthTextField(
               controller: _nameCtrl,
               label: l10n.displayName,
@@ -80,6 +88,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+
+            // ─── البريد ───
             AuthTextField(
               controller: _emailCtrl,
               label: l10n.email,
@@ -94,6 +105,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+
+            // ─── كلمة المرور ───
             AuthTextField(
               controller: _passwordCtrl,
               label: l10n.password,
@@ -117,6 +131,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+
+            // ─── تأكيد كلمة المرور ───
             AuthTextField(
               controller: _confirmCtrl,
               label: l10n.confirmPassword,
@@ -144,21 +161,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
 
-            const SizedBox(height: YaBaladiDesignTokens.space2),
+            const SizedBox(height: YaBaladiDesignTokens.space3),
 
+            // ─── زر التسجيل ───
             AuthPrimaryButton(
               label: l10n.register,
-              isLoading: auth.isLoading,
+              isLoading: isLoading,
               onPressed: _submit,
             ),
             const SizedBox(height: YaBaladiDesignTokens.space4),
 
+            // ─── رابط العودة للدخول ───
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(l10n.haveAccountAlready),
                 TextButton(
-                  onPressed: () => context.go(RoutePaths.login),
+                  onPressed:
+                      isLoading ? null : () => context.go(RoutePaths.login),
                   child: Text(l10n.login),
                 ),
               ],

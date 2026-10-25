@@ -1,16 +1,16 @@
 // lib/features/places/screens/place_details_screen.dart
 //
-// [v2.4 — 2026-10-20] — Zero Internal Maps + Real External Actions
-//   - FIX: Removed placeMapPath (fixed 404 error).
-//   - FIX: Removed duplicate Directions button.
-//   - NEW: Integrated LocationActions widget for the map.
-//   - NEW: Enabled Phone & WhatsApp using url_launcher.
+// [v2.8 — 2026-10-22] — Final zero-warning version
+//   - FIX: isLoggedIn بدلاً من uid.isEmpty (uid='guest' للزوار!)
+//   - FIX: auth.user?.displayName.trim() (إزالة ?. الزائدة)
+//   - FIX: حُذف TODO الخاص بـ place.location (تم تأكيد أنه GeoPoint?)
+//   - KEEP: توحيد url_launcher عبر LocationUrlHelper
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/helpers/location_url_helper.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../features/favorites/controllers/favorites_controller.dart';
@@ -21,7 +21,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../models/place.dart';
 import '../../../repositories/places_repository.dart';
 import '../../../theme/design_tokens.dart';
-import '../../../widgets/location_actions.dart'; // ✅ استدعاء الزر الأنيق
+import '../../../widgets/location_actions.dart';
 import '../../../widgets/login_required_dialog.dart';
 
 class PlaceDetailsScreen extends StatefulWidget {
@@ -45,9 +45,10 @@ class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final uid = context.read<AuthController>().uid;
-      if (uid != null) {
-        context.read<FavoritesController>().load(uid, widget.placeId);
+      final auth = context.read<AuthController>();
+      // ✅ isLoggedIn — الزائر uid='guest' لذا لا يصح فحص uid
+      if (auth.isLoggedIn) {
+        context.read<FavoritesController>().load(auth.uid, widget.placeId);
       }
       _reviewsCtrl.load(widget.placeId);
     });
@@ -118,8 +119,6 @@ class _PlaceBody extends StatelessWidget {
       children: [
         _HeaderImage(imageUrls: place.imageUrls),
         const SizedBox(height: YaBaladiDesignTokens.space4),
-
-        // ─── Name + Favorite ───
         Row(
           children: [
             Expanded(
@@ -134,16 +133,12 @@ class _PlaceBody extends StatelessWidget {
             _FavoriteButton(placeId: place.id),
           ],
         ),
-
         const SizedBox(height: 8),
         _RatingRow(
           rating: place.averageRating,
           count: place.reviewCount,
         ),
-
         const SizedBox(height: YaBaladiDesignTokens.space4),
-
-        // ─── Description ───
         if (place.description.isNotEmpty) ...[
           Text(
             place.description,
@@ -151,8 +146,6 @@ class _PlaceBody extends StatelessWidget {
           ),
           const SizedBox(height: YaBaladiDesignTokens.space4),
         ],
-
-        // ─── Address ───
         if (place.address.isNotEmpty || place.city.isNotEmpty)
           _InfoTile(
             icon: Icons.location_on_outlined,
@@ -163,27 +156,18 @@ class _PlaceBody extends StatelessWidget {
               place.governorate,
             ].where((s) => s.isNotEmpty).join(', '),
           ),
-
-        // ─── Contact ───
         if (place.phone.isNotEmpty)
           _InfoTile(
             icon: Icons.phone_outlined,
             title: 'الهاتف',
             value: place.phone,
           ),
-
         const SizedBox(height: YaBaladiDesignTokens.space4),
-
-        // ─── Action Buttons ───
         _ActionButtons(place: place),
-
         const SizedBox(height: YaBaladiDesignTokens.space4),
-
-        // ─── Reviews ───
         const Divider(),
         const SizedBox(height: YaBaladiDesignTokens.space3),
         _ReviewsBlock(place: place),
-
         const SizedBox(height: YaBaladiDesignTokens.space6),
       ],
     );
@@ -208,14 +192,16 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
     final ctrl = context.read<ReviewsController>();
     final messenger = ScaffoldMessenger.of(context);
 
-    if (auth.uid == null) {
+    if (!auth.isLoggedIn) {
       await showLoginRequiredDialog(context, featureName: 'المراجعات');
       return;
     }
 
-    if (!mounted) return;
+    // ✅ auth.user?.displayName.trim() — إزالة ?. الزائدة
+    final rawName = auth.user?.displayName.trim() ?? '';
+    final userName = rawName.isEmpty ? 'مستخدم' : rawName;
 
-    if (ctrl.hasReviewed(auth.uid!)) {
+    if (ctrl.hasReviewed(auth.uid)) {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -231,9 +217,9 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
       context,
       controller: ctrl,
       placeId: widget.place.id,
-      userId: auth.uid!,
-      userName: auth.displayName ?? 'مستخدم',
-      userPhotoUrl: auth.photoUrl ?? '',
+      userId: auth.uid,
+      userName: userName,
+      userPhotoUrl: auth.photoUrl,
     );
 
     if (!mounted) return;
@@ -255,7 +241,7 @@ class _ReviewsBlockState extends State<_ReviewsBlock> {
     final auth = context.watch<AuthController>();
 
     return ReviewsSection(
-      currentUserId: auth.uid,
+      currentUserId: auth.isLoggedIn ? auth.uid : null,
       onAddReview: _handleAddReview,
     );
   }
@@ -428,17 +414,16 @@ class _FavoriteButton extends StatelessWidget {
 
   Future<void> _toggle(BuildContext context) async {
     final auth = context.read<AuthController>();
-    final uid = auth.uid;
     final messenger = ScaffoldMessenger.of(context);
     final fav = context.read<FavoritesController>();
 
-    if (uid == null) {
+    if (!auth.isLoggedIn) {
       await showLoginRequiredDialog(context, featureName: 'المفضلة');
       return;
     }
 
     try {
-      final newState = await fav.toggle(uid, placeId);
+      final newState = await fav.toggle(auth.uid, placeId);
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -463,7 +448,7 @@ class _FavoriteButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ACTION BUTTONS (Clean & Functional)
+// ACTION BUTTONS
 // ═══════════════════════════════════════════════════════════════
 
 class _ActionButtons extends StatelessWidget {
@@ -491,7 +476,6 @@ class _ActionButtons extends StatelessWidget {
               backgroundColor: Colors.green.shade600,
             ),
           ),
-        // ✅ زر الخريطة الأنيق (الوحيد)
         if (place.location != null)
           LocationActions(
             lat: place.location!.latitude,
@@ -503,24 +487,23 @@ class _ActionButtons extends StatelessWidget {
   }
 
   Future<void> _launchCall(BuildContext context, String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (!await launchUrl(uri)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح تطبيق الهاتف')),
-        );
-      }
+    final ok = await LocationUrlHelper.call(phone);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح تطبيق الهاتف')),
+      );
     }
   }
 
   Future<void> _launchWhatsApp(BuildContext context, String phone) async {
-    final uri = Uri.parse('https://wa.me/$phone');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح واتساب')),
-        );
-      }
+    final ok = await LocationUrlHelper.openWhatsApp(
+      phone,
+      defaultCountryCode: '20',
+    );
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح واتساب')),
+      );
     }
   }
 }

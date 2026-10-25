@@ -1,5 +1,11 @@
 // lib/features/trip/screens/trip_details_screen.dart
 //
+// [v1.2 — 2026-10-22] — Lint fix + real directions
+//   - FIX: AuthController.uid is non-nullable per the analyzer, so
+//          `if (uid != null)` (58:15) was dead code. Now uses `auth.isLoggedIn`.
+//   - CHANGE: _openDirections now opens Google Maps via LocationUrlHelper
+//             (url_launcher is back), replacing the temporary SnackBar.
+//
 // [v1.1 — 2026-10-15] — إصلاح "الرحلة غير موجودة"
 //   - FIX: _loadPlan أصبح async ويستدعي ctrl.load(uid) إذا لم يجد الخطة
 //   - FIX: _markAsCompleted يُحدّث _plan المحلية بعد النجاح
@@ -15,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/helpers/location_url_helper.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../models/trip_plan.dart';
@@ -53,17 +60,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     var plan = ctrl.plans.where((p) => p.id == widget.tripId).firstOrNull;
 
     // ─── 2. إن لم نجد → حمّل من Firestore ───
-    if (plan == null) {
-      final uid = auth.uid;
-      if (uid != null) {
-        try {
-          await ctrl.load(uid, force: true);
-        } catch (_) {
-          // تجاهل — ستُعرض "غير موجودة" إذا لم تُوجد لاحقاً
-        }
-        if (!mounted) return;
-        plan = ctrl.plans.where((p) => p.id == widget.tripId).firstOrNull;
+    if (plan == null && auth.isLoggedIn) {
+      try {
+        await ctrl.load(auth.uid, force: true);
+      } catch (_) {
+        // تجاهل — ستُعرض "غير موجودة" إذا لم تُوجد لاحقاً
       }
+      if (!mounted) return;
+      plan = ctrl.plans.where((p) => p.id == widget.tripId).firstOrNull;
     }
 
     if (!mounted) return;
@@ -77,18 +81,20 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   // ACTIONS
   // ═══════════════════════════════════════════════════════════════
 
-  /// [v1.0.1] مؤقتاً — SnackBar بدل فتح الخرائط.
-  /// يستخدم `url_launcher` عند إعادة الحزمة.
+  /// [v1.2] يفتح اتجاهات Google Maps إلى المحطة.
   Future<void> _openDirections(TripStop stop) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('الاتجاهات إلى ${stop.placeNameAr} — قريباً'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    final url = LocationUrlHelper.directionsUrl(lat: stop.lat, lng: stop.lng);
+    final opened = await LocationUrlHelper.open(url);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('تعذّر فتح الاتجاهات إلى ${stop.placeNameAr}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+    }
   }
 
   void _openPlace(TripStop stop) {

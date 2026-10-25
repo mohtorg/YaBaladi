@@ -1,11 +1,12 @@
 // test/location_service_test.dart
 //
-// اختبارات Wave 1a: DUPLICATE-1 fix
-//   - LocationService يستخدم egypt_governorates كمصدر وحيد
-// [v1.1 — 2026-10-19] — Wave 5.5c: getBySource test
-//   - FIX: import location_source.dart
-//   - FIX: toJson keys → governorateAr / governorateEn
-//   - FIX: fromJson test → defensive (null بدل TypeError)
+// اختبارات LocationData و LocationService
+// [v1.2 — 2026-10-22] — توافق مع LocationData v5.1
+//   - FIX: استخدام nameAr بدلاً من governorateAr
+//   - FIX: استخدام accuracyMeters بدلاً من governorateEn
+//   - FIX: اختبار toJson يتوقع المفاتيح الفعلية lat/lng/nameAr/accuracy
+//   - ADD: اختبار تجاهل الحقول null في toJson
+//   - KEPT: اختبارات fromJson الدفاعية و getBySource و egypt_governorates
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yabaladi_rebuild/core/location/egypt_governorates.dart';
@@ -14,33 +15,43 @@ import 'package:yabaladi_rebuild/services/location_service.dart';
 
 void main() {
   group('LocationData — model', () {
-    test('toJson يحتوي كل الحقول', () {
+    test('toJson يحتوي الحقول غير الفارغة', () {
       const data = LocationData(
         latitude: 30.04,
         longitude: 31.23,
-        governorateAr: 'القاهرة',
-        governorateEn: 'Cairo',
+        nameAr: 'القاهرة',
+        accuracyMeters: 10.5,
       );
       final json = data.toJson();
       expect(json['lat'], 30.04);
       expect(json['lng'], 31.23);
-      // ✅ المفاتيح الفعلية في v5.0
-      expect(json['governorateAr'], 'القاهرة');
-      expect(json['governorateEn'], 'Cairo');
+      expect(json['nameAr'], 'القاهرة');
+      expect(json['accuracy'], 10.5);
+    });
+
+    test('toJson يتجاهل الحقول null', () {
+      const data = LocationData(
+        latitude: 30.04,
+        longitude: 31.23,
+      );
+      final json = data.toJson();
+      expect(json.containsKey('nameAr'), isFalse);
+      expect(json.containsKey('accuracy'), isFalse);
     });
 
     test('round-trip يحفظ البيانات', () {
       const data = LocationData(
         latitude: 31.26,
         longitude: 32.30,
-        governorateAr: 'بورسعيد',
-        governorateEn: 'Port Said',
+        nameAr: 'بورسعيد',
+        accuracyMeters: 12.0,
       );
       final restored = LocationData.fromJson(data.toJson());
       expect(restored, isNotNull);
       expect(restored!.latitude, 31.26);
       expect(restored.longitude, 32.30);
-      expect(restored.governorateAr, 'بورسعيد');
+      expect(restored.nameAr, 'بورسعيد');
+      expect(restored.accuracyMeters, 12.0);
     });
 
     test('fromJson بـ بيانات ناقصة → null (defensive)', () {
@@ -58,10 +69,12 @@ void main() {
       expect(restored, isNotNull);
       expect(restored!.latitude, 30.5);
       expect(restored.longitude, 31.2);
+      expect(restored.nameAr, isNull);
+      expect(restored.accuracyMeters, isNull);
     });
   });
 
-  group('egypt_governorates — المصدر الوحيد', () {
+  group('egypt_governorates — بيانات المحافظات', () {
     test('nearestGovernorate(القاهرة) → القاهرة', () {
       final gov = nearestGovernorate(30.0444, 31.2357);
       expect(gov.nameAr, 'القاهرة');

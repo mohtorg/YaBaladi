@@ -2,6 +2,29 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
+// [v3.7 — 2026-10-24] — Wave 10: Categories v2.0 strict rules
+//
+// NEW in v3.7:
+//   - STRICT create/update validation for `categories` (v2.0 schema):
+//       * nameAr / nameEn: strings, 1–100 chars
+//       * iconName: slug (lowercase + digits + underscore), 2–50
+//       * colorHex: #RRGGBB (7 chars, hex only)
+//       * order: int, 1–9999
+//       * isActive / isFeatured: booleans
+//       * parentId: null or string 1–50
+//       * aliases / searchKeywords: lists (≤ 50 items each)
+//       * placesCount: int ≥ 0
+//       * createdAt / updatedAt: timestamps
+//   - PROTECT: createdAt is immutable on update
+//   - PROTECT: delete blocked when placesCount > 0
+//   - SPLIT: `write` → create/update/delete (auditable per operation)
+//   - FIX: places `list` limit raised 50 → 100. The admin chart
+//     `_CategoryDistributionChart` uses .limit(100); with the old
+//     `<=50` rule the chart was silently denied.
+//   - KEPT: all prior rules intact
+//     (users, favorites, places, reviews, merchants,
+//      visit_requests, trip_plans, DEFAULT DENY).
+//
 // [v3.6 — 2026-10-20] — FIX: Relaxed list limit for reviews
 // ═══════════════════════════════════════════════════════════════
 
@@ -11,9 +34,13 @@ service cloud.firestore {
     // ─── HELPERS ───
     function isSignedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
-    function userExists() { return exists(/databases/$(database)/documents/users/$(uid())); }
-    function userData() { return get(/databases/$(database)/documents/users/$(uid())).data; }
-    
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(uid()));
+    }
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
     function isAdmin() {
       return isSignedIn() && userExists() && userData().role == 'admin';
     }
@@ -21,18 +48,26 @@ service cloud.firestore {
       return isSignedIn() && userExists() && userData().role == 'merchant';
     }
     function isSelf(userId) { return isSignedIn() && uid() == userId; }
-    
+
     function isString(field, minLen, maxLen) {
-      return field is string && field.size() >= minLen && field.size() <= maxLen;
+      return field is string
+          && field.size() >= minLen
+          && field.size() <= maxLen;
     }
     function isValidRating(rating) {
       return rating is number && rating >= 1 && rating <= 5;
     }
     function authEmail() { return request.auth.token.email; }
 
-    function isValidTripStatus(s) { return s in ['draft', 'active', 'completed', 'cancelled']; }
-    function isValidTransportMode(m) { return m in ['walking', 'driving', 'transit']; }
-    function isValidDurationType(d) { return d in ['half_day', 'full_day', 'weekend']; }
+    function isValidTripStatus(s) {
+      return s in ['draft', 'active', 'completed', 'cancelled'];
+    }
+    function isValidTransportMode(m) {
+      return m in ['walking', 'driving', 'transit'];
+    }
+    function isValidDurationType(d) {
+      return d in ['half_day', 'full_day', 'weekend'];
+    }
     function isValidStatusTransition(from, to) {
       return (from == 'draft' && to in ['active', 'cancelled'])
           || (from == 'active' && to in ['completed', 'cancelled'])
@@ -40,24 +75,44 @@ service cloud.firestore {
     }
     function isValidStopsCount(n) { return n is int && n >= 0 && n <= 50; }
 
+    // ─── [v3.7] Categories helpers ───
+    // RE2 slug: lowercase a-z, digits, underscores, 2–50 chars.
+    function isValidSlug(s) {
+      return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$');
+    }
+
+    // Hex color: #RRGGBB (size == 7, starts with '#', all hex chars).
+    function isValidHexColor(c) {
+      return c is string
+          && c.size() == 7
+          && c.matches('^#[0-9A-Fa-f]+$');
+    }
+
     // ─── USERS (Strict) ───
     match /users/{userId} {
       allow read: if isSelf(userId) || isAdmin();
       allow create: if isSelf(userId)
                     && request.resource.data.role == 'user'
                     && request.resource.data.uid == userId
-                    && (!('status' in request.resource.data) || request.resource.data.status == 'active');
+                    && (!('status' in request.resource.data)
+                        || request.resource.data.status == 'active');
       allow update: if isSelf(userId)
                     && request.resource.data.role == resource.data.role
                     && request.resource.data.uid == resource.data.uid
-                    && (!('email' in request.resource.data) || request.resource.data.email == authEmail())
-                    && (!('status' in request.resource.data) || !('status' in resource.data) || request.resource.data.status == resource.data.status)
-                    && (!('name' in request.resource.data) || isString(request.resource.data.name, 2, 50));
+                    && (!('email' in request.resource.data)
+                        || request.resource.data.email == authEmail())
+                    && (!('status' in request.resource.data)
+                        || !('status' in resource.data)
+                        || request.resource.data.status
+                           == resource.data.status)
+                    && (!('name' in request.resource.data)
+                        || isString(request.resource.data.name, 2, 50));
       allow delete: if isSelf(userId) || isAdmin();
 
       match /favorites/{placeId} {
         allow read: if isSelf(userId);
-        allow create: if isSelf(userId) && request.resource.data.placeId == placeId;
+        allow create: if isSelf(userId)
+                      && request.resource.data.placeId == placeId;
         allow delete: if isSelf(userId);
         allow update: if false;
       }
@@ -65,23 +120,28 @@ service cloud.firestore {
 
     // ─── FAVORITES (Strict) ───
     match /favorites/{favoriteId} {
-      allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == uid();
-      allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow read: if isSignedIn()
+                  && (resource.data.userId == uid() || isAdmin());
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid();
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == uid() || isAdmin());
       allow update: if false;
     }
 
     // ═══════════════════════════════════════════════════════════
-    // PLACES — READ ONLY
+    // PLACES
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
       allow get: if true;
-      allow list: if request.query.limit <= 50; // حماية أساسية
+      // [v3.7] 50 → 100 (chart uses .limit(100)). Still forces an
+      // explicit limit (null <= 100 is false in Firestore rules).
+      allow list: if request.query.limit <= 100;
       allow write: if isAdmin();
 
       match /reviews/{reviewId} {
         allow get: if true;
-        allow list: if true; // ✅ تم إزالة شرط الـ limit هنا
+        allow list: if true;
         allow create: if isSignedIn()
                       && request.resource.data.userId == uid()
                       && isValidRating(request.resource.data.rating)
@@ -95,18 +155,91 @@ service cloud.firestore {
       }
     }
 
-    // ─── CATEGORIES ───
+    // ═══════════════════════════════════════════════════════════
+    // CATEGORIES (v2.0 — Wave 10)
+    // ═══════════════════════════════════════════════════════════
     match /categories/{categoryId} {
+      // Public read — categories shown on every screen.
       allow read: if true;
-      allow write: if isAdmin();
+
+      // ── CREATE ── Admin-only, strict v2.0 schema.
+      allow create: if isAdmin()
+                    && isValidSlug(categoryId)
+                    && request.resource.data.keys().hasAll([
+                         'nameAr', 'nameEn', 'iconName', 'colorHex',
+                         'order', 'isActive', 'isFeatured',
+                         'aliases', 'searchKeywords', 'placesCount',
+                         'createdAt', 'updatedAt'
+                       ])
+                    && isString(request.resource.data.nameAr, 1, 100)
+                    && isString(request.resource.data.nameEn, 1, 100)
+                    && isValidSlug(request.resource.data.iconName)
+                    && isValidHexColor(request.resource.data.colorHex)
+                    && request.resource.data.order is int
+                    && request.resource.data.order >= 1
+                    && request.resource.data.order <= 9999
+                    && request.resource.data.isActive is bool
+                    && request.resource.data.isFeatured is bool
+                    && request.resource.data.aliases is list
+                    && request.resource.data.aliases.size() <= 50
+                    && request.resource.data.searchKeywords is list
+                    && request.resource.data.searchKeywords.size() <= 50
+                    && request.resource.data.placesCount is int
+                    && request.resource.data.placesCount >= 0
+                    && request.resource.data.createdAt is timestamp
+                    && request.resource.data.updatedAt is timestamp
+                    && (
+                         !('parentId' in request.resource.data)
+                         || request.resource.data.parentId == null
+                         || isString(request.resource.data.parentId, 1, 50)
+                       );
+
+      // ── UPDATE ── Admin-only, same validation + immutability.
+      // Note: `FieldValue.increment()` for placesCount is valid:
+      // request.resource.data contains the merged result, which still
+      // passes all checks (nameAr/etc unchanged, createdAt unchanged).
+      allow update: if isAdmin()
+                    && isString(request.resource.data.nameAr, 1, 100)
+                    && isString(request.resource.data.nameEn, 1, 100)
+                    && isValidSlug(request.resource.data.iconName)
+                    && isValidHexColor(request.resource.data.colorHex)
+                    && request.resource.data.order is int
+                    && request.resource.data.order >= 1
+                    && request.resource.data.order <= 9999
+                    && request.resource.data.isActive is bool
+                    && request.resource.data.isFeatured is bool
+                    && request.resource.data.aliases is list
+                    && request.resource.data.aliases.size() <= 50
+                    && request.resource.data.searchKeywords is list
+                    && request.resource.data.searchKeywords.size() <= 50
+                    && request.resource.data.placesCount is int
+                    && request.resource.data.placesCount >= 0
+                    && request.resource.data.updatedAt is timestamp
+                    && request.resource.data.createdAt
+                       == resource.data.createdAt
+                    && (
+                         !('parentId' in request.resource.data)
+                         || request.resource.data.parentId == null
+                         || isString(request.resource.data.parentId, 1, 50)
+                       );
+
+      // ── DELETE ── Admin-only, blocked if a place references it.
+      // (App also checks in CategoriesRepository.delete() — defense
+      //  in depth. Note: if placesCount is stale the rule cannot
+      //  detect actual refs without extra reads.)
+      allow delete: if isAdmin()
+                    && (
+                         !('placesCount' in resource.data)
+                         || resource.data.placesCount == 0
+                       );
     }
 
     // ═══════════════════════════════════════════════════════════
-    // ✅ REVIEWS TOP LEVEL
+    // REVIEWS (top-level mirror)
     // ═══════════════════════════════════════════════════════════
     match /reviews/{reviewId} {
       allow get: if true;
-      allow list: if true; // ✅ تم إزالة شرط الـ limit هنا
+      allow list: if true;
       allow create: if isSignedIn()
                     && request.resource.data.userId == uid()
                     && isValidRating(request.resource.data.rating)
@@ -121,13 +254,15 @@ service cloud.firestore {
 
     // ─── MERCHANTS ───
     match /merchants/{merchantId} {
-      allow read: if isSignedIn() && (merchantId == uid() || isAdmin());
+      allow read: if isSignedIn()
+                  && (merchantId == uid() || isAdmin());
       allow write: if isAdmin();
     }
 
     // ─── VISIT REQUESTS ───
     match /visit_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow read: if isSignedIn()
+                  && (resource.data.userId == uid() || isAdmin());
       allow create: if isSignedIn()
                     && request.resource.data.userId == uid()
                     && request.resource.data.status == 'pending';
@@ -137,36 +272,61 @@ service cloud.firestore {
                         && resource.data.status == 'pending'
                         && request.resource.data.status == 'cancelled');
       allow delete: if isSignedIn()
-                    && ((resource.data.userId == uid() && resource.data.status == 'pending') || isAdmin());
+                    && ((resource.data.userId == uid()
+                         && resource.data.status == 'pending')
+                        || isAdmin());
     }
 
     // ─── TRIP PLANS ───
     match /trip_plans/{planId} {
-      allow read: if isSignedIn() && resource.data.userId == uid();
+      allow read: if isSignedIn()
+                  && resource.data.userId == uid();
       allow create: if isSignedIn()
                     && request.resource.data.userId == uid()
-                    && request.resource.data.keys().hasAll(['userId', 'title', 'governorateId', 'governorateNameAr', 'transportMode', 'durationType', 'status', 'stops', 'totalDistanceKm', 'totalDurationMin', 'createdAt', 'updatedAt'])
+                    && request.resource.data.keys().hasAll([
+                         'userId', 'title', 'governorateId',
+                         'governorateNameAr', 'transportMode',
+                         'durationType', 'status', 'stops',
+                         'totalDistanceKm', 'totalDurationMin',
+                         'createdAt', 'updatedAt'
+                       ])
                     && isString(request.resource.data.title, 1, 100)
-                    && isValidTransportMode(request.resource.data.transportMode)
-                    && isValidDurationType(request.resource.data.durationType)
+                    && isValidTransportMode(
+                         request.resource.data.transportMode)
+                    && isValidDurationType(
+                         request.resource.data.durationType)
                     && request.resource.data.status in ['draft', 'active']
-                    && request.resource.data.stops is list && isValidStopsCount(request.resource.data.stops.size())
-                    && request.resource.data.totalDistanceKm is number && request.resource.data.totalDistanceKm >= 0
-                    && request.resource.data.totalDurationMin is int && request.resource.data.totalDurationMin >= 0
+                    && request.resource.data.stops is list
+                    && isValidStopsCount(
+                         request.resource.data.stops.size())
+                    && request.resource.data.totalDistanceKm is number
+                    && request.resource.data.totalDistanceKm >= 0
+                    && request.resource.data.totalDurationMin is int
+                    && request.resource.data.totalDurationMin >= 0
                     && request.resource.data.createdAt is timestamp
                     && request.resource.data.updatedAt is timestamp;
       allow update: if isSignedIn()
                     && resource.data.userId == uid()
-                    && request.resource.data.userId == resource.data.userId
-                    && request.resource.data.createdAt == resource.data.createdAt
-                    && isValidTripStatus(request.resource.data.status)
-                    && isValidStatusTransition(resource.data.status, request.resource.data.status)
+                    && request.resource.data.userId
+                       == resource.data.userId
+                    && request.resource.data.createdAt
+                       == resource.data.createdAt
+                    && isValidTripStatus(
+                         request.resource.data.status)
+                    && isValidStatusTransition(
+                         resource.data.status,
+                         request.resource.data.status)
                     && isString(request.resource.data.title, 1, 100)
-                    && request.resource.data.stops is list && isValidStopsCount(request.resource.data.stops.size())
-                    && request.resource.data.totalDistanceKm is number && request.resource.data.totalDistanceKm >= 0
-                    && request.resource.data.totalDurationMin is int && request.resource.data.totalDurationMin >= 0
+                    && request.resource.data.stops is list
+                    && isValidStopsCount(
+                         request.resource.data.stops.size())
+                    && request.resource.data.totalDistanceKm is number
+                    && request.resource.data.totalDistanceKm >= 0
+                    && request.resource.data.totalDurationMin is int
+                    && request.resource.data.totalDurationMin >= 0
                     && request.resource.data.updatedAt is timestamp;
-      allow delete: if isSignedIn() && resource.data.userId == uid();
+      allow delete: if isSignedIn()
+                    && resource.data.userId == uid();
     }
 
     // ─── DEFAULT DENY ALL ───

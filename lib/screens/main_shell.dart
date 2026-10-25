@@ -8,6 +8,11 @@ import '../features/auth/controllers/auth_controller.dart';
 import '../features/favorites/controllers/favorites_controller.dart';
 import '../l10n/app_localizations.dart';
 
+/// [v1.4 — 2026-10-23] — i18n of hard-coded SnackBar texts
+///   - FIX: رسالة «سجّل دخولك…» صارت من l10n.loginRequired (AR/EN).
+///   - FIX: رسالة «اضغط مرة أخرى للخروج…» كانت عربية فقط ⇒ تتبع لغة التطبيق.
+///          TODO: نقلها لمفتاح ARB مستقل عند معالجة بند الترجمة العام.
+///
 /// [v1.3 — 2026-10-15] — G6.7: Bottom Nav (4 tabs)
 ///   - CHANGE: 5 tabs → 4 tabs: الرئيسية | رحلتي | حسابي | الإعدادات
 ///   - CHANGE: المفضلة انتقلت لـ ProfileScreen (drill-down)
@@ -52,12 +57,13 @@ class _MainShellState extends State<MainShell> {
     final auth = context.read<AuthController>();
 
     if (dest.lockForGuest && auth.isGuest) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('سجّل دخولك للوصول لهذه الميزة'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(l10n.loginRequired),
+            duration: const Duration(seconds: 2),
           ),
         );
       return;
@@ -82,12 +88,17 @@ class _MainShellState extends State<MainShell> {
         now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
 
+      final isArabic = AppLocalizations.of(context).localeName == 'ar';
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('اضغط مرة أخرى للخروج من التطبيق'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(
+              isArabic
+                  ? 'اضغط مرة أخرى للخروج من التطبيق'
+                  : 'Press back again to exit',
+            ),
+            duration: const Duration(seconds: 2),
           ),
         );
       return;

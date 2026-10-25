@@ -1,4 +1,17 @@
 // lib/core/router/app_router.dart
+//
+// [v1.1 — 2026-10-22] — Redirect fixes
+//   - FIX: «نسيت كلمة المرور» كانت تُعاد إلى شاشة الدخول للمستخدم غير المسجّل،
+//          لأن مسار forgotPassword لم يُستثنَ من التحويل.
+//   - FIX: المستخدم المسجّل لا يبقى في شاشة التسجيل (register) → يُحوَّل للرئيسية.
+//   - NEW: دعم المعامل `from`: عند محاولة فتح صفحة محمية يُحوَّل لشاشة الدخول
+//          مع `?from=...`، وبعد النجاح يُعاد إلى الصفحة المطلوبة
+//          (مسارات داخلية آمنة فقط). يعالج TODO في route_guards.dart.
+//   - FIX: مسار picker يقبل أي Map (وليس Map<String, dynamic> حصراً).
+//   - CHANGE: debugLogDiagnostics في وضع التطوير فقط.
+//   - NEW: زر «الرئيسية» في صفحة 404.
+//   - NOTE: createAppRouter يجب أن يُستدعى مرة واحدة فقط (لا داخل build).
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,38 +38,70 @@ import '../../core/auth/role.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
+/// يقبل `from` فقط إذا كان مساراً داخلياً آمناً (يمنع التحويل لمواقع خارجية
+/// أو العودة لصفحات الدخول أو لوحة الإدارة).
+String? _safeFrom(String? from) {
+  if (from == null || from.isEmpty) return null;
+  if (!from.startsWith('/') || from.startsWith('//')) return null;
+
+  final path = Uri.tryParse(from)?.path ?? '';
+  if (path.isEmpty) return null;
+  if (path == RoutePaths.login ||
+      path == RoutePaths.register ||
+      path == RoutePaths.forgotPassword ||
+      path.startsWith('/admin')) {
+    return null;
+  }
+  return from;
+}
+
 GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
     // ✅ التصحيح: البدء من شاشة الدخول لتجنب تعارض الـ Shell
     initialLocation: RoutePaths.login,
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: kDebugMode,
     refreshListenable: auth,
     redirect: (context, state) {
       final status = auth.status;
       final role = auth.role;
-      final isLoggingIn = state.matchedLocation == RoutePaths.login;
-      final isRegistering = state.matchedLocation == RoutePaths.register;
-      final isAdminRoute = state.matchedLocation.startsWith('/admin');
+      final location = state.matchedLocation;
+
+      final isLoggingIn = location == RoutePaths.login;
+      final isRegistering = location == RoutePaths.register;
+      final isForgotPassword = location == RoutePaths.forgotPassword;
+      final isAuthPage = isLoggingIn || isRegistering || isForgotPassword;
+      final isAdminRoute = location.startsWith('/admin');
+      final isStaff = role == UserRole.admin || role == UserRole.moderator;
 
       if (status == AuthStatus.loading) {
         return null;
       }
 
+      // ─── غير مسجّل (زائر أو لم يدخل بعد) ───
       if (status == AuthStatus.unauthenticated) {
         if (isAdminRoute) return RoutePaths.login;
-        if (isLoggingIn || isRegistering) return null;
+        if (isAuthPage) return null;
 
-        if (!auth.isGuest) return RoutePaths.login;
+        if (!auth.isGuest) {
+          final from = state.uri.toString();
+          if (from == RoutePaths.home) return RoutePaths.login;
+          return '${RoutePaths.login}?from=${Uri.encodeComponent(from)}';
+        }
 
         return null;
       }
 
+      // ─── مسجّل ───
       if (status == AuthStatus.authenticated) {
-        if (role == UserRole.admin || role == UserRole.moderator) {
+        if (isStaff) {
           if (!isAdminRoute) return '/admin';
-        } else {
-          if (isAdminRoute) return RoutePaths.home;
-          if (isLoggingIn) return RoutePaths.home;
+          return null;
+        }
+
+        if (isAdminRoute) return RoutePaths.home;
+        if (isLoggingIn || isRegistering) {
+          return _safeFrom(state.uri.queryParameters['from']) ??
+              RoutePaths.home;
         }
       }
 
@@ -130,14 +175,15 @@ GoRouter createAppRouter(AuthController auth) {
                         path: 'picker',
                         name: RouteNames.tripPlacePicker,
                         redirect: (context, state) {
-                          final extra = state.extra;
-                          if (extra is! Map<String, dynamic>) {
+                          // extra يُفقد عند تحديث الصفحة على الويب → ارجع للمعالج
+                          if (state.extra is! Map) {
                             return RoutePaths.tripPlanner;
                           }
                           return null;
                         },
                         builder: (context, state) {
-                          final extra = state.extra as Map<String, dynamic>;
+                          final extra =
+                              Map<String, dynamic>.from(state.extra! as Map);
                           final initialStopsRaw = extra['initialStops'];
                           final initialStops = initialStopsRaw is List
                               ? initialStopsRaw.whereType<TripStop>().toList()
@@ -230,7 +276,19 @@ GoRouter createAppRouter(AuthController auth) {
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('خطأ 404')),
-      body: Center(child: Text('الصفحة غير موجودة: ${state.uri}')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('الصفحة غير موجودة: ${state.uri}'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => context.go(RoutePaths.home),
+              child: const Text('الرئيسية'),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }

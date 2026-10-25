@@ -1,26 +1,40 @@
 // lib/features/admin/screens/admin_dashboard_screen.dart
 //
-// [v7.0 — 2026-10-21] — Refactored with pagination + stats controller
-//   - ADDED: AdminStatsController (aggregate queries)
-//   - ADDED: Pagination for places and users
-//   - ADDED: ScrollController with infinite scroll
-//   - REMOVED: All _PlaceDetailScreen logic (moved to its own file)
-//   - USES: Common widgets, FirestoreUtils
+// [v7.4.1 — 2026-10-24] — Fix: textDirection outside TextStyle.copyWith
+//   - FIX: In _CategoryRowCard, `textDirection: TextDirection.ltr`
+//     moved from inside `style.copyWith(...)` to the `Text(...)` widget.
+//     TextStyle doesn't accept textDirection (Flutter 3.27+).
+//
+// [v7.4 — 2026-10-24] — Wave 10: Categories Tab
+//   - NEW: _CategoriesTab (embedded categories manager) between places & users
+//   - NEW: _CategoryRowCard (inline card with active/featured toggles)
+//   - FIX: _pages now static const (avoids rebuilding list every frame)
+//   - FIX: bounds check on tab selection
+//   - FIX: silent failures in _PlacesTab._loadMore / _UsersTab._loadMore
+//   - LANG: "الكل" → "الرئيسية", "السجل" → "سجل التدقيق"
+//
+// [v7.3 — 2026-10-23] — Theme-aware colors & typography
+// [v7.2 — 2026-10-23] — async safety
+// [v7.1 — 2026-10-22] — Wave 2: RadioGroup migration
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../core/utils/firestore_utils.dart';
+import '../../../models/category.dart';
+import '../../../repositories/categories_repository.dart';
 import '../../../theme/design_tokens.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../controllers/admin_stats_controller.dart';
+import '../widgets/add_edit_category_dialog.dart';
 import '../widgets/common_widgets.dart';
 import 'add_place_screen.dart';
 import 'import_excel_screen.dart';
 import 'place_detail_screen.dart';
 import 'place_statistics_screen.dart';
-import 'user_statistics_screen.dart';
 import 'review_statistics_screen.dart';
+import 'user_statistics_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -32,32 +46,41 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
 
+  static const List<Widget> _pages = [
+    _OverviewTab(),
+    _PlacesTab(),
+    _CategoriesTab(),
+    _UsersTab(),
+    _AuditLogsTab(),
+  ];
+
+  void _onTabSelected(int i) {
+    if (i < 0 || i >= _pages.length) return;
+    setState(() => _selectedIndex = i);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width >= 900;
-    const pages = [
-      _OverviewTab(),
-      _PlacesTab(),
-      _UsersTab(),
-      _AuditLogsTab(),
-    ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: theme.colorScheme.surface,
         elevation: 1,
         title: Row(
           children: [
-            Icon(Icons.admin_panel_settings,
-                color: YaBaladiDesignTokens.primaryBlue),
+            Icon(
+              Icons.admin_panel_settings,
+              color: YaBaladiDesignTokens.primaryBlue,
+            ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'لوحة تحكم يا بلدي',
-              style: TextStyle(
-                color: Colors.black87,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
-                fontSize: 18,
               ),
             ),
           ],
@@ -69,14 +92,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 NavigationRail(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (i) =>
-                      setState(() => _selectedIndex = i),
+                  onDestinationSelected: _onTabSelected,
                   labelType: NavigationRailLabelType.all,
-                  backgroundColor: Colors.white,
-                  selectedIconTheme: IconThemeData(
+                  backgroundColor: theme.colorScheme.surface,
+                  selectedIconTheme: const IconThemeData(
                     color: YaBaladiDesignTokens.primaryBlue,
                   ),
-                  selectedLabelTextStyle: TextStyle(
+                  selectedLabelTextStyle: const TextStyle(
                     color: YaBaladiDesignTokens.primaryBlue,
                     fontWeight: FontWeight.bold,
                   ),
@@ -84,12 +106,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     NavigationRailDestination(
                       icon: Icon(Icons.dashboard_outlined),
                       selectedIcon: Icon(Icons.dashboard),
-                      label: Text('الكل'),
+                      label: Text('الرئيسية'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.place_outlined),
                       selectedIcon: Icon(Icons.place),
                       label: Text('الأماكن'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.category_outlined),
+                      selectedIcon: Icon(Icons.category),
+                      label: Text('التصنيفات'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.people_outline),
@@ -107,27 +134,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
-                    children: pages,
+                    children: _pages,
                   ),
                 ),
               ],
             )
-          : IndexedStack(index: _selectedIndex, children: pages),
+          : IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: !isDesktop
           ? BottomNavigationBar(
               currentIndex: _selectedIndex,
-              onTap: (i) => setState(() => _selectedIndex = i),
+              onTap: _onTabSelected,
               selectedItemColor: YaBaladiDesignTokens.primaryBlue,
+              backgroundColor: theme.colorScheme.surface,
               type: BottomNavigationBarType.fixed,
               items: const [
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.dashboard), label: 'الكل'),
+                  icon: Icon(Icons.dashboard),
+                  label: 'الرئيسية',
+                ),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.place), label: 'الأماكن'),
+                  icon: Icon(Icons.place),
+                  label: 'الأماكن',
+                ),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.people), label: 'المستخدمون'),
+                  icon: Icon(Icons.category),
+                  label: 'التصنيفات',
+                ),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.history), label: 'السجل'),
+                  icon: Icon(Icons.people),
+                  label: 'المستخدمون',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.history),
+                  label: 'السجل',
+                ),
               ],
             )
           : null,
@@ -162,6 +202,7 @@ class _OverviewTabState extends State<_OverviewTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ChangeNotifierProvider.value(
       value: _controller,
       child: Consumer<AdminStatsController>(
@@ -177,17 +218,19 @@ class _OverviewTabState extends State<_OverviewTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'نظرة عامة شاملة',
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'اضغط على أي بطاقة لعرض التفاصيل',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -254,8 +297,9 @@ class _OverviewTabState extends State<_OverviewTab> {
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text('انتقل إلى تبويب "الأماكن" لمراجعتها'),
+                                content: Text(
+                                  'انتقل إلى تبويب "الأماكن" لمراجعتها',
+                                ),
                               ),
                             );
                           },
@@ -267,11 +311,15 @@ class _OverviewTabState extends State<_OverviewTab> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color:
+                              theme.colorScheme.shadow.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -290,20 +338,29 @@ class _OverviewTabState extends State<_OverviewTab> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Category Distribution (still uses .limit(100) for demo)
+// Category Distribution Chart
 // ═══════════════════════════════════════════════════════════════
 class _CategoryDistributionChart extends StatelessWidget {
   const _CategoryDistributionChart();
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('places')
           .limit(100)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Text('خطأ في جلب البيانات');
+        if (snapshot.hasError) {
+          return Text(
+            'خطأ في جلب البيانات',
+            style: textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          );
+        }
         if (!snapshot.hasData) {
           return const Center(
             child: Padding(
@@ -313,7 +370,14 @@ class _CategoryDistributionChart extends StatelessWidget {
           );
         }
         final places = snapshot.data!.docs;
-        if (places.isEmpty) return const Text('لا توجد بيانات لعرضها.');
+        if (places.isEmpty) {
+          return Text(
+            'لا توجد بيانات لعرضها.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          );
+        }
 
         final Map<String, int> categoryCounts = {};
         for (var doc in places) {
@@ -332,9 +396,12 @@ class _CategoryDistributionChart extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'توزيع الأماكن حسب التصنيف',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 16),
             ...sortedEntries.take(5).map((entry) {
@@ -346,7 +413,9 @@ class _CategoryDistributionChart extends StatelessWidget {
                       width: 70,
                       child: Text(
                         entry.key,
-                        style: const TextStyle(fontSize: 12),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -355,7 +424,8 @@ class _CategoryDistributionChart extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: entry.value / maxCount,
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             YaBaladiDesignTokens.primaryBlue,
                           ),
@@ -366,8 +436,10 @@ class _CategoryDistributionChart extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       '${entry.value}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 12),
+                      style: textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
@@ -381,7 +453,7 @@ class _CategoryDistributionChart extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Places Tab — with Pagination
+// Places Tab
 // ═══════════════════════════════════════════════════════════════
 class _PlacesTab extends StatefulWidget {
   const _PlacesTab();
@@ -430,6 +502,7 @@ class _PlacesTabState extends State<_PlacesTab> {
           .limit(_pageSize)
           .get();
 
+      if (!mounted) return;
       setState(() {
         _places.clear();
         _places.addAll(snapshot.docs);
@@ -439,6 +512,7 @@ class _PlacesTabState extends State<_PlacesTab> {
         _error = null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _initialLoading = false;
@@ -457,6 +531,7 @@ class _PlacesTabState extends State<_PlacesTab> {
           .limit(_pageSize)
           .get();
 
+      if (!mounted) return;
       setState(() {
         _places.addAll(snapshot.docs);
         _lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : _lastDoc;
@@ -464,14 +539,21 @@ class _PlacesTabState extends State<_PlacesTab> {
         _loading = false;
       });
     } catch (e) {
-      setState(() {
-        _loading = false;
-      });
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذّر تحميل المزيد: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Column(
       children: [
         Padding(
@@ -479,8 +561,13 @@ class _PlacesTabState extends State<_PlacesTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('إدارة الأماكن',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                'إدارة الأماكن',
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 10),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -494,12 +581,14 @@ class _PlacesTabState extends State<_PlacesTab> {
                             builder: (_) => const AddPlaceScreen(),
                           ),
                         );
+                        if (!mounted) return;
                         _loadInitial();
                       },
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text('إضافة مكان'),
                       style: FilledButton.styleFrom(
                         backgroundColor: YaBaladiDesignTokens.primaryBlue,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         minimumSize: const Size(0, 40),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -513,6 +602,7 @@ class _PlacesTabState extends State<_PlacesTab> {
                             builder: (_) => const ImportExcelScreen(),
                           ),
                         );
+                        if (!mounted) return;
                         _loadInitial();
                       },
                       icon: const Icon(Icons.upload_file, size: 18),
@@ -520,7 +610,8 @@ class _PlacesTabState extends State<_PlacesTab> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: YaBaladiDesignTokens.primaryBlue,
                         side: const BorderSide(
-                            color: YaBaladiDesignTokens.primaryBlue),
+                          color: YaBaladiDesignTokens.primaryBlue,
+                        ),
                         minimumSize: const Size(0, 40),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -531,27 +622,33 @@ class _PlacesTabState extends State<_PlacesTab> {
             ],
           ),
         ),
-        Expanded(child: _buildList()),
+        Expanded(child: _buildList(theme, textTheme)),
       ],
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(ThemeData theme, TextTheme textTheme) {
     if (_initialLoading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return Center(
-        child:
-            Text('❌ خطأ: $_error', style: const TextStyle(color: Colors.red)),
+        child: Text(
+          '❌ خطأ: $_error',
+          style: textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.error,
+          ),
+        ),
       );
     }
     if (_places.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'لا توجد أماكن بعد. ابدأ بـ "إضافة مكان" أو "استيراد CSV".',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey),
+          style: textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -573,27 +670,42 @@ class _PlacesTabState extends State<_PlacesTab> {
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             elevation: 0,
+            color: theme.colorScheme.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.grey.shade200),
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               leading: CircleAvatar(
-                backgroundColor: Colors.blue.shade50,
-                child: const Icon(Icons.place, color: Colors.blue),
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Icon(
+                  Icons.place,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
               ),
               title: Text(
-                FirestoreUtils.stringOf(data, 'nameAr',
-                    FirestoreUtils.stringOf(data, 'name', 'بدون اسم')),
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                FirestoreUtils.stringOf(
+                  data,
+                  'nameAr',
+                  FirestoreUtils.stringOf(data, 'name', 'بدون اسم'),
+                ),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
               subtitle: Text(
                 '${data['categoryId'] ?? data['category'] ?? '—'} • ${data['governorate'] ?? '—'}',
-                style: const TextStyle(fontSize: 12),
+                style: textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onTap: () async {
                 await Navigator.push(
                   context,
@@ -601,6 +713,7 @@ class _PlacesTabState extends State<_PlacesTab> {
                     builder: (_) => PlaceDetailScreen(placeId: place.id),
                   ),
                 );
+                if (!mounted) return;
                 _loadInitial();
               },
             ),
@@ -612,7 +725,581 @@ class _PlacesTabState extends State<_PlacesTab> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Users Tab — with Pagination
+// Categories Tab (Wave 10 — file 9)
+// ═══════════════════════════════════════════════════════════════
+class _CategoriesTab extends StatefulWidget {
+  const _CategoriesTab();
+
+  @override
+  State<_CategoriesTab> createState() => _CategoriesTabState();
+}
+
+class _CategoriesTabState extends State<_CategoriesTab> {
+  final CategoriesRepository _repo = CategoriesRepository();
+  final TextEditingController _searchController = TextEditingController();
+
+  String _query = '';
+  List<Category> _lastSnapshot = const [];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Category> _filter(List<Category> all) {
+    final q = _query.trim().toLowerCase();
+    final result = all.where((c) {
+      if (q.isEmpty) return true;
+      return c.id.toLowerCase().contains(q) ||
+          c.nameAr.contains(q) ||
+          c.nameEn.toLowerCase().contains(q) ||
+          c.iconName.toLowerCase().contains(q);
+    }).toList();
+    result.sort((a, b) => a.order.compareTo(b.order));
+    return result;
+  }
+
+  int _nextOrder() {
+    if (_lastSnapshot.isEmpty) return 1;
+    return _lastSnapshot.map((c) => c.order).reduce((a, b) => a > b ? a : b) +
+        1;
+  }
+
+  Future<void> _openAdd() async {
+    final saved = await AddEditCategoryDialog.show(
+      context,
+      repository: _repo,
+      suggestedOrder: _nextOrder(),
+    );
+    if (saved == true && mounted) {
+      _snack('تم إنشاء التصنيف بنجاح', success: true);
+    }
+  }
+
+  Future<void> _openEdit(Category cat) async {
+    final saved = await AddEditCategoryDialog.show(
+      context,
+      category: cat,
+      repository: _repo,
+    );
+    if (saved == true && mounted) {
+      _snack('تم تحديث التصنيف', success: true);
+    }
+  }
+
+  Future<void> _toggleActive(Category cat) async {
+    try {
+      await _repo.update(cat.id, {'isActive': !cat.isActive});
+    } catch (e) {
+      if (mounted) _snack('فشل التحديث: $e');
+    }
+  }
+
+  Future<void> _toggleFeatured(Category cat) async {
+    try {
+      await _repo.update(cat.id, {'isFeatured': !cat.isFeatured});
+    } catch (e) {
+      if (mounted) _snack('فشل التحديث: $e');
+    }
+  }
+
+  Future<void> _delete(Category cat) async {
+    if (cat.placesCount > 0) {
+      _snack(
+        'لا يمكن حذف "${cat.nameAr}" — يحتوي على ${cat.placesCount} مكان. عطّله بدلاً من ذلك.',
+      );
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: Text(
+          'هل تريد حذف "${cat.nameAr}" نهائياً؟\n'
+          'لا يمكن التراجع عن هذا الإجراء.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+            ),
+            onPressed: () => Navigator.pop(c, true),
+            icon: const Icon(Icons.delete_forever, size: 18),
+            label: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      await _repo.delete(cat.id);
+      if (mounted) _snack('تم حذف التصنيف', success: true);
+    } catch (e) {
+      if (mounted) _snack('فشل الحذف: $e');
+    }
+  }
+
+  void _snack(String msg, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: success ? Colors.green.shade700 : Colors.red.shade700,
+        duration: Duration(seconds: success ? 2 : 4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'إدارة التصنيفات',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _openAdd,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('تصنيف جديد'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: YaBaladiDesignTokens.primaryBlue,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'ابحث بالاسم أو المعرف...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          tooltip: 'مسح',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<Category>>(
+            stream: _repo.watchAll(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'تعذر تحميل التصنيفات',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${snapshot.error}',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              final all = snapshot.data ?? const <Category>[];
+              _lastSnapshot = all;
+              final filtered = _filter(all);
+
+              if (all.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.category_outlined,
+                          size: 72,
+                          color: theme.colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'لا توجد تصنيفات بعد',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ابدأ بإنشاء أول تصنيف',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _openAdd,
+                          icon: const Icon(Icons.add),
+                          label: const Text('إنشاء تصنيف'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (filtered.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: theme.colorScheme.outline,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'لا نتائج لـ "$_query"',
+                          style: textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async {
+                  await Future.delayed(const Duration(milliseconds: 300));
+                },
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final cat = filtered[i];
+                    return _CategoryRowCard(
+                      category: cat,
+                      onEdit: () => _openEdit(cat),
+                      onToggleActive: () => _toggleActive(cat),
+                      onToggleFeatured: () => _toggleFeatured(cat),
+                      onDelete: () => _delete(cat),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Category Row Card
+// ═══════════════════════════════════════════════════════════════
+class _CategoryRowCard extends StatelessWidget {
+  final Category category;
+  final VoidCallback onEdit;
+  final VoidCallback onToggleActive;
+  final VoidCallback onToggleFeatured;
+  final VoidCallback onDelete;
+
+  const _CategoryRowCard({
+    required this.category,
+    required this.onEdit,
+    required this.onToggleActive,
+    required this.onToggleFeatured,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = category.color;
+    final icon = category.icon;
+    final isActive = category.isActive;
+    final isFeatured = category.isFeatured;
+    final canDelete = category.placesCount == 0;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isActive ? accent : accent.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            category.nameAr,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color:
+                                  isActive ? null : theme.colorScheme.outline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isFeatured) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.star,
+                            size: 16,
+                            color: Colors.amber.shade700,
+                          ),
+                        ],
+                      ],
+                    ),
+                    // [v7.4.1 FIX] textDirection moved out of style.copyWith
+                    Text(
+                      category.nameEn,
+                      textDirection: TextDirection.ltr,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _miniChip(
+                          theme,
+                          Icons.format_list_numbered,
+                          '#${category.order}',
+                        ),
+                        _miniChip(
+                          theme,
+                          Icons.place_outlined,
+                          '${category.placesCount} مكان',
+                          highlight: category.placesCount > 0,
+                        ),
+                        _miniChip(
+                          theme,
+                          Icons.tag,
+                          category.id,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Switch.adaptive(
+                    value: isActive,
+                    onChanged: (_) => onToggleActive(),
+                    activeTrackColor: accent.withValues(alpha: 0.5),
+                    activeThumbColor: accent,
+                  ),
+                  Text(
+                    isActive ? 'نشط' : 'معطل',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: isActive ? accent : theme.colorScheme.outline,
+                      fontWeight: isActive ? FontWeight.bold : null,
+                    ),
+                  ),
+                ],
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'خيارات',
+                onSelected: (v) {
+                  switch (v) {
+                    case 'edit':
+                      onEdit();
+                      break;
+                    case 'featured':
+                      onToggleFeatured();
+                      break;
+                    case 'delete':
+                      onDelete();
+                      break;
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('تعديل'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'featured',
+                    child: Row(
+                      children: [
+                        Icon(
+                          isFeatured ? Icons.star : Icons.star_border,
+                          size: 18,
+                          color: isFeatured ? Colors.amber : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(isFeatured ? 'إلغاء التمييز' : 'تمييز'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: canDelete,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: canDelete
+                              ? Colors.red
+                              : theme.colorScheme.outline,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          canDelete
+                              ? 'حذف'
+                              : 'لا يمكن الحذف (${category.placesCount})',
+                          style: TextStyle(
+                            color: canDelete ? Colors.red : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniChip(
+    ThemeData theme,
+    IconData icon,
+    String label, {
+    bool highlight = false,
+  }) {
+    final bg = highlight
+        ? Colors.blue.shade50
+        : theme.colorScheme.surfaceContainerHighest;
+    final fg =
+        highlight ? Colors.blue.shade900 : theme.colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: highlight ? FontWeight.bold : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Users Tab
 // ═══════════════════════════════════════════════════════════════
 class _UsersTab extends StatefulWidget {
   const _UsersTab();
@@ -658,6 +1345,7 @@ class _UsersTabState extends State<_UsersTab> {
           .collection('users')
           .limit(_pageSize)
           .get();
+      if (!mounted) return;
       setState(() {
         _users.clear();
         _users.addAll(snapshot.docs);
@@ -666,6 +1354,7 @@ class _UsersTabState extends State<_UsersTab> {
         _initialLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _initialLoading = false);
     }
   }
@@ -679,6 +1368,7 @@ class _UsersTabState extends State<_UsersTab> {
           .startAfterDocument(_lastDoc!)
           .limit(_pageSize)
           .get();
+      if (!mounted) return;
       setState(() {
         _users.addAll(snapshot.docs);
         _lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : _lastDoc;
@@ -686,7 +1376,14 @@ class _UsersTabState extends State<_UsersTab> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذّر تحميل المزيد: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -701,14 +1398,21 @@ class _UsersTabState extends State<_UsersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Align(
             alignment: Alignment.centerRight,
-            child: Text('إدارة المستخدمين',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              'إدارة المستخدمين',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
           ),
         ),
         Expanded(
@@ -731,12 +1435,16 @@ class _UsersTabState extends State<_UsersTab> {
                       final data = FirestoreUtils.dataOfSnapshot(user);
                       final role =
                           FirestoreUtils.stringOf(data, 'role', 'member');
+                      final isAdmin = role == 'admin';
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         elevation: 0,
+                        color: theme.colorScheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey.shade200),
+                          side: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
                         ),
                         child: ListTile(
                           contentPadding:
@@ -745,26 +1453,51 @@ class _UsersTabState extends State<_UsersTab> {
                             backgroundImage: data['photoUrl'] != null
                                 ? NetworkImage(data['photoUrl'].toString())
                                 : null,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
                             child: data['photoUrl'] == null
-                                ? const Icon(Icons.person)
+                                ? Icon(
+                                    Icons.person,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  )
                                 : null,
                           ),
                           title: Text(
                             FirestoreUtils.stringOf(
-                                data, 'displayName', 'مستخدم'),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
+                              data,
+                              'displayName',
+                              'مستخدم',
+                            ),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                           subtitle: Text(
                             _maskEmail(FirestoreUtils.stringOf(data, 'email')),
-                            style: const TextStyle(fontSize: 12),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           trailing: Chip(
-                            label: Text(role,
-                                style: const TextStyle(fontSize: 10)),
-                            backgroundColor: role == 'admin'
-                                ? Colors.red.shade50
-                                : Colors.grey.shade100,
+                            label: Text(
+                              role,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: isAdmin
+                                    ? theme.colorScheme.onErrorContainer
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            backgroundColor: isAdmin
+                                ? theme.colorScheme.errorContainer
+                                : theme.colorScheme.surfaceContainerHighest,
+                            side: BorderSide(
+                              color: isAdmin
+                                  ? theme.colorScheme.error.withValues(
+                                      alpha: 0.4,
+                                    )
+                                  : theme.colorScheme.outlineVariant,
+                            ),
                             padding: EdgeInsets.zero,
                             visualDensity: VisualDensity.compact,
                           ),
@@ -781,30 +1514,51 @@ class _UsersTabState extends State<_UsersTab> {
   }
 
   Future<void> _showUserRoleDialog(
-      BuildContext context, String userId, String currentRole) async {
+    BuildContext context,
+    String userId,
+    String currentRole,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
     final newRole = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('تعديل الصلاحية'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['member', 'merchant', 'moderator', 'admin']
-              .map((role) => RadioListTile<String>(
+        content: RadioGroup<String>(
+          groupValue: currentRole,
+          onChanged: (val) => Navigator.pop(c, val),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['member', 'merchant', 'moderator', 'admin']
+                .map(
+                  (role) => RadioListTile<String>(
                     title: Text(role),
                     value: role,
-                    groupValue: currentRole,
-                    onChanged: (val) => Navigator.pop(c, val),
-                  ))
-              .toList(),
+                  ),
+                )
+                .toList(),
+          ),
         ),
       ),
     );
-    if (newRole != null && newRole != currentRole) {
+    if (newRole == null || newRole == currentRole) return;
+
+    try {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .update({'role': newRole});
-      _loadInitial();
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('تم تحديث الصلاحية')),
+      );
+      await _loadInitial();
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('تعذّر تحديث الصلاحية: ${e.message ?? e.code}'),
+        ),
+      );
     }
   }
 }
@@ -827,14 +1581,21 @@ class _AuditLogsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Align(
             alignment: Alignment.centerRight,
-            child: Text('سجل التدقيق',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              'سجل التدقيق',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
           ),
         ),
         Expanded(
@@ -846,8 +1607,13 @@ class _AuditLogsTab extends StatelessWidget {
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return const Center(
-                  child: Text('السجل فارغ أو حدث خطأ.'),
+                return Center(
+                  child: Text(
+                    'السجل فارغ أو حدث خطأ.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 );
               }
               if (!snapshot.hasData) {
@@ -855,7 +1621,14 @@ class _AuditLogsTab extends StatelessWidget {
               }
               final logs = snapshot.data!.docs;
               if (logs.isEmpty) {
-                return const Center(child: Text('لا توجد سجلات بعد.'));
+                return Center(
+                  child: Text(
+                    'لا توجد سجلات بعد.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
               }
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -863,26 +1636,41 @@ class _AuditLogsTab extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final log = FirestoreUtils.dataOfSnapshot(logs[index]);
                   final action = FirestoreUtils.stringOf(log, 'action', '—');
-                  final target = FirestoreUtils.stringOf(log, 'targetName',
-                      FirestoreUtils.stringOf(log, 'targetId'));
+                  final target = FirestoreUtils.stringOf(
+                    log,
+                    'targetName',
+                    FirestoreUtils.stringOf(log, 'targetId'),
+                  );
                   final by =
                       FirestoreUtils.stringOf(log, 'performedBy', 'غير معروف');
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.only(bottom: 8),
+                    color: theme.colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: Colors.grey.shade200),
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: ListTile(
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 12),
-                      leading: const Icon(Icons.history, color: Colors.grey),
-                      title: Text('$action - $target',
-                          style: const TextStyle(fontSize: 13)),
+                      leading: Icon(
+                        Icons.history,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        '$action - $target',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
                       subtitle: Text(
                         'بواسطة: $by • ${_formatTimestamp(log['timestamp'])}',
-                        style: const TextStyle(fontSize: 11),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   );
@@ -904,6 +1692,7 @@ class _UserProfileMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final auth = context.watch<AuthController>();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -913,13 +1702,22 @@ class _UserProfileMenu extends StatelessWidget {
             radius: 16,
             backgroundImage:
                 auth.photoUrl.isNotEmpty ? NetworkImage(auth.photoUrl) : null,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
             child: auth.photoUrl.isEmpty
-                ? const Icon(Icons.person, size: 16)
+                ? Icon(
+                    Icons.person,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  )
                 : null,
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red, size: 20),
+            icon: Icon(
+              Icons.logout,
+              color: theme.colorScheme.error,
+              size: 20,
+            ),
             onPressed: () => auth.signOut(),
             tooltip: 'تسجيل الخروج',
           ),

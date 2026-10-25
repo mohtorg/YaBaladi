@@ -1,15 +1,8 @@
 // lib/features/reviews/screens/my_reviews_screen.dart
 //
-// [v1.1 — 2026-10-18] — Lint fixes + UX improvement
-//   - FIX: catch (_) → on Exception catch (e) with debugPrint
-//     (يحل تحذير "Avoid catches without on clauses")
-//   - FIX: onTap uses context.push بدل context.go
-//     (يُبقي "تقييماتي" في الـ stack — يمكن العودة بزر Back)
-//   - FIX: _resolvePlace يستخدم on Exception
-//   - MINOR: _placesCache limit (100 entries) لمنع نمو غير محدود
-//
-// [v1.0.1 — 2026-10-14] — Fixed context in _placeName + removed unused import
-// [v1.0 — 2026-10-14] — R3: MyReviewsScreen
+// [v1.2 — 2026-10-22] — Wave 2: Null-safety lint fixes
+//   - FIX: isLoggedIn بدلاً من فحص uid == null (لأن uid='guest')
+//   - KEPT: context.push، _placesCache limit، etc.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -44,8 +37,9 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final uid = context.read<AuthController>().uid;
-      if (uid != null) _ctrl.load(uid);
+      final auth = context.read<AuthController>();
+      // ✅ FIX: isLoggedIn بدلاً من uid != null
+      if (auth.isLoggedIn) _ctrl.load(auth.uid);
     });
   }
 
@@ -68,7 +62,6 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
       _placesCache[placeId] = p;
       return p;
     } on Exception catch (e) {
-      // ✅ on Exception (كان catch (_) → تحذير)
       debugPrint('_resolvePlace($placeId) error: $e');
       _placesCache[placeId] = null;
       return null;
@@ -153,8 +146,9 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   }
 
   Future<void> _confirmDelete(Review review) async {
-    final uid = context.read<AuthController>().uid;
-    if (uid == null) return;
+    final auth = context.read<AuthController>();
+    // ✅ FIX: isLoggedIn بدلاً من uid == null
+    if (!auth.isLoggedIn) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -181,7 +175,8 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     if (!mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await _ctrl.remove(review.id, uid);
+    // ✅ استخدمنا auth.uid مباشرة (بدون !)
+    final ok = await _ctrl.remove(review.id, auth.uid);
 
     messenger
       ..hideCurrentSnackBar()

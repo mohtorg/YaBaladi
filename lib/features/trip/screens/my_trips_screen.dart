@@ -1,5 +1,11 @@
 // lib/features/trip/screens/my_trips_screen.dart
 //
+// [v1.3 — 2026-10-22] — Guest detection corrected
+//   - FIX: AuthController.uid returns 'guest' for visitors (never null/empty),
+//          so signed-in state is now read from `auth.isLoggedIn`.
+//          (v1.2 used uid.isEmpty, which treated guests as signed in.)
+//   - KEPT: all UI and navigation behavior
+//
 // [v1.1 — 2026-10-18] — Wave 5.4: Route to Trip Detailed
 //   - CHANGED: _openTrip → context.push('/trips/detailed/:id')
 //   - KEPT: fallback إلى Overview/Summary عند غياب id (نادر)
@@ -33,9 +39,9 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final uid = context.read<AuthController>().uid;
-      if (uid != null) {
-        context.read<TripPlansController>().load(uid);
+      final auth = context.read<AuthController>();
+      if (auth.isLoggedIn) {
+        context.read<TripPlansController>().load(auth.uid);
       }
     });
   }
@@ -62,7 +68,9 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ctrl = context.watch<TripPlansController>();
-    final uid = context.watch<AuthController>().uid;
+    final auth = context.watch<AuthController>();
+    final uid = auth.uid;
+    final signedIn = auth.isLoggedIn;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,21 +83,22 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'تحديث',
-            onPressed: uid == null ? null : () => ctrl.load(uid, force: true),
+            onPressed: signedIn ? () => ctrl.load(uid, force: true) : null,
           ),
         ],
       ),
-      body: _buildBody(ctrl, uid, theme),
+      body: _buildBody(ctrl, uid, signedIn, theme),
     );
   }
 
   Widget _buildBody(
     TripPlansController ctrl,
-    String? uid,
+    String uid,
+    bool signedIn,
     ThemeData theme,
   ) {
-    // ─── غير مسجل الدخول ───
-    if (uid == null) {
+    // ─── غير مسجل الدخول (الزائر uid == 'guest') ───
+    if (!signedIn) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

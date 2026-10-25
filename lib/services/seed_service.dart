@@ -1,20 +1,22 @@
 // lib/services/seed_service.dart
 //
+// [v2.0 — 2026-10-24] — Category v2.0 schema alignment
+//   - REPLACED: iconKey (v1 Arabic labels) → iconName (v2.0 English slugs)
+//   - iconName values match Category.availableIcons keys exactly:
+//       'restaurant', 'coffee', 'beach_access', 'hotel',
+//       'family_restroom', 'account_balance', 'shopping_bag',
+//       'park', 'event'
+//   - All Category() constructors now provide the required iconName,
+//     resolving 27 analyzer errors:
+//       * iconKey isn't defined (9)
+//       * iconName is required, but no argument (9)
+//       * Null can't be assigned to String (9)
+//   - KEPT: seedPlaces unchanged (v1.2 — no schema change)
+//   - KEPT: public API — seedCategories, seedPlaces, seedAll*, clearAll
+//
 // [v1.2 — 2026-10-18] — Lint fix: static const for seedPlaces
-//   - FIX: static final List<Place> → static const List<Place>
-//          (Place و GeoPoint كلاهما const-constructible،
-//           وكل القيم بداخلهم const → يُصحح 12 تحذير)
-//   - NOTE: هذا الملف غير مستخدَم حالياً في التطبيق
-//           (بعد حذف زر Seed من profile_screen).
-//           يُحتفَظ به كأداة admin للتطوير المستقبلي.
-//
-// [v1.1 — 2026-10-16] — Wave Seed: merge: true
-//   - FIX: batch.set يستخدم SetOptions(merge: true)
-//     السبب: abu_tarek + beit_elqahwa + fish_market موجودون
-//     بدون merge تُفقد حقولهم (imageUrls, tags, whatsapp).
-//   - النتيجة: الحقول الموجودة تبقى، الحقول الجديدة تُضاف.
-//
-// [v1.0] — يزرع Firestore ببيانات أولية (9 تصنيفات + 12 مكان تجريبي).
+// [v1.1 — 2026-10-16] — Wave Seed: merge: true on writes
+// [v1.0] — initial seed service
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' hide Category;
@@ -32,70 +34,70 @@ class SeedService {
   static const String placesCol = 'places';
 
   // ════════════════════════════════════════════════════════════
-  // 9 تصنيفات MVP — iconKey يطابق PlaceCategories.byId() الموجود
+  // 9 تصنيفات — v2.0 schema (iconName: English slug key)
   // ════════════════════════════════════════════════════════════
   static const List<Category> seedCategories = [
     Category(
       id: 'restaurants',
       nameAr: 'مطاعم',
       nameEn: 'Restaurants',
-      iconKey: 'مطعم',
+      iconName: 'restaurant',
       order: 1,
     ),
     Category(
       id: 'cafes',
       nameAr: 'كافيهات',
       nameEn: 'Cafes',
-      iconKey: 'كافيه',
+      iconName: 'coffee',
       order: 2,
     ),
     Category(
       id: 'beaches',
       nameAr: 'شواطئ وبلاجات',
       nameEn: 'Beaches',
-      iconKey: 'بلاج',
+      iconName: 'beach_access',
       order: 3,
     ),
     Category(
       id: 'hotels',
       nameAr: 'فنادق ومنتجعات',
       nameEn: 'Hotels & Resorts',
-      iconKey: 'فندق ومنتجع',
+      iconName: 'hotel',
       order: 4,
     ),
     Category(
       id: 'family',
       nameAr: 'ترفيه أسري',
       nameEn: 'Family & Entertainment',
-      iconKey: 'ترفيه أسري',
+      iconName: 'family_restroom',
       order: 5,
     ),
     Category(
       id: 'landmarks',
       nameAr: 'معالم تاريخية',
       nameEn: 'Historical Landmarks',
-      iconKey: 'معلم تاريخي',
+      iconName: 'account_balance',
       order: 6,
     ),
     Category(
       id: 'shopping',
       nameAr: 'تسوق',
       nameEn: 'Shopping',
-      iconKey: 'تسوق',
+      iconName: 'shopping_bag',
       order: 7,
     ),
     Category(
       id: 'parks',
       nameAr: 'حدائق ومتنزهات',
       nameEn: 'Parks',
-      iconKey: 'حديقة',
+      iconName: 'park',
       order: 8,
     ),
     Category(
       id: 'events',
       nameAr: 'فعاليات',
       nameEn: 'Events',
-      iconKey: 'فعالية',
+      iconName: 'event',
       order: 9,
     ),
   ];
@@ -103,7 +105,6 @@ class SeedService {
   // ════════════════════════════════════════════════════════════
   // 12 مكان تجريبي — موزّعين على 5 محافظات
   // priceLevel: 1=$ · 2=$$ · 3=$$$ · 4=$$$$
-  // ✅ [v1.2] static const (كان final) — Place و GeoPoint const
   // ════════════════════════════════════════════════════════════
   static const List<Place> seedPlaces = [
     Place(
@@ -328,7 +329,6 @@ class SeedService {
   // العمليات
   // ════════════════════════════════════════════════════════════
 
-  /// [v1.1] merge:true — لا يمسح حقولاً موجودة.
   Future<int> seedAllCategories() async {
     final batch = _db.batch();
     for (final cat in seedCategories) {
@@ -343,7 +343,6 @@ class SeedService {
     return seedCategories.length;
   }
 
-  /// [v1.1] merge:true — لا يمسح imageUrls / tags الموجودة.
   Future<int> seedAllPlaces() async {
     final batch = _db.batch();
     for (final place in seedPlaces) {

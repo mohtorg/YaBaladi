@@ -1,5 +1,11 @@
 // lib/features/trip/screens/trip_planner_screen.dart
 //
+// [v2.0.4 — 2026-10-22] — Guest detection corrected
+//   - FIX: AuthController.uid returns 'guest' for visitors (never null/empty),
+//          so saving is gated by `auth.isLoggedIn`.
+//          (v2.0.3 used uid.isEmpty, which would let guests try to save.)
+//   - KEPT: all UI and generation logic
+//
 // [v2.0.2 — 2026-10-18] — Lint fixes for strict analyze
 //   - FIX: unawaited() + MaterialPageRoute<void> for Navigator
 //   - ADDED: import 'dart:async'
@@ -194,7 +200,8 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
     if (_generatedPlan == null) return;
 
     final auth = context.read<AuthController>();
-    final uid = auth.uid ?? 'guest';
+    // uid يُرجع 'guest' للزائر (غير قابل لـ null)
+    final uid = auth.uid;
 
     final result = await context.push<List<TripStop>>(
       RoutePaths.tripPlacePicker,
@@ -264,7 +271,8 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
     final uid = auth.uid;
     final messenger = ScaffoldMessenger.of(context);
 
-    if (uid == null) {
+    // الزائر uid == 'guest' — نعتمد isLoggedIn
+    if (!auth.isLoggedIn) {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(

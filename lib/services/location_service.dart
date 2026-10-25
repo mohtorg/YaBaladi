@@ -1,15 +1,10 @@
 // lib/services/location_service.dart
 //
-// [v5.0.1 — 2026-10-19] — Wave 5.5c: defensive fromJson
-//   - FIX: fromJson يقبل num أو String رقمي، يرفض الباقي بـ null
-//   - KEPT: getBySource, searchPlaces, BigDataCloud, Nominatim (v5.0)
-//
-// [v5.0 — 2026-10-19] — Wave 5.5c: getBySource + searchPlaces
-//   - ADD: getBySource(LocationSource) — ADR-5
-//   - ADD: searchPlaces(query) — Nominatim search
-//   - ADD: PlaceSearchResult model
-//   - CHANGE: _readGps({required LocationAccuracy accuracy})
-//   - KEPT: fromJson static + governorateAr/En deprecated (v4.2)
+// [v5.1 — 2026-10-22] — Wave 5.6 Cleanup: Remove deprecated fields
+//   - REMOVE: governorateAr (deprecated) — replaced by nameAr
+//   - REMOVE: governorateEn (deprecated)
+//   - KEPT: getBySource, searchPlaces, BigDataCloud, Nominatim
+//   - KEPT: defensive fromJson
 
 import 'dart:async';
 import 'dart:convert';
@@ -23,12 +18,6 @@ class LocationData {
   final double latitude;
   final double longitude;
 
-  @Deprecated('Use nameAr for fine locality. Will be removed in Wave 5.6.')
-  final String? governorateAr;
-
-  @Deprecated('Will be removed in Wave 5.6.')
-  final String? governorateEn;
-
   /// اسم المكان بالعربية (مثال: "الشرق، بورسعيد")
   final String? nameAr;
 
@@ -38,8 +27,6 @@ class LocationData {
   const LocationData({
     required this.latitude,
     required this.longitude,
-    this.governorateAr,
-    this.governorateEn,
     this.nameAr,
     this.accuracyMeters,
   });
@@ -47,13 +34,11 @@ class LocationData {
   Map<String, dynamic> toJson() => {
         'lat': latitude,
         'lng': longitude,
-        if (governorateAr != null) 'governorateAr': governorateAr,
-        if (governorateEn != null) 'governorateEn': governorateEn,
         if (nameAr != null) 'nameAr': nameAr,
         if (accuracyMeters != null) 'accuracy': accuracyMeters,
       };
 
-  /// ✅ [v5.0.1] defensive parsing — يقبل num أو String رقمي، يرفض الباقي بـ null
+  /// ✅ defensive parsing — يقبل num أو String رقمي، يرفض الباقي بـ null
   static LocationData? fromJson(Map<String, dynamic> j) {
     final latRaw = j['lat'];
     final lngRaw = j['lng'];
@@ -78,8 +63,6 @@ class LocationData {
     return LocationData(
       latitude: lat,
       longitude: lng,
-      governorateAr: j['governorateAr'] as String?,
-      governorateEn: j['governorateEn'] as String?,
       nameAr: j['nameAr'] as String?,
       accuracyMeters: (j['accuracy'] as num?)?.toDouble(),
     );
@@ -144,7 +127,6 @@ class LocationService {
         longitude: last.longitude,
         accuracyMeters: last.accuracy,
         nameAr: name.nameAr,
-        governorateAr: name.governorateAr,
       );
     } on Exception {
       return null;
@@ -173,8 +155,6 @@ class LocationService {
       longitude: gps.longitude,
       accuracyMeters: gps.accuracyMeters,
       nameAr: resolved.nameAr,
-      governorateAr: resolved.governorateAr,
-      governorateEn: null,
     );
 
     // لا نخزن دقة منخفضة في الكاش الثابت كقيمة أساسية
@@ -307,7 +287,6 @@ class LocationService {
 
       return _PlaceNameResult(
         nameAr: parts.isEmpty ? null : parts.join('، '),
-        governorateAr: region,
       );
     } on Exception {
       return const _PlaceNameResult();
@@ -353,7 +332,6 @@ class LocationService {
 
       return _PlaceNameResult(
         nameAr: parts.isEmpty ? null : parts.join('، '),
-        governorateAr: state,
       );
     } on Exception {
       return const _PlaceNameResult();
@@ -363,7 +341,6 @@ class LocationService {
 
 class _PlaceNameResult {
   final String? nameAr;
-  final String? governorateAr;
 
-  const _PlaceNameResult({this.nameAr, this.governorateAr});
+  const _PlaceNameResult({this.nameAr});
 }
