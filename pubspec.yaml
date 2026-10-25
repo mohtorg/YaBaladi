@@ -1,7 +1,7 @@
 name: yabaladi_rebuild
 description: "Ya Baladi - Local Discovery Platform for Port Said, Egypt"
 publish_to: 'none'
-version: 1.0.0+6
+version: 1.0.0+7
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
@@ -39,6 +39,12 @@ dependencies:
 
   # ═══ Location (federated plugin — لا يحتاج geolocator_web) ═══
   geolocator: ^13.0.0
+
+  # ═══ Maps (OpenStreetMap tiles, no API key required) ═══
+  # flutter_map 7.x: متوافق مع Flutter 3.27+ و RichAttributionWidget
+  # latlong2: يوفّر LatLng, LatLngBounds, Distance
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # ═══ External Links ═══
   url_launcher: ^6.3.0
