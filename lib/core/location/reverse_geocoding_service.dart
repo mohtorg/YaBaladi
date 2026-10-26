@@ -1,11 +1,12 @@
 // lib/core/location/reverse_geocoding_service.dart
 //
-// [v1.0 — 2026-10-14] — G4.2-c-4: Nominatim Reverse Geocoding
-//   - مجاني 100%، لا API key.
-//   - يعمل على Web + Android + iOS.
-//   - Cache 30 دقيقة (lat/lng rounded to 3 decimals ≈ 111m).
-//   - Timeout 5 ثوان — فشل صامت (يُعيد null).
+// [v1.1 — 2026-10-25] — FIX: Web User-Agent exception + Math domain error
+//   - FIXED: User-Agent header is now conditionally added only on non-web
+//     platforms (browsers forbid setting it, which throws a ClientException).
+//   - FIXED: haversineKm now uses clamp(0.0, 1.0) to prevent math.sqrt(negative).
+//   - KEPT: all logic, caching, and timeouts identical.
 
+import 'dart:async'; // لضمان توفر TimeoutException
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -55,10 +56,18 @@ class ReverseGeocodingService {
         '&addressdetails=1',
       );
 
-      final response = await http.get(
-        uri,
-        headers: {'User-Agent': _userAgent},
-      ).timeout(_timeout);
+      // [FIX] المتصفحات تمنع إرسال User-Agent برمجياً (CORS)
+      final headers = <String, String>{};
+      if (!kIsWeb) {
+        headers['User-Agent'] = _userAgent;
+      }
+
+      final response = await http
+          .get(
+            uri,
+            headers: headers,
+          )
+          .timeout(_timeout);
 
       if (response.statusCode != 200) {
         debugPrint(
@@ -102,7 +111,12 @@ class ReverseGeocodingService {
             math.sin(dLng / 2) *
             math.sin(dLng / 2);
 
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    // [FIX] استخدام clamp لتجنب NaN في حال كانت a أكبر من 1 قليلاً
+    final c = 2 *
+        math.atan2(
+          math.sqrt(a.clamp(0.0, 1.0)),
+          math.sqrt((1 - a).clamp(0.0, 1.0)),
+        );
     return 6371.0 * c;
   }
 }

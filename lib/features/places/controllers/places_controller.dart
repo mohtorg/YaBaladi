@@ -1,15 +1,15 @@
 // lib/features/places/controllers/places_controller.dart
 //
-// [v3.1 — 2026-10-20] — CRITICAL FIXES:
-//   - ADD: setAmenities(Set<String>) & setFeatures(Set<String>) — used by filter sheet v2.0.
-//   - ADD: _requestGeneration token — prevents race conditions between loads.
-//   - FIX: _sort auto-reset to recommended when switching from nearest to all.
-//   - CLEANUP: removed redundant assignments in loadPaginated.
+// [v4.1 — 2026-10-25] — Wave 11 FIX: applyFilters() لمعاينة النتائج
+//   - ADD: applyFilters(Map) — read-only preview، يستعيد الحالة الأصلية فوراً.
+//   - REST unchanged.
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../../../models/place.dart';
+import '../../../models/filter_definition.dart';
 import '../../../repositories/places_repository.dart';
 
 enum PlacesStatus { initial, loading, loaded, error }
@@ -34,7 +34,7 @@ class PlacesController extends ChangeNotifier {
   List<Place> _places = [];
   List<Place> get places => _places;
 
-  // ─── Filters ───
+  // ─── Legacy Filters (deprecated) ───
   String _query = '';
   String get query => _query;
 
@@ -53,21 +53,59 @@ class PlacesController extends ChangeNotifier {
   final Set<String> _features = {};
   Set<String> get features => _features;
 
+  // ─── [Wave 11] Dynamic Filters ───
+  Map<String, FilterSelection> _activeDynamicFilters = {};
+  Map<String, FilterDefinition> _filtersMetadata = {};
+
+  Map<String, FilterSelection> get activeDynamicFilters =>
+      Map.unmodifiable(_activeDynamicFilters);
+
+  void setFiltersMetadata(List<FilterDefinition> filters) {
+    _filtersMetadata = {for (final f in filters) f.id: f};
+    notifyListeners();
+  }
+
+  void applyDynamicFilters(Map<String, FilterSelection> filters) {
+    _activeDynamicFilters = Map.from(filters);
+    notifyListeners();
+  }
+
+  /// [Wave 11 FIX] معاينة نتيجة الفلاتر دون تعديل الحالة الدائمة.
+  /// يُستخدم في PlacesFilterSheet لحساب count قبل التطبيق.
+  List<Place> applyFilters(Map<String, FilterSelection> filters) {
+    final previous = _activeDynamicFilters;
+    _activeDynamicFilters = Map.from(filters);
+    try {
+      return List<Place>.from(filteredPlaces);
+    } finally {
+      _activeDynamicFilters = previous;
+    }
+  }
+
+  // ─── Errors ───
   String? _error;
   String? get error => _error;
 
   bool get hasQuery => _query.isNotEmpty;
-  bool get hasActiveFilters =>
-      _minRating != null ||
-      _priceLevel != null ||
-      _amenities.isNotEmpty ||
-      _features.isNotEmpty;
 
-  int get activeFilterCount =>
-      (_minRating != null ? 1 : 0) +
-      (_priceLevel != null ? 1 : 0) +
-      _amenities.length +
-      _features.length;
+  bool get hasActiveFilters {
+    final legacy = _minRating != null ||
+        _priceLevel != null ||
+        _amenities.isNotEmpty ||
+        _features.isNotEmpty;
+    final dynamic = _activeDynamicFilters.values.any((s) => s.isNotEmpty);
+    return legacy || dynamic;
+  }
+
+  int get activeFilterCount {
+    final legacy = (_minRating != null ? 1 : 0) +
+        (_priceLevel != null ? 1 : 0) +
+        _amenities.length +
+        _features.length;
+    final dynamic =
+        _activeDynamicFilters.values.where((s) => s.isNotEmpty).length;
+    return legacy + dynamic;
+  }
 
   // ─── Pagination ───
   bool _isLoadingMore = false;
@@ -80,33 +118,103 @@ class PlacesController extends ChangeNotifier {
   String? _currentGovernorate;
   String? _currentCategoryId;
 
-  // ─── User location (for distance sort) ───
+  // ─── User location ───
   double? _userLat;
   double? get userLat => _userLat;
 
   double? _userLng;
   double? get userLng => _userLng;
 
-  // ✅ [v3.1] حماية من Race Conditions
   int _requestGeneration = 0;
 
-  // ═══════════════════════════════════════════════════════════════
-  // ✅ [v3.1] FILTERED PLACES — applies all filters + sort locally
-  // ═══════════════════════════════════════════════════════════════
+  // ─── Effective Sort ───
+  PlaceSort get effectiveSort {
+    for (final entry in _activeDynamicFilters.entries) {
+      final filter = _filtersMetadata[entry.key];
+      if (filter?.type == FilterType.sort && entry.value.isNotEmpty) {
+        final v = entry.value.values.first;
+        switch (v) {
+          case 'rating_desc':
+            return PlaceSort.ratingDesc;
+          case 'newest':
+            return PlaceSort.newest;
+          case 'distance':
+            return PlaceSort.distance;
+          case 'recommended':
+          default:
+            return PlaceSort.recommended;
+        }
+      }
+    }
+    return _sort;
+  }
+
+  // ─── Dynamic Filter Engine ───
+  List<Place> _applyDynamicFilters(List<Place> input) {
+    var result = input;
+
+    for (final entry in _activeDynamicFilters.entries) {
+      final filter = _filtersMetadata[entry.key];
+      if (filter == null) continue;
+      final selection = entry.value;
+      if (selection.isEmpty) continue;
+
+      switch (filter.type) {
+        case FilterType.boolean:
+          final wanted = selection.values.first == 'true';
+          result = result.where((p) {
+            final v = p.toMap()[filter.fieldKey];
+            return (v == true) == wanted;
+          }).toList();
+          break;
+
+        case FilterType.singleChoice:
+          final value = selection.values.first;
+          result = result.where((p) {
+            final v = p.toMap()[filter.fieldKey];
+            return v?.toString() == value;
+          }).toList();
+          break;
+
+        case FilterType.multiChoice:
+          result = result.where((p) {
+            final raw = p.toMap()[filter.fieldKey];
+            final list = (raw is List)
+                ? raw.map((e) => e.toString()).toSet()
+                : <String>{};
+            return selection.values.every((s) => list.contains(s));
+          }).toList();
+          break;
+
+        case FilterType.range:
+          final rawValue = selection.values.first;
+          final min = double.tryParse(rawValue) ?? 0;
+          result = result.where((p) {
+            final v = (p.toMap()[filter.fieldKey] as num?)?.toDouble() ?? 0;
+            return v >= min;
+          }).toList();
+          break;
+
+        case FilterType.sort:
+          break;
+      }
+    }
+
+    return result;
+  }
+
+  // ─── Filtered Places ───
   List<Place> get filteredPlaces {
     var result = [..._places];
 
-    // 1. Rating filter
+    result = _applyDynamicFilters(result);
+
     if (_minRating != null) {
       result = result.where((p) => p.averageRating >= _minRating!).toList();
     }
-
-    // 2. Price filter (max allowed)
     if (_priceLevel != null) {
       result = result.where((p) => p.priceLevel <= _priceLevel!).toList();
     }
-
-    // 3. Amenities filter
     if (_amenities.contains('wifi')) {
       result = result.where((p) => p.hasWifi).toList();
     }
@@ -119,8 +227,6 @@ class PlacesController extends ChangeNotifier {
     if (_amenities.contains('accessibility')) {
       result = result.where((p) => p.hasAccessibility).toList();
     }
-
-    // 4. Features filter
     if (_features.contains('family')) {
       result = result.where((p) => p.isFamilyFriendly).toList();
     }
@@ -133,8 +239,6 @@ class PlacesController extends ChangeNotifier {
     if (_features.contains('reservation')) {
       result = result.where((p) => p.hasReservation).toList();
     }
-
-    // 5. Text search
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
       result = result
@@ -144,10 +248,10 @@ class PlacesController extends ChangeNotifier {
           .toList();
     }
 
-    // 6. Sort
-    if (_sort == PlaceSort.ratingDesc) {
+    final sort = effectiveSort;
+    if (sort == PlaceSort.ratingDesc) {
       result.sort((a, b) => b.averageRating.compareTo(a.averageRating));
-    } else if (_sort == PlaceSort.distance &&
+    } else if (sort == PlaceSort.distance &&
         _userLat != null &&
         _userLng != null) {
       result.sort((a, b) {
@@ -159,7 +263,7 @@ class PlacesController extends ChangeNotifier {
             _userLat!, _userLng!, b.location!.latitude, b.location!.longitude);
         return dA.compareTo(dB);
       });
-    } else if (_sort == PlaceSort.newest) {
+    } else if (sort == PlaceSort.newest) {
       result.sort((a, b) {
         final da = a.createdAt ?? DateTime(2000);
         final db = b.createdAt ?? DateTime(2000);
@@ -170,9 +274,7 @@ class PlacesController extends ChangeNotifier {
     return result;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // LOAD — Legacy (for home/wizard screens)
-  // ═══════════════════════════════════════════════════════════════
+  // ─── LOAD ───
   Future<void> load() async {
     final myGen = ++_requestGeneration;
     _status = PlacesStatus.loading;
@@ -194,15 +296,14 @@ class PlacesController extends ChangeNotifier {
 
   Future<void> refresh() => load();
 
-  // ═══════════════════════════════════════════════════════════════
-  // CLEAR — reset everything
-  // ═══════════════════════════════════════════════════════════════
+  // ─── CLEAR ───
   void clearAll({bool notify = true}) {
     _query = '';
     _minRating = null;
     _priceLevel = null;
     _amenities.clear();
     _features.clear();
+    _activeDynamicFilters = {};
     _mode = PlacesMode.all;
     _sort = PlaceSort.recommended;
     _userLat = null;
@@ -215,12 +316,11 @@ class PlacesController extends ChangeNotifier {
     _priceLevel = null;
     _amenities.clear();
     _features.clear();
+    _activeDynamicFilters = {};
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // SETTERS
-  // ═══════════════════════════════════════════════════════════════
+  // ─── SETTERS (legacy) ───
   void setQuery(String q) {
     _query = q;
     notifyListeners();
@@ -241,7 +341,6 @@ class PlacesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ [v3.1] Batch setters — required by filter sheet v2.0
   void setAmenities(Set<String> val) {
     _amenities
       ..clear()
@@ -256,7 +355,6 @@ class PlacesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Legacy per-item toggles (kept for backward compatibility)
   void toggleAmenity(String key) {
     _amenities.contains(key) ? _amenities.remove(key) : _amenities.add(key);
     notifyListeners();
@@ -267,9 +365,7 @@ class PlacesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // PAGINATION
-  // ═══════════════════════════════════════════════════════════════
+  // ─── PAGINATION ───
   Future<void> loadPaginated({
     required String governorateNameAr,
     String? categoryId,
@@ -287,7 +383,6 @@ class PlacesController extends ChangeNotifier {
     _error = null;
     _userLat = null;
     _userLng = null;
-    // ✅ [v3.1] إعادة ترتيب افتراضي
     _sort = PlaceSort.recommended;
     notifyListeners();
 
@@ -297,7 +392,7 @@ class PlacesController extends ChangeNotifier {
         categoryId: categoryId,
         limit: limit,
       );
-      if (myGen != _requestGeneration) return; // ✅ stale
+      if (myGen != _requestGeneration) return;
       _places = result.places;
       _lastDocument = result.lastDoc;
       _hasMore = result.places.length == limit;
@@ -318,7 +413,7 @@ class PlacesController extends ChangeNotifier {
       return;
     }
 
-    final myGen = _requestGeneration; // ← snapshot (لا نزيد هنا)
+    final myGen = _requestGeneration;
     _isLoadingMore = true;
     notifyListeners();
 
@@ -329,7 +424,7 @@ class PlacesController extends ChangeNotifier {
         limit: 20,
         lastDocument: _lastDocument,
       );
-      if (myGen != _requestGeneration) return; // ✅ stale
+      if (myGen != _requestGeneration) return;
       _places.addAll(result.places);
       _lastDocument = result.lastDoc;
       _hasMore = result.places.length == 20;
@@ -341,9 +436,7 @@ class PlacesController extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // NEAREST
-  // ═══════════════════════════════════════════════════════════════
+  // ─── NEAREST ───
   Future<void> loadNearest({
     required double userLat,
     required double userLng,

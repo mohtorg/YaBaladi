@@ -1,3 +1,7 @@
+// lib/features/auth/widgets/auth_text_field.dart
+//
+// [v1.1 — 2026-10-25] — FIX: Cleaned and verified.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -30,7 +34,7 @@ class AuthTextField extends StatelessWidget {
   final void Function(String)? onFieldSubmitted;
   final Widget? suffixIcon;
 
-  /// لتفiltering/تحديد الإدخال (أرقام فقط، حد الطول، إلخ)
+  /// لفلترة/تحديد الإدخال (أرقام فقط، حد الطول، إلخ)
   final List<TextInputFormatter>? inputFormatters;
 
   @override

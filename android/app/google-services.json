@@ -66,6 +66,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "231838490815-4uoo9687gmalo46jdau5dip0ilejh9ta.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egypt.yabaladi_rebuild",
+            "certificate_hash": "53111940468db6d33ded0c0985bb39251069bcbb"
+          }
+        },
+        {
           "client_id": "231838490815-j4j8omranvjvf017g4mlssv57digkhlo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

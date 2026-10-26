@@ -1,24 +1,29 @@
 // lib/core/router/app_router.dart
 //
-// [v1.1 — 2026-10-22] — Redirect fixes
-//   - FIX: «نسيت كلمة المرور» كانت تُعاد إلى شاشة الدخول للمستخدم غير المسجّل،
-//          لأن مسار forgotPassword لم يُستثنَ من التحويل.
-//   - FIX: المستخدم المسجّل لا يبقى في شاشة التسجيل (register) → يُحوَّل للرئيسية.
-//   - NEW: دعم المعامل `from`: عند محاولة فتح صفحة محمية يُحوَّل لشاشة الدخول
-//          مع `?from=...`، وبعد النجاح يُعاد إلى الصفحة المطلوبة
-//          (مسارات داخلية آمنة فقط). يعالج TODO في route_guards.dart.
-//   - FIX: مسار picker يقبل أي Map (وليس Map<String, dynamic> حصراً).
-//   - CHANGE: debugLogDiagnostics في وضع التطوير فقط.
-//   - NEW: زر «الرئيسية» في صفحة 404.
-//   - NOTE: createAppRouter يجب أن يُستدعى مرة واحدة فقط (لا داخل build).
+// [v5.1 — 2026-10-26] — ROUTING FIX: Protect /merchant/apply & redirect existing merchants
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+// ─── Auth & Core ───
 import '../../features/auth/controllers/auth_controller.dart';
+
+// ─── Public Routes ───
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+
+// ─── Admin Routes ───
+import '../../features/admin/screens/admin_dashboard_screen.dart';
+
+// ─── Merchant Routes ───
+import '../../features/merchant/controllers/merchant_application_controller.dart';
+import '../../features/merchant/merchant_shell.dart';
+import '../../features/merchant/screens/merchant_application_screen.dart';
+
+// ─── User Routes ───
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -33,22 +38,17 @@ import '../../models/trip_plan.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../screens/settings_screen.dart';
-import '../../features/admin/screens/admin_dashboard_screen.dart';
-import '../../core/auth/role.dart';
-import 'route_names.dart';
-import 'route_paths.dart';
 
-/// يقبل `from` فقط إذا كان مساراً داخلياً آمناً (يمنع التحويل لمواقع خارجية
-/// أو العودة لصفحات الدخول أو لوحة الإدارة).
+// ✅ دالة آمنة للتحقق من المسار
 String? _safeFrom(String? from) {
   if (from == null || from.isEmpty) return null;
   if (!from.startsWith('/') || from.startsWith('//')) return null;
 
   final path = Uri.tryParse(from)?.path ?? '';
   if (path.isEmpty) return null;
-  if (path == RoutePaths.login ||
-      path == RoutePaths.register ||
-      path == RoutePaths.forgotPassword ||
+  if (path == '/login' ||
+      path == '/register' ||
+      path == '/forgot-password' ||
       path.startsWith('/admin')) {
     return null;
   }
@@ -57,91 +57,132 @@ String? _safeFrom(String? from) {
 
 GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
-    // ✅ التصحيح: البدء من شاشة الدخول لتجنب تعارض الـ Shell
-    initialLocation: RoutePaths.login,
+    initialLocation: '/login',
     debugLogDiagnostics: kDebugMode,
     refreshListenable: auth,
     redirect: (context, state) {
       final status = auth.status;
-      final role = auth.role;
-      final location = state.matchedLocation;
+      final roleName = auth.role.toString().split('.').last;
+      final location = state.uri.path;
 
-      final isLoggingIn = location == RoutePaths.login;
-      final isRegistering = location == RoutePaths.register;
-      final isForgotPassword = location == RoutePaths.forgotPassword;
-      final isAuthPage = isLoggingIn || isRegistering || isForgotPassword;
+      // 1. حالة التحميل
+      if (status == AuthStatus.loading) return null;
+
+      final isAuthPage = location == '/login' ||
+          location == '/register' ||
+          location == '/forgot-password';
       final isAdminRoute = location.startsWith('/admin');
-      final isStaff = role == UserRole.admin || role == UserRole.moderator;
 
-      if (status == AuthStatus.loading) {
-        return null;
-      }
+      // ✅ فصل مسار التقديم عن باقي مسارات التاجر
+      final isMerchantApplyRoute = location == '/merchant/apply';
+      final isMerchantDashboardRoute =
+          location.startsWith('/merchant') && !isMerchantApplyRoute;
 
-      // ─── غير مسجّل (زائر أو لم يدخل بعد) ───
+      final isStaff = roleName == 'admin' || roleName == 'moderator';
+
+      // 2. المستخدم غير المسجل (زائر أو جديد)
       if (status == AuthStatus.unauthenticated) {
-        if (isAdminRoute) return RoutePaths.login;
-        if (isAuthPage) return null;
-
-        if (!auth.isGuest) {
-          final from = state.uri.toString();
-          if (from == RoutePaths.home) return RoutePaths.login;
-          return '${RoutePaths.login}?from=${Uri.encodeComponent(from)}';
+        // ✅ حماية مسار التقديم: يجب تسجيل الدخول أولاً
+        if (isAdminRoute || isMerchantDashboardRoute || isMerchantApplyRoute) {
+          return '/login?from=${Uri.encodeComponent(location)}';
         }
-
-        return null;
+        return null; // السماح بالتصفح للزوار
       }
 
-      // ─── مسجّل ───
+      // 3. المستخدم المسجل (Authenticated)
       if (status == AuthStatus.authenticated) {
+        // الموظفون (أدمن/مشرف)
         if (isStaff) {
           if (!isAdminRoute) return '/admin';
           return null;
         }
 
-        if (isAdminRoute) return RoutePaths.home;
-        if (isLoggingIn || isRegistering) {
-          return _safeFrom(state.uri.queryParameters['from']) ??
-              RoutePaths.home;
+        if (isAdminRoute) {
+          return '/home';
+        }
+
+        // ✅ إذا كان تاجراً بالفعل، لا داعي لتقديم طلب جديد
+        if (isMerchantApplyRoute && roleName == 'merchant') {
+          return '/merchant/dashboard';
+        }
+
+        // منع غير التجار من دخول مسارات لوحة التحكم
+        if (isMerchantDashboardRoute && roleName != 'merchant') {
+          return '/home';
+        }
+
+        // منع المسجل من رؤية صفحات الدخول
+        if (isAuthPage) {
+          return _safeFrom(state.uri.queryParameters['from']) ?? '/home';
         }
       }
 
-      return null;
+      return null; // لا تغيير في المسار
     },
     routes: [
+      // ═══════════════════════════════════════════════════════════
+      // 1. المسارات العامة (Public Routes)
+      // ═══════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/merchant/apply',
+        name: 'merchantApply',
+        builder: (context, state) => ChangeNotifierProvider(
+          create: (_) => MerchantApplicationController(),
+          child: const MerchantApplicationScreen(),
+        ),
+      ),
+
+      // ═══════════════════════════════════════════════════════════
+      // 2. مسارات الأدمن (Admin Routes)
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
         path: '/admin',
         name: 'adminDashboard',
         builder: (context, state) => const AdminDashboardScreen(),
       ),
+
+      // ═══════════════════════════════════════════════════════════
+      // 3. واجهة التاجر (Merchant Shell)
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
-        path: RoutePaths.login,
-        name: RouteNames.login,
-        builder: (context, state) => const LoginScreen(),
+        path: '/merchant/dashboard',
+        name: 'merchantDashboard',
+        builder: (context, state) => const MerchantShell(),
       ),
-      GoRoute(
-        path: RoutePaths.register,
-        name: RouteNames.register,
-        builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.forgotPassword,
-        name: RouteNames.forgotPassword,
-        builder: (context, state) => const ForgotPasswordScreen(),
-      ),
+
+      // ═══════════════════════════════════════════════════════════
+      // 4. واجهة المستخدم العادي (User Shell) - 5 Branches
+      // ═══════════════════════════════════════════════════════════
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
         branches: [
+          // ─── الفرع 0: الاستكشاف (Home) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.home,
-                name: RouteNames.home,
+                path: '/home',
+                name: 'home',
                 builder: (context, state) => const HomeScreen(),
                 routes: [
                   GoRoute(
                     path: 'category/:id',
-                    name: RouteNames.category,
+                    name: 'category',
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
                       return ExploreScreen(categoryId: id);
@@ -149,7 +190,7 @@ GoRouter createAppRouter(AuthController auth) {
                   ),
                   GoRoute(
                     path: 'place/:id',
-                    name: RouteNames.place,
+                    name: 'place',
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
                       return PlaceDetailsScreen(placeId: id);
@@ -159,43 +200,49 @@ GoRouter createAppRouter(AuthController auth) {
               ),
             ],
           ),
+
+          // ─── الفرع 1: رحلاتي (Trips) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.trips,
-                name: RouteNames.trips,
+                path: '/trips',
+                name: 'trips',
                 builder: (context, state) => const TripPlansScreen(),
                 routes: [
                   GoRoute(
                     path: 'planner',
-                    name: RouteNames.tripPlanner,
+                    name: 'tripPlanner',
                     builder: (context, state) => const WizardContainerScreen(),
                     routes: [
                       GoRoute(
                         path: 'picker',
-                        name: RouteNames.tripPlacePicker,
+                        name: 'tripPlacePicker',
                         redirect: (context, state) {
-                          // extra يُفقد عند تحديث الصفحة على الويب → ارجع للمعالج
-                          if (state.extra is! Map) {
-                            return RoutePaths.tripPlanner;
-                          }
+                          if (state.extra is! Map) return '/trips/planner';
                           return null;
                         },
                         builder: (context, state) {
-                          final extra =
-                              Map<String, dynamic>.from(state.extra! as Map);
+                          final extraRaw = state.extra;
+                          final extra = extraRaw is Map
+                              ? Map<String, dynamic>.from(extraRaw)
+                              : <String, dynamic>{};
+
                           final initialStopsRaw = extra['initialStops'];
                           final initialStops = initialStopsRaw is List
                               ? initialStopsRaw.whereType<TripStop>().toList()
                               : <TripStop>[];
+
                           final govIdRaw = extra['governorateId'];
                           final governorateId =
                               govIdRaw is String ? govIdRaw : '';
+
                           final govNameRaw = extra['governorateNameAr'];
                           final governorateNameAr =
                               govNameRaw is String ? govNameRaw : '';
+
                           final maxStopsRaw = extra['maxStops'];
                           final maxStops = maxStopsRaw is int ? maxStopsRaw : 8;
+
                           final userIdRaw = extra['userId'];
                           final userId =
                               userIdRaw is String ? userIdRaw : 'guest';
@@ -213,7 +260,7 @@ GoRouter createAppRouter(AuthController auth) {
                   ),
                   GoRoute(
                     path: 'detailed/:id',
-                    name: RouteNames.tripDetailed,
+                    name: 'tripDetailed',
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
                       return TripDetailedScreen(tripId: id);
@@ -221,7 +268,7 @@ GoRouter createAppRouter(AuthController auth) {
                   ),
                   GoRoute(
                     path: ':id',
-                    name: RouteNames.tripDetails,
+                    name: 'tripDetails',
                     builder: (context, state) {
                       final id = state.pathParameters['id'] ?? '';
                       return TripDetailsScreen(tripId: id);
@@ -231,47 +278,61 @@ GoRouter createAppRouter(AuthController auth) {
               ),
             ],
           ),
+
+          // ─── الفرع 2: المفضلة (Favorites) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.profile,
-                name: RouteNames.profile,
+                path: '/favorites',
+                name: 'favorites',
+                builder: (context, state) => const FavoritesScreen(),
+              ),
+            ],
+          ),
+
+          // ─── الفرع 3: حسابي (Profile) ───
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                name: 'profile',
                 builder: (context, state) => const ProfileScreen(),
                 routes: [
                   GoRoute(
                     path: 'my-reviews',
-                    name: RouteNames.myReviews,
+                    name: 'myReviews',
                     builder: (context, state) => const MyReviewsScreen(),
                   ),
                   GoRoute(
                     path: 'favorites',
-                    name: RouteNames.profileFavorites,
+                    name: 'profileFavorites',
                     builder: (context, state) => const FavoritesScreen(),
                   ),
                 ],
               ),
             ],
           ),
+
+          // ─── الفرع 4: الإعدادات (Settings) ───
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.settings,
-                name: RouteNames.settings,
+                path: '/settings',
+                name: 'settings',
                 builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),
         ],
       ),
+
+      // ═══════════════════════════════════════════════════════════
+      // 5. مسارات مساعدة (Standalone)
+      // ═══════════════════════════════════════════════════════════
       GoRoute(
-        path: RoutePaths.search,
-        name: RouteNames.search,
+        path: '/search',
+        name: 'search',
         builder: (context, state) => const ExploreScreen(),
-      ),
-      GoRoute(
-        path: RoutePaths.favorites,
-        name: RouteNames.favorites,
-        builder: (context, state) => const FavoritesScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
@@ -283,7 +344,7 @@ GoRouter createAppRouter(AuthController auth) {
             Text('الصفحة غير موجودة: ${state.uri}'),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => context.go(RoutePaths.home),
+              onPressed: () => context.go('/home'),
               child: const Text('الرئيسية'),
             ),
           ],

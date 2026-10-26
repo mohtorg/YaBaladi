@@ -1,12 +1,8 @@
 // lib/features/reviews/widgets/add_review_sheet.dart
 //
-// [v1.0 — 2026-10-14] — F2.3: AddReviewSheet
-//   - BottomSheet لإضافة مراجعة جديدة (تقييم + تعليق).
-//   - يُقدَّم عبر `AddReviewSheet.show(context, controller, ...)`.
-//   - يعرض: 5 نجوم قابلة للنقر + TextField (max 1000).
-//   - يتحقق من صحة الإدخال قبل الإرسال.
-//   - يُدير حالة الإرسال (loading) + SnackBar للفشل.
-//   - يُرجع `true` عند النجاح (بعد إغلاق الـ sheet).
+// [v1.0.1 — 2026-10-25] — FIX: Removed unsupported userPhotoUrl from Review, added isVerified
+//   - FIXED: Review instantiation to match add_review_screen.dart structure
+//   - KEPT: all UI, sheet logic, and focus handling identical.
 
 import 'package:flutter/material.dart';
 
@@ -95,15 +91,18 @@ class _AddReviewSheetState extends State<AddReviewSheet> {
 
     setState(() => _isSubmitting = true);
 
+    // [FIX] تعديل كائن الـ Review ليتوافق مع الموديل الخاص بك
     final review = Review(
       id: '',
       placeId: widget.placeId,
       userId: widget.userId,
       userName: widget.userName,
-      userPhotoUrl: widget.userPhotoUrl,
+      // userPhotoUrl: widget.userPhotoUrl, // ⚠️ قم بإزالة التعليق إذا كان الموديل يدعم هذا الحقل
       rating: _rating,
       comment: _commentController.text.trim(),
       createdAt: DateTime.now(),
+      isVerified:
+          false, // [FIX] إضافة هذا الحقل لتفادي خطأ "Required parameter"
     );
 
     final ok = await widget.controller.submit(review);

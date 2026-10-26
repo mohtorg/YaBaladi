@@ -1,3 +1,5 @@
+// lib/theme/design_tokens.dart
+
 import 'package:flutter/material.dart';
 
 /// Central Design Tokens foundation for Ya Baladi.
@@ -11,7 +13,7 @@ import 'package:flutter/material.dart';
 /// - Elevation scale
 /// - Text colors
 /// - Surface colors
-abstract final class YaBaladiDesignTokens {
+class YaBaladiDesignTokens {
   YaBaladiDesignTokens._();
 
   // ============================================================
@@ -54,22 +56,22 @@ abstract final class YaBaladiDesignTokens {
   // TEXT COLORS (Light Mode)
   // ============================================================
 
-  static const Color textPrimary = Color(0xFF111827);   // Almost black
+  static const Color textPrimary = Color(0xFF111827); // Almost black
   static const Color textSecondary = Color(0xFF6B7280); // Grey 500
-  static const Color textTertiary = Color(0xFF9CA3AF);  // Grey 400
-  static const Color textInverse = Color(0xFFFFFFFF);   // On dark backgrounds
-  static const Color textBrand = primaryBlue;           // Links, brand text
+  static const Color textTertiary = Color(0xFF9CA3AF); // Grey 400
+  static const Color textInverse = Color(0xFFFFFFFF); // On dark backgrounds
+  static const Color textBrand = primaryBlue; // Links, brand text
 
   // ============================================================
   // SURFACE COLORS (Light Mode)
   // ============================================================
 
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFF3F4F6);   // Grey 100
+  static const Color surfaceVariant = Color(0xFFF3F4F6); // Grey 100
   static const Color surfaceElevated = Color(0xFFFFFFFF);
-  static const Color background = Color(0xFFF9FAFB);        // Grey 50
-  static const Color divider = Color(0xFFE5E7EB);           // Grey 200
-  static const Color border = Color(0xFFD1D5DB);            // Grey 300
+  static const Color background = Color(0xFFF9FAFB); // Grey 50
+  static const Color divider = Color(0xFFE5E7EB); // Grey 200
+  static const Color border = Color(0xFFD1D5DB); // Grey 300
 
   // ============================================================
   // TEXT COLORS (Dark Mode)
@@ -84,10 +86,10 @@ abstract final class YaBaladiDesignTokens {
   // SURFACE COLORS (Dark Mode)
   // ============================================================
 
-  static const Color surfaceDark = Color(0xFF1F2937);         // Grey 800
-  static const Color surfaceVariantDark = Color(0xFF374151);   // Grey 700
+  static const Color surfaceDark = Color(0xFF1F2937); // Grey 800
+  static const Color surfaceVariantDark = Color(0xFF374151); // Grey 700
   static const Color surfaceElevatedDark = Color(0xFF374151);
-  static const Color backgroundDark = Color(0xFF111827);       // Grey 900
+  static const Color backgroundDark = Color(0xFF111827); // Grey 900
   static const Color dividerDark = Color(0xFF374151);
   static const Color borderDark = Color(0xFF4B5563);
 

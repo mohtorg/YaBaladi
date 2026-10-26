@@ -557,15 +557,18 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.map, size: 80, color: Theme.of(context).colorScheme.primary),
+            Icon(Icons.map,
+                size: 80, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 16),
-            Text('أنت اخترت ${_selectedStops.length} مكان', style: Theme.of(context).textTheme.titleMedium),
+            Text('أنت اخترت ${_selectedStops.length} مكان',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 24),
             // ✅ فتح المسار في تطبيق خارجي
             ElevatedButton.icon(
               onPressed: () {
                 if (_selectedStops.isNotEmpty) {
-                   MapService.openDirections(_selectedStops.first.lat, _selectedStops.first.lng);
+                  MapService.openDirections(
+                      _selectedStops.first.lat, _selectedStops.first.lng);
                 }
               },
               icon: const Icon(Icons.navigation),

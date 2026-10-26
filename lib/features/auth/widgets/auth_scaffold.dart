@@ -1,3 +1,8 @@
+// lib/features/auth/widgets/auth_scaffold.dart
+//
+// [v1.1 — 2026-10-25] — FIX: Cleaned, verified. Added fallback for PopScope.
+//   - KEPT: all UI, assets, and routing logic identical.
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 

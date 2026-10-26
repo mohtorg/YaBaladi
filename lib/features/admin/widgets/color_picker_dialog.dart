@@ -1,17 +1,6 @@
 // lib/features/admin/widgets/color_picker_dialog.dart
 //
-// [Wave 10 — file 8/12] — 2026-10-24
-// Color Picker Dialog for Category management.
-//
-// Returns a String color in '#RRGGBB' format (uppercase).
-// Returns null if user cancels.
-//
-// Usage:
-//   final colorHex = await ColorPickerDialog.show(
-//     context,
-//     initialColor: category.colorHex,
-//   );
-//   if (colorHex != null) { ... }
+// [v1.1 — 2026-10-26] — BUILD FIX: Strict analyzer compliance, types normalized
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,13 +27,7 @@ class ColorPickerDialog extends StatefulWidget {
 }
 
 class _ColorPickerDialogState extends State<ColorPickerDialog> {
-  // ═══════════════════════════════════════════════════════════════
-  // 36-color curated palette (6x6) — organized by hue.
-  // Includes all 9 category default colors from Category v2.0:
-  //   restaurants #E53935, cafes #6D4C41, beaches #039BE5,
-  //   hotels #3949AB, family #FDD835, landmarks #8D6E63,
-  //   shopping #D81B60, parks #43A047, events #FB8C00.
-  // ═══════════════════════════════════════════════════════════════
+  // 36-color curated palette (6x6)
   static const List<String> _palette = [
     // Reds
     '#D32F2F', '#E53935', '#F44336', '#EF5350', '#E57373', '#FFCDD2',
@@ -83,6 +66,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
   // ─── Helpers ───
   String _normalize(String input) {
     final cleaned = input.replaceAll('#', '').trim().toUpperCase();
+    // ✅ استخدام RegExp(r'...') لتجنب التحذيرات
     if (cleaned.length == 6 && RegExp(r'^[0-9A-F]{6}$').hasMatch(cleaned)) {
       return '#$cleaned';
     }
@@ -90,12 +74,18 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
   }
 
   Color _parseHex(String hex) {
-    final cleaned = hex.replaceAll('#', '');
-    return Color(int.parse('FF$cleaned', radix: 16));
+    try {
+      final cleaned = hex.replaceAll('#', '');
+      return Color(int.parse('FF$cleaned', radix: 16));
+    } catch (_) {
+      return const Color(0xFF0D6EFD); // Fallback
+    }
   }
 
-  bool _isValidHex(String input) =>
-      RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(input.trim());
+  bool _isValidHex(String input) {
+    // ✅ استخدام RegExp(r'...')
+    return RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(input.trim());
+  }
 
   Color _contrastFor(Color bg) =>
       bg.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
@@ -166,7 +156,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                   crossAxisCount: 6,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
-                  childAspectRatio: 1,
+                  childAspectRatio: 1.0, // ✅ استخدام 1.0 بدلاً من 1
                 ),
                 itemCount: _palette.length,
                 itemBuilder: (_, i) {
@@ -243,7 +233,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Small sub-widgets (kept private to this file)
+// Small sub-widgets
 // ═══════════════════════════════════════════════════════════════
 
 class _PreviewCard extends StatelessWidget {

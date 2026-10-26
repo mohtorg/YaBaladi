@@ -1,16 +1,13 @@
 // lib/core/location/browsing_location_controller.dart
 //
-// [v1.2 — 2026-10-19] — Wave 5.5c: On-Demand metadata (ADR-4)
-//   - ADD: _physicalPlaceName (اسم GPS الدقيق)
-//   - ADD: _lastSource (من أين جاء الموقع)
-//   - ADD: _lastUpdatedAt (متى تم التحديث)
-//   - CHANGE: setPhysicalLocation يقبل {placeName, source}
-//   - KEPT: _resolvePhysicalAddress (fallback إذا لم يُمرَّر placeName)
+// [v1.2.1 — 2026-10-25] — FIX: Removed unused import + improved notify logic
+//   - REMOVED: unused import '../../services/location_service.dart'
+//   - FIXED: notifyListeners() now triggers if placeName or source changes
+//   - KEPT: all logic, getters, and metadata handling identical
 
 import 'package:flutter/foundation.dart';
 
 import '../../models/address_info.dart';
-import '../../services/location_service.dart';
 import 'egypt_governorates.dart';
 import 'location_source.dart';
 import 'reverse_geocoding_service.dart';
@@ -83,7 +80,7 @@ class BrowsingLocationController extends ChangeNotifier {
     LocationSource? source,
   }) {
     final gov = nearestGovernorate(lat, lng);
-    final changed = _physicalId != gov.id;
+    final govChanged = _physicalId != gov.id;
     _physicalId = gov.id;
 
     if (_isUsingPhysical || _browsingId == null) {
@@ -91,12 +88,25 @@ class BrowsingLocationController extends ChangeNotifier {
       _isUsingPhysical = true;
     }
 
-    // [v1.2] تحديث metadata
-    _lastSource = source;
-    _lastUpdatedAt = DateTime.now();
-    if (placeName != null) _physicalPlaceName = placeName;
+    // [v1.2.1 FIX] تتبع تغيير البيانات الوصفية
+    bool metadataChanged = false;
 
-    if (changed) _safeNotify();
+    if (source != null && source != _lastSource) {
+      _lastSource = source;
+      metadataChanged = true;
+    }
+
+    if (placeName != null && placeName != _physicalPlaceName) {
+      _physicalPlaceName = placeName;
+      metadataChanged = true;
+    }
+
+    _lastUpdatedAt = DateTime.now();
+
+    // نُحدّث الواجهة إذا تغيرت المحافظة أو تغيرت البيانات الوصفية
+    if (govChanged || metadataChanged) {
+      _safeNotify();
+    }
 
     // Reverse geocode فقط إذا لم يأتِ placeName من الخارج
     if (placeName == null) {

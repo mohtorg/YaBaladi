@@ -1,3 +1,5 @@
+// lib/widgets/confirm_dialog.dart
+
 import 'package:flutter/material.dart';
 
 /// حوار تأكيد موحّد للتطبيق.
@@ -16,6 +18,7 @@ Future<bool?> showYaConfirmDialog({
   bool isDestructive = false,
 }) {
   final theme = Theme.of(context);
+
   return showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(

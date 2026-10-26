@@ -1,405 +1,316 @@
 // lib/features/search/screens/explore_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../../../core/location/browsing_location_controller.dart';
-import '../../../core/location/governorate_picker_sheet.dart';
-import '../../../core/router/route_paths.dart';
-import '../../../features/categories/controllers/categories_controller.dart';
-import '../../../features/places/controllers/places_controller.dart';
-import '../../../features/places/widgets/places_filter_sheet.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../../models/place.dart';
-import '../../../services/location_service.dart';
-import '../../../services/map_service.dart';
-import '../../../widgets/location_actions.dart';
 
 class ExploreScreen extends StatefulWidget {
+  final String? categoryId; // ✅ اختياري لتوافق الراوتر
+
   const ExploreScreen({super.key, this.categoryId});
-  final String? categoryId;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  final _scrollController = ScrollController();
-  final _searchController = TextEditingController();
-  bool _isFetchingLocation = false;
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  // بيانات تجريبية (Mock Data) لعرضها
+  late List<Map<String, dynamic>> _places;
 
   @override
   void initState() {
     super.initState();
-
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.8) {
-        context.read<PlacesController>().loadMore();
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _loadCurrentGovernorateData();
-    });
+    // في التطبيق الحقيقي، ستقوم بجلب البيانات من Firebase هنا بناءً على widget.categoryId
+    _loadMockData();
   }
 
-  void _loadCurrentGovernorateData() {
-    final browsing = context.read<BrowsingLocationController>().browsing;
-    context.read<PlacesController>().loadPaginated(
-          governorateNameAr: browsing.nameAr,
-          categoryId: widget.categoryId,
-        );
+  void _loadMockData() {
+    _places = [
+      {
+        'id': 'p1',
+        'name': 'مطعم ريكو',
+        'category': 'مطاعم',
+        'rating': 4.8,
+        'reviewCount': 120,
+        'isOpen': true,
+        'image':
+            'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=60',
+      },
+      {
+        'id': 'p2',
+        'name': 'كافيه بورسعيد',
+        'category': 'مقاهي',
+        'rating': 4.5,
+        'reviewCount': 85,
+        'isOpen': true,
+        'image':
+            'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&auto=format&fit=crop&q=60',
+      },
+      {
+        'id': 'p3',
+        'name': 'مطعم الشرقاوي',
+        'category': 'مطاعم',
+        'rating': 4.2,
+        'reviewCount': 45,
+        'isOpen': false,
+        'image':
+            'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=500&auto=format&fit=crop&q=60',
+      },
+    ];
+
+    // فلترة تجريبية إذا تم تمرير تصنيف
+    if (widget.categoryId != null) {
+      _places =
+          _places.where((p) => p['category'] == widget.categoryId).toList();
+    }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
-    _searchController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadNearest() async {
-    if (_isFetchingLocation) return;
-    setState(() => _isFetchingLocation = true);
-
-    try {
-      final loc = await LocationService.getCurrentLocation();
-      if (!mounted) return;
-
-      if (loc == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('تعذر تحديد موقعك. تأكد من تفعيل GPS.'),
-              backgroundColor: Colors.orange),
-        );
-        return;
-      }
-
-      await context.read<PlacesController>().loadNearest(
-            userLat: loc.latitude,
-            userLng: loc.longitude,
-          );
-    } finally {
-      if (mounted) setState(() => _isFetchingLocation = false);
-    }
-  }
-
-  void _openFilterSheet(PlacesController controller) {
-    showPlacesFilterSheet(context: context, controller: controller);
-  }
-
-  void _openGovernoratePicker(BrowsingLocationController ctrl) {
-    GovernoratePickerSheet.show(
-      context,
-      controller: ctrl,
-    ).then((_) {
-      if (mounted) {
-        _loadCurrentGovernorateData();
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final controller = context.watch<PlacesController>();
-    final browsingCtrl = context.watch<BrowsingLocationController>();
-    final browsing = browsingCtrl.browsing;
-    final isNearestMode = controller.mode == PlacesMode.nearest;
     final theme = Theme.of(context);
-
-    String title = l10n.search;
-    if (widget.categoryId != null) {
-      final cats = context.watch<CategoriesController>().categories;
-      final cat = cats.where((c) => c.id == widget.categoryId).firstOrNull;
-      if (cat != null) title = cat.nameAr;
-    }
-
-    final displayPlaces = controller.filteredPlaces;
+    final title = widget.categoryId ?? 'استكشاف الأماكن';
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
+        title: Text(title),
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(RoutePaths.home),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 4),
-            // ✅ الزر الجديد الواضح (Pill Button)
-            if (!isNearestMode)
-              InkWell(
-                onTap: () => _openGovernoratePicker(browsingCtrl),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.location_on,
-                          size: 14,
-                          color: theme.colorScheme.onPrimaryContainer),
-                      const SizedBox(width: 4),
-                      Text(
-                        browsing.nameAr,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.arrow_drop_down,
-                          size: 16,
-                          color: theme.colorScheme.onPrimaryContainer),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.near_me,
-                        size: 14, color: theme.colorScheme.onPrimaryContainer),
-                    const SizedBox(width: 4),
-                    Text(
-                      'الأقرب إليك',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         actions: [
           IconButton(
-            tooltip: 'الفلاتر',
-            icon: Badge(
-              label: Text('${controller.activeFilterCount}'),
-              isLabelVisible: controller.activeFilterCount > 0,
-              child: const Icon(Icons.tune),
-            ),
-            onPressed: () => _openFilterSheet(controller),
-          ),
-          IconButton(
-            tooltip: isNearestMode ? 'عرض الكل' : 'الأقرب إليك',
-            icon: _isFetchingLocation
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(
-                    isNearestMode ? Icons.list : Icons.near_me,
-                    color: isNearestMode ? theme.colorScheme.primary : null,
-                  ),
-            onPressed: () {
-              if (isNearestMode) {
-                _loadCurrentGovernorateData();
-              } else {
-                _loadNearest();
-              }
-            },
+            icon: const Icon(Icons.filter_list),
+            onPressed: _showFilterBottomSheet,
           ),
         ],
       ),
       body: Column(
         children: [
+          // ─── شريط البحث والفلترة ───
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
             child: TextField(
-              controller: _searchController,
-              onChanged: (val) => controller.setQuery(val),
+              controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'ابحث عن مكان...',
+                hintText: 'ابحث داخل هذه النتائج...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
+              onChanged: (val) {
+                // منطق البحث المحلي
+              },
             ),
           ),
+
+          // ─── قائمة النتائج ───
           Expanded(
-            child: _buildBody(context, controller, displayPlaces),
+            child: _places.isEmpty
+                ? _buildEmptyState(theme)
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _places.length,
+                    itemBuilder: (context, index) {
+                      final place = _places[index];
+                      return _PlaceListCard(place: place);
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBody(
-      BuildContext context, PlacesController controller, List<Place> places) {
-    if (controller.status == PlacesStatus.loading && places.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off, size: 80, color: theme.colorScheme.outline),
+          const SizedBox(height: 16),
+          Text(
+            'لا توجد نتائج مطابقة',
+            style: theme.textTheme.titleMedium,
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (controller.status == PlacesStatus.error) {
-      return Center(child: Text('حدث خطأ: ${controller.error}'));
-    }
-
-    if (places.isEmpty) {
-      final isNearest = controller.mode == PlacesMode.nearest;
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(isNearest ? Icons.location_off : Icons.search_off,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-              const SizedBox(height: 16),
               Text(
-                isNearest
-                    ? 'لا يوجد مقدمي خدمة قرب منك حالياً.'
-                    : 'لا توجد أماكن تطابق بحثك.',
-                style: const TextStyle(fontSize: 16),
+                'ترتيب النتائج حسب',
+                style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
-              if (controller.hasActiveFilters) ...[
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: controller.clearFilters,
-                  icon: const Icon(Icons.filter_alt_off),
-                  label: const Text('مسح الفلاتر'),
-                ),
-              ] else if (isNearest) ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _loadCurrentGovernorateData,
-                  icon: const Icon(Icons.list),
-                  label: const Text('عرض الأماكن في المحافظة'),
-                ),
-              ]
+              const SizedBox(height: 24),
+              ListTile(
+                leading: const Icon(Icons.star),
+                title: const Text('الأعلى تقييماً'),
+                onTap: () => Navigator.pop(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.near_me),
+                title: const Text('الأقرب إليّ'),
+                onTap: () => Navigator.pop(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.timer),
+                title: const Text('مفتوح الآن'),
+                onTap: () => Navigator.pop(context),
+              ),
             ],
           ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(12),
-      itemCount: places.length + (controller.isLoadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == places.length) {
-          return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()));
-        }
-
-        final place = places[index];
-        double? distanceKm;
-        if (controller.userLat != null &&
-            controller.userLng != null &&
-            place.location != null) {
-          final meters = MapService.getDistanceInMeters(
-            controller.userLat!,
-            controller.userLng!,
-            place.location!.latitude,
-            place.location!.longitude,
-          );
-          distanceKm = meters / 1000;
-        }
-
-        return _PlaceCard(place: place, distanceKm: distanceKm);
+        );
       },
     );
   }
 }
 
-class _PlaceCard extends StatelessWidget {
-  final Place place;
-  final double? distanceKm;
+// ═══════════════════════════════════════════════════════════════
+// ويدجت بطاقة المكان في القائمة
+// ═══════════════════════════════════════════════════════════════
 
-  const _PlaceCard({required this.place, this.distanceKm});
+class _PlaceListCard extends StatelessWidget {
+  final Map<String, dynamic> place;
+
+  const _PlaceListCard({required this.place});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isOpen = place['isOpen'] as bool;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
       child: InkWell(
-        onTap: () => context.push(RoutePaths.placePath(place.id)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12)),
-                child: Icon(Icons.place,
-                    size: 32, color: theme.colorScheme.primary),
+        onTap: () {
+          // الانتقال لصفحة التفاصيل (مسار موجود في الراوتر)
+          context.push('/home/place/${place['id']}');
+        },
+        child: Row(
+          children: [
+            // الصورة
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Image.network(
+                place['image'] as String,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey.shade300,
+                  child: const Icon(Icons.broken_image, size: 40),
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            ),
+            // التفاصيل
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      place.nameAr,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            place['name'] as String,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // شارة مفتوح/مغلق
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isOpen
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isOpen ? 'مفتوح' : 'مغلق',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isOpen ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
+                    Text(
+                      place['category'] as String,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.star, size: 14, color: Colors.amber),
-                        const SizedBox(width: 2),
-                        Text(place.averageRating.toStringAsFixed(1),
-                            style: theme.textTheme.bodySmall),
-                        const SizedBox(width: 8),
-                        if (distanceKm != null) ...[
-                          Icon(Icons.near_me,
-                              size: 14, color: theme.colorScheme.primary),
-                          const SizedBox(width: 2),
-                          Text(
-                            distanceKm! < 1
-                                ? '${(distanceKm! * 1000).toStringAsFixed(0)} م'
-                                : '${distanceKm!.toStringAsFixed(1)} كم',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold),
+                        const Icon(Icons.star, color: Colors.amber, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${place['rating']}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${place['reviewCount']} تقييم)',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              if (place.location != null)
-                LocationActions(
-                    lat: place.location!.latitude,
-                    lng: place.location!.longitude),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

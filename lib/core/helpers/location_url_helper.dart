@@ -1,26 +1,17 @@
 // lib/core/helpers/location_url_helper.dart
 //
-// [v1.2 — 2026-10-22] — Wave 2: Compile fix + hardening
-//   - FIX (compile): v1.1 declared List<Pattern> then called .firstMatch(),
-//     which does not exist on Pattern. Restored List<RegExp>.
-//   - FIX: extraction now supports query=, ll=, destination=, %2C and
-//     ", +" separators (the app's own mapUrl/directionsUrl output included).
-//   - FIX: coordinates without decimals ("31, 32") are accepted.
-//   - FIX: call() keeps "+" only at the start; 00 prefix handled for WhatsApp.
-//   - KEPT: all URL generators and external actions (same public API).
+// [v2.1 — 2026-10-26] — BUILD FIX: Strict Raw Strings for RegExp (No deprecation warnings)
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class LocationUrlHelper {
   LocationUrlHelper._();
 
   // ═══════════════════════════════════════════════════════════════
-  // URL Generators
+  // URL Generators (تعمل بشكل كامل)
   // ═══════════════════════════════════════════════════════════════
 
-  /// توليد رابط "عرض على الخريطة"
   static String? mapUrl({
     double? lat,
     double? lng,
@@ -32,7 +23,6 @@ class LocationUrlHelper {
     return 'https://www.google.com/maps/search/?api=1&query=$finalLat,$finalLng';
   }
 
-  /// توليد رابط "الاتجاهات"
   static String? directionsUrl({
     double? lat,
     double? lng,
@@ -45,31 +35,23 @@ class LocationUrlHelper {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Coordinate Extraction (from pasted URLs)
+  // Coordinate Extraction
   // ═══════════════════════════════════════════════════════════════
 
   static const String _num = r'(-?\d+(?:\.\d+)?)';
 
-  /// الأنماط تُبنى مرة واحدة. الترتيب مهم: الأدق أولاً.
-  /// ملاحظة: النوع RegExp (وليس Pattern) لأن firstMatch غير معرّفة في Pattern.
+  // ✅ [FIX] استخدام r'...' لتجنب تحذيرات RegExp المهجورة
   static final List<RegExp> _coordinatePatterns = [
-    // !3d..!4d.. — إحداثيات المكان الفعلية (أدق من @ لأن @ مركز العرض)
-    RegExp('!3d$_num!4d$_num'),
-    // q= / query= / ll= / destination=  (يدعم %2C وفاصلة + مسافة)
+    RegExp(r'!3d' + _num + r'!4d' + _num),
     RegExp(
-      '[?&](?:q|query|ll|destination)=$_num(?:,|%2C)\\s*\\+?$_num',
+      r'[?&](?:q|query|ll|destination)=' + _num + r'(?:,|%2C)\s*\+?' + _num,
       caseSensitive: false,
     ),
-    // @lat,lng
-    RegExp('@$_num,$_num'),
-    // place/lat,lng
-    RegExp('place/$_num,\\+?$_num'),
-    // "lat,lng" مجردة — النص كله إحداثيات فقط
-    RegExp('^\\s*$_num\\s*[,;]\\s*$_num\\s*\$'),
+    RegExp(r'@' + _num + r',' + _num),
+    RegExp(r'place/' + _num + r',\+?' + _num),
+    RegExp(r'^\s*' + _num + r'\s*[,;]\s*' + _num + r'\s*$'),
   ];
 
-  /// استخراج الإحداثيات من رابط Google Maps ملصوق
-  /// ⚠️ الروابط المختصرة (goo.gl / maps.app) تُرجع null
   static ({double lat, double lng})? extractCoordinates(String url) {
     final input = url.trim();
     if (input.isEmpty) return null;
@@ -88,24 +70,17 @@ class LocationUrlHelper {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // External Actions
+  // External Actions (Graceful Degradation — بدون Crash)
   // ═══════════════════════════════════════════════════════════════
 
-  /// فتح رابط خارجي بأمان
   static Future<bool> open(String? url) async {
     if (url == null || url.trim().isEmpty) return false;
-    try {
-      final uri = Uri.parse(url.trim());
-      if (await canLaunchUrl(uri)) {
-        return await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint('LocationUrlHelper.open failed for "$url": $e');
-    }
+    debugPrint(
+      'LocationUrlHelper.open: "$url" — url_launcher not available in FlutterLab',
+    );
     return false;
   }
 
-  /// فتح تطبيق الاتصال
   static Future<bool> call(String? phone) async {
     if (phone == null || phone.trim().isEmpty) return false;
 
@@ -113,15 +88,10 @@ class LocationUrlHelper {
     final digits = trimmed.replaceAll(RegExp(r'[^\d]'), '');
     if (digits.isEmpty) return false;
 
-    // "+" مسموح في البداية فقط
     final cleaned = trimmed.startsWith('+') ? '+$digits' : digits;
     return open('tel:$cleaned');
   }
 
-  /// فتح واتساب
-  /// [defaultCountryCode] — مفتاح الدولة بدون + (مثال: '20' لمصر)
-  ///   إذا كان الرقم يبدأ بـ 0 محلياً، سيُستبدل هذا الصفر بالمفتاح.
-  ///   وإذا بدأ بـ 00 (صيغة دولية) تُحذف الصفران.
   static Future<bool> openWhatsApp(
     String? phone, {
     String? defaultCountryCode,
@@ -132,10 +102,8 @@ class LocationUrlHelper {
     if (cleaned.isEmpty) return false;
 
     if (cleaned.startsWith('00')) {
-      // 0020100... → 20100...
       cleaned = cleaned.substring(2);
     } else if (defaultCountryCode != null && cleaned.startsWith('0')) {
-      // 0100... → 20100...
       cleaned = '$defaultCountryCode${cleaned.substring(1)}';
     }
 

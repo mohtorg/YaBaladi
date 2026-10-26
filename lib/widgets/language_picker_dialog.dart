@@ -1,3 +1,5 @@
+// lib/widgets/language_picker_dialog.dart
+
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -5,13 +7,6 @@ import '../l10n/locale_controller.dart';
 import '../theme/design_tokens.dart';
 
 /// A professional Material 3 dialog for picking the app's language.
-///
-/// Features:
-/// - Radio-style selection between Arabic and English
-/// - Shows language name in its own script (العربية / English)
-/// - Shows RTL/LTR direction hint
-/// - Shows current language with a check mark
-/// - Applies immediately on selection (no apply button)
 class LanguagePickerDialog extends StatelessWidget {
   const LanguagePickerDialog({
     super.key,
@@ -137,7 +132,6 @@ class _LanguageOptionTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Leading icon
               Icon(
                 leading,
                 color: isSelected
@@ -145,8 +139,6 @@ class _LanguageOptionTile extends StatelessWidget {
                     : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: YaBaladiDesignTokens.space3),
-
-              // Title + Subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,9 +150,8 @@ class _LanguageOptionTile extends StatelessWidget {
                         color: isSelected
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurface,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -173,8 +164,6 @@ class _LanguageOptionTile extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Check icon
               if (isSelected)
                 Icon(
                   Icons.check_circle,

@@ -2,29 +2,19 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
-// [v3.7 — 2026-10-24] — Wave 10: Categories v2.0 strict rules
+// [v3.8 — 2026-10-25] — Wave 11: Filters (dynamic, Firestore-backed)
 //
-// NEW in v3.7:
-//   - STRICT create/update validation for `categories` (v2.0 schema):
-//       * nameAr / nameEn: strings, 1–100 chars
-//       * iconName: slug (lowercase + digits + underscore), 2–50
-//       * colorHex: #RRGGBB (7 chars, hex only)
-//       * order: int, 1–9999
-//       * isActive / isFeatured: booleans
-//       * parentId: null or string 1–50
-//       * aliases / searchKeywords: lists (≤ 50 items each)
-//       * placesCount: int ≥ 0
-//       * createdAt / updatedAt: timestamps
-//   - PROTECT: createdAt is immutable on update
-//   - PROTECT: delete blocked when placesCount > 0
-//   - SPLIT: `write` → create/update/delete (auditable per operation)
-//   - FIX: places `list` limit raised 50 → 100. The admin chart
-//     `_CategoryDistributionChart` uses .limit(100); with the old
-//     `<=50` rule the chart was silently denied.
-//   - KEPT: all prior rules intact
-//     (users, favorites, places, reviews, merchants,
+// NEW in v3.8:
+//   - ADD: `filters` collection (read: public, write: admin/moderator).
+//   - ADD: `isModerator()`, `isModeratorOrAdmin()` helpers.
+//   - ADD: `isValidFilterSlug()`, `isValidFilterData()` helpers.
+//   - PROTECT: moderator cannot change `rolesAllowed` on update.
+//   - PROTECT: `createdAt` immutable on update.
+//   - KEPT: all prior v3.7 rules intact
+//     (users, favorites, places, categories, reviews, merchants,
 //      visit_requests, trip_plans, DEFAULT DENY).
 //
+// [v3.7 — 2026-10-24] — Wave 10: Categories v2.0 strict rules
 // [v3.6 — 2026-10-20] — FIX: Relaxed list limit for reviews
 // ═══════════════════════════════════════════════════════════════
 
@@ -46,6 +36,12 @@ service cloud.firestore {
     }
     function isMerchant() {
       return isSignedIn() && userExists() && userData().role == 'merchant';
+    }
+    function isModerator() {
+      return isSignedIn() && userExists() && userData().role == 'moderator';
+    }
+    function isModeratorOrAdmin() {
+      return isAdmin() || isModerator();
     }
     function isSelf(userId) { return isSignedIn() && uid() == userId; }
 
@@ -76,16 +72,34 @@ service cloud.firestore {
     function isValidStopsCount(n) { return n is int && n >= 0 && n <= 50; }
 
     // ─── [v3.7] Categories helpers ───
-    // RE2 slug: lowercase a-z, digits, underscores, 2–50 chars.
     function isValidSlug(s) {
       return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$');
     }
-
-    // Hex color: #RRGGBB (size == 7, starts with '#', all hex chars).
     function isValidHexColor(c) {
       return c is string
           && c.size() == 7
           && c.matches('^#[0-9A-Fa-f]+$');
+    }
+
+    // ─── [v3.8] Filters helpers ───
+    function isValidFilterSlug(s) {
+      return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$');
+    }
+    function isValidFilterData(data) {
+      return data.keys().hasAll([
+               'nameAr', 'nameEn', 'type', 'fieldKey', 'options'
+             ])
+          && isString(data.nameAr, 1, 100)
+          && isString(data.nameEn, 1, 100)
+          && data.type in [
+               'single_choice', 'multi_choice', 'range', 'boolean', 'sort'
+             ]
+          && isString(data.fieldKey, 1, 50)
+          && data.options is list
+          && data.options.size() <= 50
+          && (!('isActive' in data) || data.isActive is bool)
+          && (!('isRequired' in data) || data.isRequired is bool)
+          && (!('rolesAllowed' in data) || data.rolesAllowed is list);
     }
 
     // ─── USERS (Strict) ───
@@ -134,8 +148,6 @@ service cloud.firestore {
     // ═══════════════════════════════════════════════════════════
     match /places/{placeId} {
       allow get: if true;
-      // [v3.7] 50 → 100 (chart uses .limit(100)). Still forces an
-      // explicit limit (null <= 100 is false in Firestore rules).
       allow list: if request.query.limit <= 100;
       allow write: if isAdmin();
 
@@ -159,10 +171,8 @@ service cloud.firestore {
     // CATEGORIES (v2.0 — Wave 10)
     // ═══════════════════════════════════════════════════════════
     match /categories/{categoryId} {
-      // Public read — categories shown on every screen.
       allow read: if true;
 
-      // ── CREATE ── Admin-only, strict v2.0 schema.
       allow create: if isAdmin()
                     && isValidSlug(categoryId)
                     && request.resource.data.keys().hasAll([
@@ -194,10 +204,6 @@ service cloud.firestore {
                          || isString(request.resource.data.parentId, 1, 50)
                        );
 
-      // ── UPDATE ── Admin-only, same validation + immutability.
-      // Note: `FieldValue.increment()` for placesCount is valid:
-      // request.resource.data contains the merged result, which still
-      // passes all checks (nameAr/etc unchanged, createdAt unchanged).
       allow update: if isAdmin()
                     && isString(request.resource.data.nameAr, 1, 100)
                     && isString(request.resource.data.nameEn, 1, 100)
@@ -223,15 +229,39 @@ service cloud.firestore {
                          || isString(request.resource.data.parentId, 1, 50)
                        );
 
-      // ── DELETE ── Admin-only, blocked if a place references it.
-      // (App also checks in CategoriesRepository.delete() — defense
-      //  in depth. Note: if placesCount is stale the rule cannot
-      //  detect actual refs without extra reads.)
       allow delete: if isAdmin()
                     && (
                          !('placesCount' in resource.data)
                          || resource.data.placesCount == 0
                        );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FILTERS (Wave 11 — Dynamic, Firestore-backed)
+    // ═══════════════════════════════════════════════════════════
+    match /filters/{filterId} {
+      // ── READ: public ──
+      allow read: if true;
+
+      // ── CREATE: admin or moderator ──
+      allow create: if isModeratorOrAdmin()
+                    && isValidFilterSlug(filterId)
+                    && isValidFilterData(request.resource.data);
+
+      // ── UPDATE: admin or moderator ──
+      // moderator لا يستطيع تغيير rolesAllowed
+      allow update: if isModeratorOrAdmin()
+                    && isValidFilterData(request.resource.data)
+                    && request.resource.data.createdAt
+                       == resource.data.createdAt
+                    && (
+                         isAdmin() ||
+                         !request.resource.data.diff(resource.data)
+                           .affectedKeys().hasAny(['rolesAllowed'])
+                       );
+
+      // ── DELETE: admin only ──
+      allow delete: if isAdmin();
     }
 
     // ═══════════════════════════════════════════════════════════

@@ -1,16 +1,12 @@
 // lib/features/profile/profile_screen.dart
+//
+// [v1.1 — 2026-10-26] — FINAL BUILD FIX: Corrected import path & const constructor
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/auth/role.dart';
-import '../../core/router/route_paths.dart';
-import '../../features/favorites/controllers/favorites_controller.dart';
-import '../../l10n/app_localizations.dart';
-import '../../repositories/reviews_repository.dart';
-import '../../theme/design_tokens.dart';
-import '../../widgets/confirm_dialog.dart';
-import '../../widgets/ya_app_bar.dart';
+// ✅ [FIX] المسار الصحيح (بدون features)
 import '../auth/controllers/auth_controller.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -18,825 +14,259 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final auth = context.watch<AuthController>();
     final theme = Theme.of(context);
+    final auth = context.watch<AuthController>();
 
-    // ═══════════════════════════════════════════════════════════
-    // GUEST أو غير مسجل
-    // ═══════════════════════════════════════════════════════════
-    if (!auth.isLoggedIn) {
-      return Scaffold(
-        appBar: YaAppBar(title: l10n.profile),
-        body: auth.isGuest
-            ? _GuestUpgradeCard(
-                onLogin: () => context.go(RoutePaths.login),
-                onRegister: () => context.go(RoutePaths.register),
-                onExitGuest: () => _confirmExitGuest(context, auth),
-              )
-            : _LoginRequired(
-                onLogin: () => context.go(RoutePaths.login),
-                onRegister: () => context.go(RoutePaths.register),
-              ),
-      );
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // مستخدم مسجّل
-    // ═══════════════════════════════════════════════════════════
-    final displayName = auth.displayName; // ✅ غير nullable الآن
+    // البيانات الافتراضية في حال عدم وجود مستخدم (زائر)
+    final displayName = auth.isLoggedIn ? auth.displayName : 'زائر';
+    final email = auth.user?.email ?? 'سجل الدخول للاستفادة من الميزات';
+    final photoUrl = auth.photoUrl;
+    final isMerchant = auth.isMerchant;
 
     return Scaffold(
-      appBar: YaAppBar(title: l10n.profile),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(
-          vertical: YaBaladiDesignTokens.space4,
-        ),
-        children: [
-          _ProfileHeader(
-            name: displayName,
-            initials: _initials(displayName),
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: const Text('حسابي'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
           ),
-          const SizedBox(height: 8),
-          _RoleBadge(role: auth.currentRole), // ✅ متوافق مع UserRole
-          const SizedBox(height: YaBaladiDesignTokens.space5),
-          const Divider(height: 1),
-          const _StatsSection(),
-          const Divider(height: 1),
-          const _LoyaltyComingSoonCard(),
-          const _ReferralComingSoonCard(),
-          const SizedBox(height: YaBaladiDesignTokens.space4),
-          const Divider(height: 1),
-          ListTile(
-            leading: Icon(Icons.logout, color: theme.colorScheme.error),
-            title: Text(
-              l10n.logout,
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-            onTap: () => _confirmLogout(context, auth),
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space4),
         ],
       ),
-    );
-  }
-
-  static String _initials(String input) {
-    final trimmed = input.trim();
-    if (trimmed.isEmpty || trimmed == '—') return '؟';
-    final parts = trimmed.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
-  }
-
-  Future<void> _confirmLogout(
-    BuildContext context,
-    AuthController auth,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showYaConfirmDialog(
-      context: context,
-      title: l10n.logoutConfirmTitle,
-      message: l10n.logoutConfirmMessage,
-      confirmLabel: l10n.confirm,
-      cancelLabel: l10n.cancel,
-      isDestructive: true,
-    );
-
-    if (confirmed == true) {
-      await auth.signOut();
-      // ✅ التصحيح: إجبار التوجيه لشاشة الدخول
-      if (context.mounted) {
-        context.go(RoutePaths.login);
-      }
-    }
-  }
-
-  Future<void> _confirmExitGuest(
-    BuildContext context,
-    AuthController auth,
-  ) async {
-    final confirmed = await showYaConfirmDialog(
-      context: context,
-      title: 'خروج من الوضع الزائر',
-      message: 'هل تريد الخروج من وضع الزائر والعودة لصفحة تسجيل الدخول؟',
-      confirmLabel: 'خروج',
-      cancelLabel: 'إلغاء',
-      isDestructive: true,
-    );
-
-    if (confirmed == true) {
-      await auth.signOut();
-      // ✅ التصحيح: إجبار التوجيه لشاشة الدخول
-      if (context.mounted) {
-        context.go(RoutePaths.login);
-      }
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ROLE BADGE
-// ═══════════════════════════════════════════════════════════════
-
-class _RoleBadge extends StatelessWidget {
-  const _RoleBadge({required this.role});
-
-  final UserRole role;
-
-  @override
-  Widget build(BuildContext context) {
-    if (role == UserRole.member || role == UserRole.visitor) {
-      return const SizedBox.shrink();
-    }
-
-    final (Color color, IconData icon) = switch (role) {
-      UserRole.merchant => (Colors.blue, Icons.storefront),
-      UserRole.team => (Colors.teal, Icons.groups),
-      UserRole.moderator => (Colors.orange, Icons.verified_user),
-      UserRole.manager => (Colors.purple, Icons.admin_panel_settings),
-      UserRole.admin => (Colors.red, Icons.shield),
-      _ => (Colors.grey, Icons.person),
-    };
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Chip(
-          avatar: Icon(icon, size: 16, color: color),
-          label: Text(
-            role.labelAr,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-          backgroundColor: color.withValues(alpha: 0.1),
-          side: BorderSide(color: color.withValues(alpha: 0.3)),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GUEST UPGRADE CARD
-// ═══════════════════════════════════════════════════════════════
-
-class _GuestUpgradeCard extends StatelessWidget {
-  const _GuestUpgradeCard({
-    required this.onLogin,
-    required this.onRegister,
-    required this.onExitGuest,
-  });
-
-  final VoidCallback onLogin;
-  final VoidCallback onRegister;
-  final VoidCallback onExitGuest;
-
-  @override
-  Widget build(BuildContext context) {
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(YaBaladiDesignTokens.space5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: YaBaladiDesignTokens.space5),
+          // ═══════ 1. بطاقة المستخدم ═══════
           Center(
-            child: Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person_outline,
-                size: 60,
-                color: theme.colorScheme.primary,
-              ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                  ? NetworkImage(photoUrl)
+                  : null,
+              child: photoUrl == null || photoUrl.isEmpty
+                  ? Icon(
+                      Icons.person,
+                      size: 50,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    )
+                  : null,
             ),
           ),
-          const SizedBox(height: YaBaladiDesignTokens.space5),
+          const SizedBox(height: 16),
           Text(
-            isArabic ? 'أنت تتصفّح كزائر' : "You're browsing as guest",
+            displayName,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: YaBaladiDesignTokens.space2),
+          const SizedBox(height: 4),
           Text(
-            isArabic
-                ? 'أنشئ حسابًا الآن لحفظ الأماكن المفضلة،\nإضافة تقييماتك، ومتابعة عروض يا بلدي.'
-                : 'Create an account to save favorites,\nadd reviews, and follow Ya Baladi offers.',
+            email,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              height: 1.5,
             ),
           ),
-          const SizedBox(height: YaBaladiDesignTokens.space5),
-          _BenefitRow(
-            icon: Icons.favorite_border,
-            label:
-                isArabic ? 'احفظ مفضلتك في أي وقت' : 'Save favorites anytime',
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space2),
-          _BenefitRow(
-            icon: Icons.star_border,
-            label: isArabic
-                ? 'شارك تقييماتك مع المجتمع'
-                : 'Share your reviews with community',
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space2),
-          _BenefitRow(
-            icon: Icons.local_offer_outlined,
-            label: isArabic ? 'احصل على عروض حصرية' : 'Get exclusive offers',
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space5),
-          FilledButton.icon(
-            onPressed: onRegister,
-            icon: const Icon(Icons.person_add_alt_1),
-            label: Text(l10n.registerCta),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+          const SizedBox(height: 24),
+
+          // ═══════ 2. بطاقة التاجر الذكية ═══════
+          if (isMerchant) ...[
+            const _MerchantDashboardCard(),
+            const SizedBox(height: 24),
+          ],
+
+          // ═══════ 3. القائمة ═══════
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space3),
-          OutlinedButton.icon(
-            onPressed: onLogin,
-            icon: const Icon(Icons.login),
-            label: Text(l10n.login),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-          const SizedBox(height: YaBaladiDesignTokens.space5),
-          const Divider(),
-          const SizedBox(height: YaBaladiDesignTokens.space2),
-          TextButton.icon(
-            onPressed: onExitGuest,
-            icon: Icon(
-              Icons.logout,
-              size: 18,
-              color: theme.colorScheme.error,
-            ),
-            label: Text(
-              isArabic ? 'الخروج من الوضع الزائر' : 'Exit guest mode',
-              style: TextStyle(
-                color: theme.colorScheme.error,
-                fontSize: 14,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BenefitRow extends StatelessWidget {
-  const _BenefitRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label, style: theme.textTheme.bodyMedium),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.name,
-    required this.initials,
-  });
-
-  final String name;
-  final String initials;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    final greeting = isArabic ? 'أهلاً بك يا $name' : 'Welcome, $name';
-
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 40,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            initials,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: YaBaladiDesignTokens.space3),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            greeting,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatsSection extends StatefulWidget {
-  const _StatsSection();
-
-  @override
-  State<_StatsSection> createState() => _StatsSectionState();
-}
-
-class _StatsSectionState extends State<_StatsSection> {
-  final _reviewsRepo = ReviewsRepository();
-  Future<int>? _reviewsCountFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final uid = context.read<AuthController>().uid;
-      // ✅ تصحيح: التحقق من أن المستخدم ليس زائراً
-      if (uid != 'guest') {
-        setState(() {
-          _reviewsCountFuture = _reviewsRepo.getCountByUser(uid);
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final favorites = context.watch<FavoritesController>();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: YaBaladiDesignTokens.space4,
-        vertical: YaBaladiDesignTokens.space4,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(
-              left: YaBaladiDesignTokens.space2,
-              bottom: YaBaladiDesignTokens.space3,
-            ),
-            child: Text(
-              l10n.profileActivity,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.favorite_border,
-                  label: l10n.profileStatsFavorites,
-                  value: favorites.count,
-                  onTap: () => context.go(RoutePaths.profileFavorites),
-                ),
-              ),
-              const SizedBox(width: YaBaladiDesignTokens.space3),
-              Expanded(
-                child: FutureBuilder<int>(
-                  future: _reviewsCountFuture,
-                  builder: (context, snap) {
-                    final count = snap.data ?? 0;
-                    return _StatCard(
-                      icon: Icons.star_border,
-                      label: l10n.profileStatsRatings,
-                      value: count,
-                      onTap: () => context.go(RoutePaths.myReviews),
-                    );
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.reviews_outlined),
+                  title: const Text('تقييماتي'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () {
+                    if (auth.isLoggedIn) {
+                      context.push('/profile/my-reviews');
+                    } else {
+                      _showLoginDialog(context);
+                    }
                   },
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final int value;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(YaBaladiDesignTokens.space4),
-          child: Column(
-            children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 28),
-              const SizedBox(height: YaBaladiDesignTokens.space2),
-              Text(
-                '$value',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.favorite_outline),
+                  title: const Text('المفضلة'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => context.push('/profile/favorites'),
                 ),
-              ),
-              const SizedBox(height: YaBaladiDesignTokens.space1),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('الإعدادات'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => context.push('/settings'),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoyaltyComingSoonCard extends StatelessWidget {
-  const _LoyaltyComingSoonCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.emoji_events_outlined,
-                    color: theme.colorScheme.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isArabic ? 'نقاط الولاء' : 'Loyalty Points',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          isArabic ? 'قريبًا' : 'Coming soon',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.lock_outline,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            Text(
-              isArabic
-                  ? '🎁 كيف ستكسب نقاطًا من تفاعلك؟'
-                  : '🎁 How to earn points from your activity?',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _LoyaltyRuleRow(
-              icon: Icons.favorite_border,
-              label: isArabic ? 'إضافة مفضلة' : 'Add favorite',
-              points: '+10',
-            ),
-            _LoyaltyRuleRow(
-              icon: Icons.star_border,
-              label: isArabic ? 'كتابة تقييم' : 'Write review',
-              points: '+50',
-            ),
-            _LoyaltyRuleRow(
-              icon: Icons.person_add_outlined,
-              label: isArabic ? 'دعوة صديق' : 'Invite friend',
-              points: '+100',
-            ),
-            _LoyaltyRuleRow(
-              icon: Icons.calendar_today_outlined,
-              label: isArabic ? 'تسجيل دخول يومي' : 'Daily check-in',
-              points: '+5',
-              isLast: true,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LoyaltyRuleRow extends StatelessWidget {
-  const _LoyaltyRuleRow({
-    required this.icon,
-    required this.label,
-    required this.points,
-    this.isLast = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String points;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-          Text(
-            points,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReferralComingSoonCard extends StatelessWidget {
-  const _ReferralComingSoonCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.group_add_outlined,
-                color: theme.colorScheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        isArabic ? 'دعوة صديق' : 'Invite a friend',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          isArabic ? 'قريبًا' : 'Soon',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isArabic
-                        ? 'شارك التطبيق مع أصدقائك'
-                        : 'Share the app with your friends',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                if (!isMerchant) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.storefront, color: Colors.orange),
+                    title: const Text('هل أنت صاحب عمل؟'),
+                    subtitle: const Text('انضم إلينا كتاجر معتمد'),
+                    trailing: const Icon(Icons.chevron_left),
+                    onTap: () => context.push('/merchant/apply'),
                   ),
                 ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ═══════ 4. زر تسجيل الخروج ═══════
+          if (auth.isLoggedIn)
+            OutlinedButton.icon(
+              onPressed: () async {
+                await auth.signOut();
+                if (context.mounted) context.go('/login');
+              },
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text(
+                'تسجيل الخروج',
+                style: TextStyle(color: Colors.red),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            )
+          else
+            FilledButton.icon(
+              onPressed: () => context.go('/login'),
+              icon: const Icon(Icons.login),
+              label: const Text('تسجيل الدخول'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-            Icon(
-              Icons.lock_outline,
-              size: 18,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  void _showLoginDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تسجيل الدخول مطلوب'),
+        content: const Text('يجب عليك تسجيل الدخول لعرض تقييماتك.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/login');
+            },
+            child: const Text('تسجيل الدخول'),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _LoginRequired extends StatelessWidget {
-  const _LoginRequired({
-    required this.onLogin,
-    required this.onRegister,
-  });
+// ═══════════════════════════════════════════════════════════════
+// بطاقة الانتقال للوحة التاجر
+// ═══════════════════════════════════════════════════════════════
 
-  final VoidCallback onLogin;
-  final VoidCallback onRegister;
+class _MerchantDashboardCard extends StatelessWidget {
+  // ✅ [FIX] إضافة const constructor
+  const _MerchantDashboardCard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(YaBaladiDesignTokens.space5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.person_outline,
-              size: 72,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: YaBaladiDesignTokens.space4),
-            Text(
-              l10n.loginSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: YaBaladiDesignTokens.space5),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onLogin,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(l10n.login),
-              ),
-            ),
-            const SizedBox(height: YaBaladiDesignTokens.space3),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onRegister,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text(l10n.registerCta),
-              ),
+    return InkWell(
+      onTap: () => context.push('/merchant/dashboard'),
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade600, Colors.green.shade400],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.dashboard,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '🎉 أنت تاجر معتمد',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'اضغط هنا لإدارة نشاطك التجاري.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white,
+                size: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );

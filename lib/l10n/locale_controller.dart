@@ -9,8 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// - Provides `isArabic` helper
 /// - Provides `toggle()` for quick switch
 class LocaleController extends ChangeNotifier {
-  LocaleController();
-
   // ============================================================
   // CONSTANTS
   // ============================================================
@@ -37,11 +35,8 @@ class LocaleController extends ChangeNotifier {
   // ============================================================
 
   Locale get locale => _locale;
-
   bool get isLoaded => _isLoaded;
-
   bool get isArabic => _locale.languageCode == 'ar';
-
   bool get isEnglish => _locale.languageCode == 'en';
 
   // ============================================================

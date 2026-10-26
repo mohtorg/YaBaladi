@@ -1,4 +1,8 @@
 // lib/main.dart
+//
+// [v11.2 — 2026-10-25] — Enable Offline Persistence
+//   - CHANGE: persistenceEnabled: false → true (allows offline reads)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +16,7 @@ import 'core/router/app_router.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
 import 'features/favorites/controllers/favorites_controller.dart';
+import 'features/filters/controllers/filters_controller.dart';
 import 'features/places/controllers/places_controller.dart';
 import 'features/trip/controllers/trip_plans_controller.dart';
 import 'firebase_options.dart';
@@ -32,8 +37,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // ✅ [FIX] تفعيل التخزين المؤقت للسماح بالعمل دون اتصال بالإنترنت
   FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: false,
+    persistenceEnabled: true, // 👈 تم التغيير إلى true
     webExperimentalForceLongPolling: true,
     webExperimentalAutoDetectLongPolling: true,
   );
@@ -61,8 +67,13 @@ class YaBaladiApp extends StatelessWidget {
         ChangeNotifierProvider<CategoriesController>(
           create: (_) => CategoriesController()..start(),
         ),
-        ChangeNotifierProvider<PlacesController>(
+        ChangeNotifierProvider<FiltersController>(
+          create: (_) => FiltersController()..load(),
+        ),
+        ChangeNotifierProxyProvider<FiltersController, PlacesController>(
           create: (_) => PlacesController(),
+          update: (_, filters, places) =>
+              places!..setFiltersMetadata(filters.all),
         ),
         ChangeNotifierProvider<FavoritesController>(
           create: (_) => FavoritesController(),

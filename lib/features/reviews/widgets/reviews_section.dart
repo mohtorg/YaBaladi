@@ -1,11 +1,8 @@
 // lib/features/reviews/widgets/reviews_section.dart
 //
-// [v1.0.2 — 2026-10-14] — Removed duplicate "Add Review" button in _EmptyState
-//   - زر واحد فقط الآن (في _Header) — يحترم قاعدة UI/UX "عنصر رئيسي واحد"
-//   - _EmptyState يعرض رسالة تشجيعية فقط + تلميح للزر أعلى
-//
-// [v1.0.1 — 2026-10-14] — Fixed FilledButton infinite width in Row
-// [v1.0 — 2026-10-14] — F2.2: ReviewsSection widget
+// [v1.0.3 — 2026-10-25] — FIX: Replaced review.userPhotoUrl with fallback to prevent build error
+//   - FIXED: Removed call to unsupported Review.userPhotoUrl (passes empty string instead)
+//   - KEPT: all UI, state routing, and delete logic identical.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -248,7 +245,9 @@ class _ReviewCard extends StatelessWidget {
           Row(
             children: [
               _Avatar(
-                imageUrl: review.userPhotoUrl,
+                // [FIX] تم تمرير نص فارغ بدلاً من review.userPhotoUrl
+                // لأن الموديل لا يدعم هذا الحقل، وسيظهر الحرف الأول كبديل.
+                imageUrl: '',
                 name: review.userName,
               ),
               const SizedBox(width: 12),

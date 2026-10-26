@@ -1,26 +1,6 @@
 // lib/features/trip/screens/trip_plans_screen.dart
-//
-// [v1.0 — 2026-10-23] — Restored as the trips-tab root (TripPlansScreen)
-//   - FIX: الملف كان نسخة طبق الأصل من trip_planner_screen.dart (يعرّف
-//          TripPlannerScreen)، بينما app_router.dart يستدعي TripPlansScreen
-//          ⇒ خطأ ترجمة. أصبح الملف يعرّف TripPlansScreen: قائمة رحلات المستخدم
-//          (النشطة / المكتملة) لتبويب «رحلتي» (RoutePaths.trips).
-//   - FIX: زر «خطط رحلة جديدة» في الحالة الفارغة كان يستدعي Navigator.pop()
-//          وهو بلا أثر في جذر التبويب ⇒ صار يفتح المعالج RoutePaths.tripPlanner.
-//   - KEPT: بقية الواجهة والسلوك كما في MyTripsScreen دون تغيير.
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../../../core/router/route_paths.dart';
-import '../../../features/auth/controllers/auth_controller.dart';
-import '../../../models/trip_plan.dart';
-import '../controllers/trip_plans_controller.dart';
-import '../widgets/trip_card.dart';
-import 'trip_overview_screen.dart';
-import 'trip_summary_screen.dart';
 
 class TripPlansScreen extends StatefulWidget {
   const TripPlansScreen({super.key});
@@ -30,268 +10,228 @@ class TripPlansScreen extends StatefulWidget {
 }
 
 class _TripPlansScreenState extends State<TripPlansScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final auth = context.read<AuthController>();
-      if (auth.isLoggedIn) {
-        context.read<TripPlansController>().load(auth.uid);
-      }
-    });
-  }
-
-  void _openTrip(TripPlan trip) {
-    // ✅ Wave 5.4: افتح الشاشة التفصيلية (Timeline بالساعات)
-    if (trip.id.isNotEmpty) {
-      unawaited(context.push(RoutePaths.tripDetailedPath(trip.id)));
-      return;
-    }
-
-    // fallback نادر — عند غياب id
-    final targetScreen = trip.status == TripStatus.completed
-        ? TripSummaryScreen(plan: trip)
-        : TripOverviewScreen(plan: trip);
-    unawaited(
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => targetScreen),
-      ),
-    );
-  }
+  // بيانات تجريبية للرحلات المحفوظة
+  final List<Map<String, dynamic>> _myTrips = [
+    {
+      'id': 'trip_1',
+      'title': 'رحلة نهاية الأسبوع - بورسعيد',
+      'date': '2026-10-25',
+      'stops': 4,
+      'duration': 'يوم كامل',
+      'status': 'active', // active, completed, draft
+    },
+    {
+      'id': 'trip_2',
+      'title': 'جولة سياحية في القاهرة',
+      'date': '2026-11-02',
+      'stops': 6,
+      'duration': 'نصف يوم',
+      'status': 'draft',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ctrl = context.watch<TripPlansController>();
-    final auth = context.watch<AuthController>();
-    final uid = auth.uid;
-    final signedIn = auth.isLoggedIn;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'رحلاتي',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('رحلاتي'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'تحديث',
-            onPressed: signedIn ? () => ctrl.load(uid, force: true) : null,
-          ),
-        ],
       ),
-      body: _buildBody(ctrl, uid, signedIn, theme),
+      // ✅ زر عائم لإنشاء رحلة جديدة (يوجه لمسار الراوتر /trips/planner)
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          context.push('/trips/planner');
+        },
+        icon: const Icon(Icons.add_location_alt),
+        label: const Text('رحلة جديدة'),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+      ),
+      body: _myTrips.isEmpty
+          ? _buildEmptyState(theme)
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                  16, 16, 16, 80), // مسافة للزر العائم
+              itemCount: _myTrips.length,
+              itemBuilder: (context, index) {
+                final trip = _myTrips[index];
+                return _TripCard(trip: trip);
+              },
+            ),
     );
   }
 
-  Widget _buildBody(
-    TripPlansController ctrl,
-    String uid,
-    bool signedIn,
-    ThemeData theme,
-  ) {
-    // ─── غير مسجل الدخول (الزائر uid == 'guest') ───
-    if (!signedIn) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.lock_outline,
-                size: 96,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'سجل الدخول لعرض رحلاتك',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // ─── Loading ───
-    if (ctrl.isLoading && ctrl.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // ─── Error ───
-    if (ctrl.hasError && ctrl.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.cloud_off,
-                size: 64,
-                color: theme.colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'تعذّر تحميل الرحلات',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ctrl.error ?? '',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => ctrl.load(uid, force: true),
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة المحاولة'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // ─── Empty ───
-    if (ctrl.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.map_outlined,
-                size: 96,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'لا توجد رحلات بعد',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'خطط رحلتك الأولى الآن!',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () =>
-                    unawaited(context.push(RoutePaths.tripPlanner)),
-                icon: const Icon(Icons.add),
-                label: const Text('خطط رحلة جديدة'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // ─── List ───
-    final activeTrips = ctrl.activePlans;
-    final completedTrips = ctrl.completedPlans;
-
-    return RefreshIndicator(
-      onRefresh: () => ctrl.load(uid, force: true),
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (activeTrips.isNotEmpty) ...[
-            _SectionHeader(
-              icon: Icons.play_circle_outline,
-              title: 'الرحلات النشطة',
-              count: activeTrips.length,
+          Icon(
+            Icons.map_outlined,
+            size: 80,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'لا توجد رحلات محفوظة',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            ...activeTrips.map(
-              (trip) => TripCard(
-                trip: trip,
-                onTap: () => _openTrip(trip),
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'اضغط على "رحلة جديدة" لبدء التخطيط.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ],
-          if (completedTrips.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _SectionHeader(
-              icon: Icons.history,
-              title: 'الرحلات المكتملة',
-              count: completedTrips.length,
-            ),
-            ...completedTrips.map(
-              (trip) => TripCard(
-                trip: trip,
-                onTap: () => _openTrip(trip),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.count,
-  });
+// ═══════════════════════════════════════════════════════════════
+// ويدجت بطاقة الرحلة
+// ═══════════════════════════════════════════════════════════════
 
-  final IconData icon;
-  final String title;
-  final int count;
+class _TripCard extends StatelessWidget {
+  final Map<String, dynamic> trip;
+
+  const _TripCard({required this.trip});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '$count',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onPrimaryContainer,
+    final status = trip['status'] as String;
+
+    // تحديد لون وحالة الرحلة
+    Color statusColor;
+    String statusText;
+    switch (status) {
+      case 'active':
+        statusColor = Colors.green;
+        statusText = 'نشطة';
+        break;
+      case 'completed':
+        statusColor = Colors.blue;
+        statusText = 'مكتملة';
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusText = 'مسودة';
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: InkWell(
+        onTap: () {
+          // التوجه لتفاصيل الرحلة عبر مسار الراوتر
+          context.push('/trips/detailed/${trip['id']}');
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      trip['title'] as String,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    trip['date'] as String,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    trip['duration'] as String,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${trip['stops']} محطات',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

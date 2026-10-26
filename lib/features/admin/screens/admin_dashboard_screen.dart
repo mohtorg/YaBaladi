@@ -1,21 +1,6 @@
 // lib/features/admin/screens/admin_dashboard_screen.dart
 //
-// [v7.4.1 — 2026-10-24] — Fix: textDirection outside TextStyle.copyWith
-//   - FIX: In _CategoryRowCard, `textDirection: TextDirection.ltr`
-//     moved from inside `style.copyWith(...)` to the `Text(...)` widget.
-//     TextStyle doesn't accept textDirection (Flutter 3.27+).
-//
-// [v7.4 — 2026-10-24] — Wave 10: Categories Tab
-//   - NEW: _CategoriesTab (embedded categories manager) between places & users
-//   - NEW: _CategoryRowCard (inline card with active/featured toggles)
-//   - FIX: _pages now static const (avoids rebuilding list every frame)
-//   - FIX: bounds check on tab selection
-//   - FIX: silent failures in _PlacesTab._loadMore / _UsersTab._loadMore
-//   - LANG: "الكل" → "الرئيسية", "السجل" → "سجل التدقيق"
-//
-// [v7.3 — 2026-10-23] — Theme-aware colors & typography
-// [v7.2 — 2026-10-23] — async safety
-// [v7.1 — 2026-10-22] — Wave 2: RadioGroup migration
+// [v7.8 — 2026-10-26] — FIX: Null Safety in _UserProfileMenu, MerchantRequestsPage name
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -30,7 +15,9 @@ import '../controllers/admin_stats_controller.dart';
 import '../widgets/add_edit_category_dialog.dart';
 import '../widgets/common_widgets.dart';
 import 'add_place_screen.dart';
+import 'filters_management_screen.dart';
 import 'import_excel_screen.dart';
+import 'merchant_requests_screen.dart';
 import 'place_detail_screen.dart';
 import 'place_statistics_screen.dart';
 import 'review_statistics_screen.dart';
@@ -50,6 +37,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _OverviewTab(),
     _PlacesTab(),
     _CategoriesTab(),
+    FiltersManagementScreen(),
+    MerchantRequestsScreen(),
     _UsersTab(),
     _AuditLogsTab(),
   ];
@@ -64,113 +53,181 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final theme = Theme.of(context);
     final isDesktop = MediaQuery.of(context).size.width >= 900;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        surfaceTintColor: theme.colorScheme.surface,
-        elevation: 1,
-        title: Row(
-          children: [
-            Icon(
-              Icons.admin_panel_settings,
-              color: YaBaladiDesignTokens.primaryBlue,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'لوحة تحكم يا بلدي',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: const [_UserProfileMenu()],
-      ),
-      body: isDesktop
-          ? Row(
+    // 🆕 Stream لجلب عدد الطلبات المعلقة في الوقت الفعلي
+    return StreamBuilder<int>(
+      stream: FirebaseFirestore.instance
+          .collection('merchant_requests')
+          .where('status', isEqualTo: 'pending')
+          .snapshots()
+          .map((s) => s.docs.length),
+      initialData: 0,
+      builder: (context, snapshot) {
+        final pendingCount = snapshot.data ?? 0;
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: theme.colorScheme.surface,
+            surfaceTintColor: theme.colorScheme.surface,
+            elevation: 1,
+            title: Row(
               children: [
-                NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onTabSelected,
-                  labelType: NavigationRailLabelType.all,
-                  backgroundColor: theme.colorScheme.surface,
-                  selectedIconTheme: const IconThemeData(
-                    color: YaBaladiDesignTokens.primaryBlue,
-                  ),
-                  selectedLabelTextStyle: const TextStyle(
-                    color: YaBaladiDesignTokens.primaryBlue,
+                Icon(Icons.admin_panel_settings,
+                    color: YaBaladiDesignTokens.primaryBlue),
+                const SizedBox(width: 8),
+                Text(
+                  'لوحة تحكم يا بلدي',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('الرئيسية'),
+                ),
+              ],
+            ),
+            actions: const [_UserProfileMenu()],
+          ),
+          body: isDesktop
+              ? Row(
+                  children: [
+                    NavigationRail(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _onTabSelected,
+                      labelType: NavigationRailLabelType.all,
+                      backgroundColor: theme.colorScheme.surface,
+                      selectedIconTheme: const IconThemeData(
+                        color: YaBaladiDesignTokens.primaryBlue,
+                      ),
+                      selectedLabelTextStyle: const TextStyle(
+                        color: YaBaladiDesignTokens.primaryBlue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      destinations: [
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.dashboard_outlined),
+                          selectedIcon: Icon(Icons.dashboard),
+                          label: Text('الرئيسية'),
+                        ),
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.place_outlined),
+                          selectedIcon: Icon(Icons.place),
+                          label: Text('الأماكن'),
+                        ),
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.category_outlined),
+                          selectedIcon: Icon(Icons.category),
+                          label: Text('التصنيفات'),
+                        ),
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.tune_outlined),
+                          selectedIcon: Icon(Icons.tune),
+                          label: Text('الفلاتر'),
+                        ),
+                        // 🆕 التجار مع شارة
+                        NavigationRailDestination(
+                          icon: _BadgeIcon(
+                            icon: Icons.assignment_outlined,
+                            count: pendingCount,
+                          ),
+                          selectedIcon: _BadgeIcon(
+                            icon: Icons.assignment,
+                            count: pendingCount,
+                          ),
+                          label: const Text('التجار'),
+                        ),
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.people_outline),
+                          selectedIcon: Icon(Icons.people),
+                          label: Text('المستخدمون'),
+                        ),
+                        const NavigationRailDestination(
+                          icon: Icon(Icons.history_outlined),
+                          selectedIcon: Icon(Icons.history),
+                          label: Text('السجل'),
+                        ),
+                      ],
                     ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.place_outlined),
-                      selectedIcon: Icon(Icons.place),
-                      label: Text('الأماكن'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.category_outlined),
-                      selectedIcon: Icon(Icons.category),
-                      label: Text('التصنيفات'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.people_outline),
-                      selectedIcon: Icon(Icons.people),
-                      label: Text('المستخدمون'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.history_outlined),
-                      selectedIcon: Icon(Icons.history),
-                      label: Text('السجل'),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: _pages,
+                      ),
                     ),
                   ],
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedIndex,
-                    children: _pages,
-                  ),
-                ),
-              ],
-            )
-          : IndexedStack(index: _selectedIndex, children: _pages),
-      bottomNavigationBar: !isDesktop
-          ? BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: _onTabSelected,
-              selectedItemColor: YaBaladiDesignTokens.primaryBlue,
-              backgroundColor: theme.colorScheme.surface,
-              type: BottomNavigationBarType.fixed,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard),
-                  label: 'الرئيسية',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.place),
-                  label: 'الأماكن',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.category),
-                  label: 'التصنيفات',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people),
-                  label: 'المستخدمون',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.history),
-                  label: 'السجل',
-                ),
-              ],
-            )
-          : null,
+                )
+              : IndexedStack(index: _selectedIndex, children: _pages),
+          bottomNavigationBar: !isDesktop
+              ? BottomNavigationBar(
+                  currentIndex: _selectedIndex,
+                  onTap: _onTabSelected,
+                  selectedItemColor: YaBaladiDesignTokens.primaryBlue,
+                  backgroundColor: theme.colorScheme.surface,
+                  type: BottomNavigationBarType.fixed,
+                  items: [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.dashboard),
+                      label: 'الرئيسية',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.place),
+                      label: 'الأماكن',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.category),
+                      label: 'التصنيفات',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.tune),
+                      label: 'الفلاتر',
+                    ),
+                    // 🆕 التجار مع شارة
+                    BottomNavigationBarItem(
+                      icon: _BadgeIcon(
+                        icon: Icons.assignment,
+                        count: pendingCount,
+                      ),
+                      label: 'التجار',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.people),
+                      label: 'المستخدمون',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.history),
+                      label: 'السجل',
+                    ),
+                  ],
+                )
+              : null,
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🆕 _BadgeIcon: أيقونة مع شارة حمراء
+// ═══════════════════════════════════════════════════════════════
+class _BadgeIcon extends StatelessWidget {
+  final IconData icon;
+  final int count;
+
+  const _BadgeIcon({required this.icon, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return Icon(icon);
+
+    return Badge(
+      label: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: Colors.red,
+      child: Icon(icon),
     );
   }
 }
@@ -287,23 +344,9 @@ class _OverviewTabState extends State<_OverviewTab> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: AdminKpiCard(
-                          title: 'أماكن تنتظر الموافقة',
-                          count: ctrl.stats.unapprovedPlaces,
-                          unit: 'مكان',
-                          icon: Icons.pending_actions,
-                          color: Colors.orange,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'انتقل إلى تبويب "الأماكن" لمراجعتها',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                      // 🆕 بطاقة طلبات التجار مع العدد الحقيقي (StreamBuilder)
+                      const Expanded(
+                        child: _PendingMerchantKpiCard(),
                       ),
                     ],
                   ),
@@ -333,6 +376,41 @@ class _OverviewTabState extends State<_OverviewTab> {
           );
         },
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🆕 _PendingMerchantKpiCard: بطاقة KPI بعدد حقيقي
+// ═══════════════════════════════════════════════════════════════
+class _PendingMerchantKpiCard extends StatelessWidget {
+  const _PendingMerchantKpiCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('merchant_requests')
+          .where('status', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.docs.length ?? 0;
+
+        return AdminKpiCard(
+          title: 'طلبات التجار',
+          count: count,
+          unit: 'طلب',
+          icon: Icons.assignment,
+          color: Colors.orange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              // ✅ إصلاح: توحيد اسم الكلاس إلى Screen
+              builder: (_) => const MerchantRequestsScreen(),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -725,7 +803,7 @@ class _PlacesTabState extends State<_PlacesTab> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Categories Tab (Wave 10 — file 9)
+// Categories Tab
 // ═══════════════════════════════════════════════════════════════
 class _CategoriesTab extends StatefulWidget {
   const _CategoriesTab();
@@ -1134,7 +1212,6 @@ class _CategoryRowCard extends StatelessWidget {
                         ],
                       ],
                     ),
-                    // [v7.4.1 FIX] textDirection moved out of style.copyWith
                     Text(
                       category.nameEn,
                       textDirection: TextDirection.ltr,
@@ -1694,16 +1771,21 @@ class _UserProfileMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = context.watch<AuthController>();
+    // ✅ استخراج القيمة أولاً للتعامل مع الـ Nullability
+    final photoUrl = auth.photoUrl;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Row(
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundImage:
-                auth.photoUrl.isNotEmpty ? NetworkImage(auth.photoUrl) : null,
+            // ✅ حماية ضد Null
+            backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                ? NetworkImage(photoUrl)
+                : null,
             backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            child: auth.photoUrl.isEmpty
+            child: (photoUrl == null || photoUrl.isEmpty)
                 ? Icon(
                     Icons.person,
                     size: 16,

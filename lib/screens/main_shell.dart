@@ -1,183 +1,88 @@
+// lib/screens/main_shell.dart
+//
+// [v3.0 — 2026-10-26] — ARCHITECTURE: User Shell with Smart Merchant Switch
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../core/router/route_paths.dart';
 import '../features/auth/controllers/auth_controller.dart';
-import '../features/favorites/controllers/favorites_controller.dart';
-import '../l10n/app_localizations.dart';
 
-/// [v1.4 — 2026-10-23] — i18n of hard-coded SnackBar texts
-///   - FIX: رسالة «سجّل دخولك…» صارت من l10n.loginRequired (AR/EN).
-///   - FIX: رسالة «اضغط مرة أخرى للخروج…» كانت عربية فقط ⇒ تتبع لغة التطبيق.
-///          TODO: نقلها لمفتاح ARB مستقل عند معالجة بند الترجمة العام.
-///
-/// [v1.3 — 2026-10-15] — G6.7: Bottom Nav (4 tabs)
-///   - CHANGE: 5 tabs → 4 tabs: الرئيسية | رحلتي | حسابي | الإعدادات
-///   - CHANGE: المفضلة انتقلت لـ ProfileScreen (drill-down)
-///   - NEW: تبويب "رحلتي" (trips)
-///
-/// [v1.2 — 2026-10-14] — StatefulShellRoute + Favorites race fix
-class MainShell extends StatefulWidget {
-  const MainShell({super.key, required this.navigationShell});
-
+class MainShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
-  @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  DateTime? _lastBackPress;
-  String? _lastSyncedUid;
-  int _favoritesSyncGeneration = 0;
-
-  void _syncFavoritesWatcher(String? uid) {
-    if (_lastSyncedUid == uid) return;
-    _lastSyncedUid = uid;
-
-    final myGen = ++_favoritesSyncGeneration;
-    final fav = context.read<FavoritesController>();
-    final capturedUid = uid;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (myGen != _favoritesSyncGeneration) return;
-
-      if (capturedUid != null) {
-        fav.startWatching(capturedUid);
-      } else {
-        fav.stopWatching();
-      }
-    });
-  }
-
-  void _onTap(BuildContext context, _NavDest dest, int index) {
-    final auth = context.read<AuthController>();
-
-    if (dest.lockForGuest && auth.isGuest) {
-      final l10n = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(l10n.loginRequired),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
-
-    widget.navigationShell.goBranch(
-      index,
-      initialLocation: index == widget.navigationShell.currentIndex,
-    );
-  }
-
-  void _handleBack(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-
-    if (location != RoutePaths.home) {
-      widget.navigationShell.goBranch(0, initialLocation: true);
-      return;
-    }
-
-    final now = DateTime.now();
-    if (_lastBackPress == null ||
-        now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
-      _lastBackPress = now;
-
-      final isArabic = AppLocalizations.of(context).localeName == 'ar';
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              isArabic
-                  ? 'اضغط مرة أخرى للخروج من التطبيق'
-                  : 'Press back again to exit',
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
-
-    SystemNavigator.pop();
-  }
+  const MainShell({
+    super.key,
+    required this.navigationShell,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    // ✅ نراقب حالة المصادقة لمعرفة ما إذا كان المستخدم تاجراً أم لا
     final auth = context.watch<AuthController>();
-    final currentIndex = widget.navigationShell.currentIndex;
+    final theme = Theme.of(context);
 
-    _syncFavoritesWatcher(auth.uid);
+    return Scaffold(
+      // ─── محتوى التبويبات (يُدار بواسطة GoRouter) ───
+      body: navigationShell,
 
-    // [v1.3] 4 tabs — المفضلة انتقلت لـ Profile
-    final destinations = [
-      _NavDest(
-        icon: Icons.home_outlined,
-        selectedIcon: Icons.home,
-        label: l10n.home,
-        lockForGuest: false,
-      ),
-      _NavDest(
-        icon: Icons.explore_outlined,
-        selectedIcon: Icons.explore,
-        label: l10n.tripsTitle,
-        lockForGuest: false, // الزائر يرى Empty State
-      ),
-      _NavDest(
-        icon: Icons.person_outline,
-        selectedIcon: Icons.person,
-        label: l10n.profile,
-        lockForGuest: false,
-      ),
-      _NavDest(
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
-        label: l10n.settings,
-        lockForGuest: false,
-      ),
-    ];
+      // ─── زر التبديل الذكي (يظهر فقط للتجار) ───
+      // ابتكار: بدلاً من وضع التبويب في القائمة السفلية وإزعاج المستخدم العادي،
+      // نضع زراً عائماً (FAB) أنيقاً يظهر فقط لمن لديه صلاحية تاجر.
+      floatingActionButton: auth.isMerchant
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                // الانتقال إلى لوحة تحكم التاجر
+                context.push('/merchant/dashboard');
+              },
+              icon: const Icon(Icons.storefront),
+              label: const Text('لوحة التاجر'),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              elevation: 4,
+            )
+          : null,
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        _handleBack(context);
-      },
-      child: Scaffold(
-        body: widget.navigationShell,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: currentIndex,
-          onDestinationSelected: (i) => _onTap(context, destinations[i], i),
-          destinations: [
-            for (final d in destinations)
-              NavigationDestination(
-                icon: Icon(d.icon),
-                selectedIcon: Icon(d.selectedIcon),
-                label: d.label,
-              ),
-          ],
-        ),
+      // ─── شريط التنقل السفلي (للمستخدم العادي) ───
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (int index) {
+          navigationShell.goBranch(
+            index,
+            // العودة إلى الصفحة الرئيسية للتبويب إذا تم الضغط عليه مرة أخرى
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
+        backgroundColor: theme.colorScheme.surface,
+        indicatorColor: theme.colorScheme.primaryContainer,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'الاستكشاف',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'رحلاتي',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_outline),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'المفضلة',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'حسابي',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'الإعدادات',
+          ),
+        ],
       ),
     );
   }
-}
-
-class _NavDest {
-  const _NavDest({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.lockForGuest,
-  });
-
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool lockForGuest;
 }

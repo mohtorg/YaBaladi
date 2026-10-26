@@ -1,9 +1,9 @@
 // lib/core/auth/permissions.dart
 //
-// [v1.0 — 2026-10-14] — G4.1-b: Permission enum + matrix
-//   - يمثل مفاتيح الصلاحيات من Master Plan § 7.2.
-//   - يرتبط بـ UserRole عبر defaultPermissionsFor(role).
-//   - مستقل تماماً — يعتمد على role.dart فقط.
+// [v1.1 — 2026-10-25] — FIX: Non-exhaustive switch in defaultPermissionsFor
+//   - ADDED: default case returns empty set to prevent compilation error
+//     if UserRole enum contains additional values in role.dart.
+//   - KEPT: all permissions, labels, and logic identical.
 
 import 'role.dart';
 
@@ -212,6 +212,11 @@ Set<Permission> defaultPermissionsFor(UserRole role) {
     case UserRole.admin:
       // كل الصلاحيات.
       return Permission.values.toSet();
+
+    // [FIX] تمت إضافة هذه الحالة لمنع خطأ التجميع (Non-exhaustive switch)
+    // في حال كان الـ enum UserRole يحتوي على أدوار إضافية.
+    default:
+      return {};
   }
 }
 

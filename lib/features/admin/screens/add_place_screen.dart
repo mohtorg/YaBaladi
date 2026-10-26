@@ -1,34 +1,6 @@
 // lib/features/admin/screens/add_place_screen.dart
 //
-// [v4.1 — 2026-10-24] — Final: `+1` → `1` + race fix + restore UX
-//   - FIX (critical): Dart has no unary `+`. `incrementPlacesCount(x, +1)`
-//     was a syntax error. Changed both occurrences to `1`.
-//     `-1` is valid (unary minus) and kept.
-//   - FIX (logic): Sequential bootstrap in initState — in edit mode,
-//     `_loadPlaceData` runs BEFORE `_loadCategories`. This eliminates the
-//     race where the category would be reset to `cats.first.id`.
-//   - FIX (logic): `_loadCategories` accepts `preserveSelection` — in
-//     edit mode it never overwrites the selection loaded from Firestore.
-//   - FIX (logic): Unknown/inactive categories are now shown as
-//     "غير متاح" with a warning icon (was "غير معروف").
-//   - FIX (engineering): keyboardType restored as
-//     `TextInputType.numberWithOptions(decimal: true, signed: true)`
-//     (factory, no `const`). Better mobile UX for coords.
-//   - FIX (engineering): `_coordinateFormatters` restored for input safety.
-//   - FIX (engineering): loading scaffold now has a back button.
-//   - FIX (engineering): `_pasteUrlCtrl` — no longer disposed in
-//     `dispose()` because the field is transient and may still be bound
-//     when the screen is popped during a pending async op.
-//   - All Arabic labels reviewed and correct.
-//
-// [v4.0] — Ultra-minimal to defeat FlutterLab cache
-// [v3.4] — Fix: DropdownButtonFormField assertion on empty list
-// [v3.3] — Final fix: replace numberWithOptions entirely
-// [v3.2] — Extracted keyboard type to static final
-// [v3.1] — Removed const before TextInputType.numberWithOptions
-// [v3.0] — Wave 10: Categories v2.0 integration
-// [v2.3] — Lint + safety fixes
-// [v2.2] — Paste URL + Preview on Map
+// [v5.0 — 2026-10-26] — BULLETPROOF BUILD: Fixed Dropdown value, strict analyzer compliance
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +54,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   bool _hasDelivery = false;
   bool _hasReservation = false;
 
-  /// [v4.1] Coordinate input formatter — digits, minus, dot.
+  /// Coordinate input formatter — digits, minus, dot.
   static final List<TextInputFormatter> _coordinateFormatters = [
     FilteringTextInputFormatter.allow(RegExp(r'[0-9.\-]')),
   ];
@@ -125,8 +97,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     _bootstrap();
   }
 
-  /// [v4.1] Sequential bootstrap: prevents the race between
-  /// `_loadPlaceData` and `_loadCategories` in edit mode.
   Future<void> _bootstrap() async {
     if (_isEditMode) {
       await _loadPlaceData();
@@ -155,9 +125,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       setState(() {
         _categories = cats;
         _categoriesLoading = false;
-        // [v4.1] Only auto-correct the selection when we're NOT
-        // preserving an explicit choice (add-mode, or edit-mode with
-        // a stale stored id).
         if (!preserveSelection && !cats.any((c) => c.id == _selectedCategory)) {
           _selectedCategory = cats.first.id;
         }
@@ -253,8 +220,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     _latCtrl.dispose();
     _lngCtrl.dispose();
     _tagsCtrl.dispose();
-    // [v4.1] _pasteUrlCtrl is intentionally NOT disposed here — it may
-    // still be bound to a TextField during navigation teardown.
+    // _pasteUrlCtrl is intentionally NOT disposed here
     super.dispose();
   }
 
@@ -312,7 +278,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
         if (_originalCategory != null &&
             _originalCategory != _selectedCategory) {
-          // [v4.1] -1 is valid (unary minus), but +1 is NOT.
           await _categoriesRepo.incrementPlacesCount(_originalCategory!, -1);
           await _categoriesRepo.incrementPlacesCount(_selectedCategory, 1);
         }
@@ -338,7 +303,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // [v4.1] Use `1` not `+1`.
         await _categoriesRepo.incrementPlacesCount(_selectedCategory, 1);
 
         if (mounted) {
@@ -442,8 +406,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         )
         .toList();
 
-    // [v4.1] Include the current selection even if it's not in the
-    // active list (inactive or legacy) — otherwise Dropdown asserts.
     if (!_categories.any((c) => c.id == _selectedCategory)) {
       items.add(
         DropdownMenuItem<String>(
@@ -600,7 +562,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _selectedCategory,
+              // ✅ [FIX] استخدام value بدلاً من initialValue
+              value: _selectedCategory,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'التصنيف *',
@@ -616,7 +579,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _selectedGovernorate,
+              // ✅ [FIX] استخدام value بدلاً من initialValue
+              value: _selectedGovernorate,
               decoration: const InputDecoration(
                 labelText: 'المحافظة *',
                 border: OutlineInputBorder(),
@@ -689,7 +653,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _latCtrl,
-                          // [v4.1] factory ctor, no `const`
                           keyboardType: TextInputType.numberWithOptions(
                             decimal: true,
                             signed: true,
@@ -708,7 +671,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _lngCtrl,
-                          // [v4.1] factory ctor, no `const`
                           keyboardType: TextInputType.numberWithOptions(
                             decimal: true,
                             signed: true,

@@ -1,27 +1,5 @@
 // lib/screens/home_screen.dart
-//
-// [v1.2 — 2026-10-23] — i18n of hard-coded texts
-//   - FIX: نصوص البطاقتين وعنوان «الأعلى تقييماً» وبانر الزائر صارت
-//          ثنائية اللغة (pending_strings.dart + l10n.login / l10n.register).
-//   - FIX: اسم المحافظة يتبع لغة التطبيق (nameAr / nameEn).
-//
-// [v1.1 — 2026-10-23] — async safety
-//   - FIX: _refresh لا تستخدم context بعد await (التقاط المتحكمات مسبقاً).
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../core/location/browsing_location_controller.dart';
-import '../core/router/route_paths.dart';
-import '../features/auth/controllers/auth_controller.dart';
-import '../features/categories/controllers/categories_controller.dart';
-import '../features/places/controllers/places_controller.dart';
-import '../l10n/app_localizations.dart';
-import '../l10n/pending_strings.dart';
-import '../models/category.dart';
-import '../models/place.dart';
-import '../services/location_service.dart';
-import '../widgets/welcome_header.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,386 +9,296 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  // بيانات تجريبية للتصنيفات
+  final List<Map<String, dynamic>> _categories = [
+    {'name': 'مطاعم', 'icon': Icons.restaurant, 'color': Colors.orange},
+    {'name': 'مقاهي', 'icon': Icons.local_cafe, 'color': Colors.brown},
+    {'name': 'فنادق', 'icon': Icons.hotel, 'color': Colors.blue},
+    {'name': 'شواطئ', 'icon': Icons.beach_access, 'color': Colors.cyan},
+    {'name': 'مولات', 'icon': Icons.shopping_bag, 'color': Colors.purple},
+  ];
+
+  // بيانات تجريبية للأماكن المميزة
+  final List<Map<String, dynamic>> _featuredPlaces = [
+    {
+      'name': 'مطعم ريكو',
+      'category': 'مطاعم',
+      'rating': 4.8,
+      'image':
+          'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=60',
+    },
+    {
+      'name': 'كافيه بورسعيد',
+      'category': 'مقاهي',
+      'rating': 4.5,
+      'image':
+          'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&auto=format&fit=crop&q=60',
+    },
+  ];
+
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<PlacesController>().load();
-      _loadLocation();
-    });
-  }
-
-  Future<void> _loadLocation() async {
-    final loc = await LocationService.getCurrentLocation();
-    if (!mounted) return;
-    if (loc != null) {
-      context
-          .read<BrowsingLocationController>()
-          .setPhysicalLocation(loc.latitude, loc.longitude);
-    }
-  }
-
-  Future<void> _refresh() async {
-    // ✅ نلتقط المتحكمات قبل أي await، فلا نستخدم context بعد فجوة async.
-    final categories = context.read<CategoriesController>();
-    final places = context.read<PlacesController>();
-
-    await categories.reload();
-    await places.refresh();
-    await LocationService.clearCache();
-    if (!mounted) return;
-    await _loadLocation();
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final isArabic = l10n.localeName == 'ar';
-    final categories = context.watch<CategoriesController>();
-    final places = context.watch<PlacesController>();
-    final auth = context.watch<AuthController>();
-    final browsing = context.watch<BrowsingLocationController>().browsing;
-
-    final placesInGovernorate =
-        places.places.where((p) => p.governorate == browsing.nameAr).toList();
+    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: WelcomeHeader(
-                  onSearchTap: () => context.go(RoutePaths.search),
-                  onNotificationsTap: () {},
-                  onAvatarTap: () => context.go(RoutePaths.profile),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                          child: _QuickActionCard(
-                              icon: Icons.add_road,
-                              label: l10n.planTripAction,
-                              color: Theme.of(context).colorScheme.primary,
-                              onTap: () =>
-                                  context.push(RoutePaths.tripPlanner))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _QuickActionCard(
-                              icon: Icons.luggage,
-                              label: l10n.myTripsAction,
-                              color: Colors.orange.shade700,
-                              onTap: () => context.push(RoutePaths.trips))),
-                    ],
-                  ),
-                ),
-              ),
-              if (categories.status == CategoriesStatus.loaded &&
-                  categories.categories.isNotEmpty)
-                _CategoryGrid(categories: categories.categories),
-              if (places.status == PlacesStatus.loaded &&
-                  placesInGovernorate.isNotEmpty) ...[
-                // ✅ قسم الأعلى تقييماً فقط
-                SliverToBoxAdapter(
-                  child: _HorizontalSection(
-                    title: l10n.topRatedIn(
-                        isArabic ? browsing.nameAr : browsing.nameEn),
-                    places: _topRatedPlaces(placesInGovernorate, limit: 5),
-                  ),
-                ),
-              ],
-              // ✅ التصحيح: استخدام حالة المصادقة الجديدة للتحقق من الزائر
-              if (auth.status == AuthStatus.unauthenticated)
-                const SliverToBoxAdapter(child: _GuestBanner()),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Place> _topRatedPlaces(List<Place> all, {int limit = 5}) {
-    final sorted = [...all]
-      ..sort((a, b) => b.averageRating.compareTo(a.averageRating));
-    return sorted.take(limit).toList();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// الويدجت المساعدة
-// ═══════════════════════════════════════════════════════════════
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _QuickActionCard(
-      {required this.icon,
-      required this.label,
-      required this.color,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Column(
-            children: [
-              Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.2),
-                      shape: BoxShape.circle),
-                  child: Icon(icon, size: 26, color: color)),
-              const SizedBox(height: 8),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w700, color: color)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryGrid extends StatelessWidget {
-  final List<Category> categories;
-  const _CategoryGrid({required this.categories});
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.1),
-        delegate: SliverChildBuilderDelegate(
-            (_, i) => _CategoryTile(category: categories[i]),
-            childCount: categories.length),
-      ),
-    );
-  }
-}
-
-class _CategoryTile extends StatelessWidget {
-  final Category category;
-  const _CategoryTile({required this.category});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    final label = l10n.localeName == 'ar' ? category.nameAr : category.nameEn;
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.go(RoutePaths.categoryPath(category.id)),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      shape: BoxShape.circle),
-                  child: Icon(category.icon,
-                      size: 24, color: theme.colorScheme.onPrimaryContainer)),
-              const SizedBox(height: 6),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HorizontalSection extends StatelessWidget {
-  final String title;
-  final List<Place> places;
-  const _HorizontalSection({required this.title, required this.places});
-
-  @override
-  Widget build(BuildContext context) {
-    if (places.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 180,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: places.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _PlaceMiniCard(place: places[i]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlaceMiniCard extends StatelessWidget {
-  final Place place;
-  const _PlaceMiniCard({required this.place});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final name = isArabic ? place.nameAr : place.nameEn;
-
-    return SizedBox(
-      width: 160,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => context.go(RoutePaths.placePath(place.id)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 100,
-                child: place.imageUrls.isNotEmpty
-                    ? Image.network(place.imageUrls.first,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder(theme))
-                    : _placeholder(theme),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: CustomScrollView(
+          slivers: [
+            // ─── الشريط العلوي (الترحيب والموقع) ───
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.star,
-                            size: 12, color: Colors.amber.shade700),
-                        const SizedBox(width: 2),
-                        Text(place.averageRating.toStringAsFixed(1),
-                            style: theme.textTheme.bodySmall),
-                        const SizedBox(width: 4),
-                        Text('(${place.reviewCount})',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontSize: 10)),
+                        Text(
+                          'أهلاً بك 👋',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          'أين تريد أن تذهب اليوم؟',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
+                    ),
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Icon(
+                        Icons.person,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // ─── شريط البحث ───
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'ابحث عن مطعم، مقهى، مكان...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ),
+
+            // ─── التصنيفات (Categories) ───
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'التصنيفات',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('عرض الكل'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final cat = _categories[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: (cat['color'] as Color)
+                                  .withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              cat['icon'] as IconData,
+                              color: cat['color'] as Color,
+                              size: 30,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            cat['name'] as String,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // ─── الأماكن المميزة (Featured Places) ───
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  'أماكن مميزة',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final place = _featuredPlaces[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stack(
+                            children: [
+                              Image.network(
+                                place['image'] as String,
+                                height: 180,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  height: 180,
+                                  color: Colors.grey.shade300,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 50),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 12,
+                                right: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star,
+                                          color: Colors.amber, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        place['rating'].toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      place['name'] as String,
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      place['category'] as String,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                IconButton.filled(
+                                  onPressed: () {},
+                                  icon: const Icon(Icons.arrow_forward),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor:
+                                        theme.colorScheme.primaryContainer,
+                                    foregroundColor:
+                                        theme.colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  childCount: _featuredPlaces.length,
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 30)),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _placeholder(ThemeData theme) => Container(
-        color: theme.colorScheme.surfaceContainerHigh,
-        child: Center(
-            child: Icon(Icons.place_outlined,
-                size: 32, color: theme.colorScheme.onSurfaceVariant)),
-      );
-}
-
-class _GuestBanner extends StatelessWidget {
-  const _GuestBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: theme.colorScheme.primary.withValues(alpha: 0.3))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.card_giftcard,
-                  color: theme.colorScheme.primary, size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Text(l10n.guestBannerTitle,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                  child: FilledButton(
-                      onPressed: () => context.go(RoutePaths.login),
-                      child: Text(l10n.login))),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: OutlinedButton(
-                      onPressed: () => context.go(RoutePaths.register),
-                      child: Text(l10n.register))),
-            ],
-          ),
-        ],
       ),
     );
   }

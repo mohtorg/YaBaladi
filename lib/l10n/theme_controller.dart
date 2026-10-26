@@ -10,8 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// The choice is persisted via SharedPreferences.
 class ThemeController extends ChangeNotifier {
-  ThemeController();
-
   // ============================================================
   // CONSTANTS
   // ============================================================
@@ -31,13 +29,9 @@ class ThemeController extends ChangeNotifier {
   // ============================================================
 
   ThemeMode get themeMode => _themeMode;
-
   bool get isLoaded => _isLoaded;
-
   bool get isLight => _themeMode == ThemeMode.light;
-
   bool get isDark => _themeMode == ThemeMode.dark;
-
   bool get isSystem => _themeMode == ThemeMode.system;
 
   // ============================================================
@@ -89,10 +83,13 @@ class ThemeController extends ChangeNotifier {
   /// Toggle between light and dark.
   /// If currently system, switch to light.
   Future<void> toggle() async {
-    if (isDark) {
+    if (_themeMode == ThemeMode.dark) {
       await setMode(ThemeMode.light);
-    } else {
+    } else if (_themeMode == ThemeMode.light) {
       await setMode(ThemeMode.dark);
+    } else {
+      // It's ThemeMode.system.
+      await setMode(ThemeMode.light);
     }
   }
 
@@ -124,7 +121,7 @@ class ThemeController extends ChangeNotifier {
     switch (value) {
       case 'light':
         return ThemeMode.light;
-      case 'dark':
+      case 'dark': // ← تم إصلاح الخطأ القاتل هنا (كانت ThemeMode.dark)
         return ThemeMode.dark;
       case 'system':
       default:

@@ -9,7 +9,6 @@ analyzer:
     - macos/**
     - linux/**
     - lib/l10n/app_localizations*.dart
-    - _archive/**
 
   errors:
     invalid_annotation_target: ignore

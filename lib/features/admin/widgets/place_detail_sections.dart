@@ -1,10 +1,19 @@
 // lib/features/admin/widgets/place_detail_sections.dart
 //
+// [v1.1 — 2026-10-25] — FIX: remove unused import + safer GeoPoint cast
+//   - REMOVED: unused import '../../../theme/design_tokens.dart'
+//     (was flagged as unused_import by flutter analyze)
+//   - IMPROVED: GeoPoint cast uses `is GeoPoint` guard instead of `as GeoPoint?`
+//     (avoids runtime TypeError if location is not a GeoPoint)
+//   - IMPROVED: `Function(String, bool)` → `void Function(String, bool)`
+//     (explicit return type for clarity)
+//   - KEPT: all widget structure, styling, and behavior identical
+//
 // [v1.0 — 2026-10-21] — Separate sections for place detail screen
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../theme/design_tokens.dart';
+
 import 'common_widgets.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -14,7 +23,7 @@ class PlaceStatusSection extends StatelessWidget {
   final bool isActive;
   final bool isApproved;
   final bool updating;
-  final Function(String field, bool value) onToggle;
+  final void Function(String field, bool value) onToggle;
 
   const PlaceStatusSection({
     super.key,
@@ -72,10 +81,13 @@ class PlaceLocationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lat =
-        (data['latitude'] ?? (data['location'] as GeoPoint?)?.latitude) as num?;
-    final lng = (data['longitude'] ??
-        (data['location'] as GeoPoint?)?.longitude) as num?;
+    // GeoPoint-safe extraction
+    final location = data['location'];
+    final geoPoint = location is GeoPoint ? location : null;
+
+    final lat = (data['latitude'] as num?)?.toDouble() ?? geoPoint?.latitude;
+    final lng = (data['longitude'] as num?)?.toDouble() ?? geoPoint?.longitude;
+
     final hasLocation = lat != null && lng != null;
     final address = data['address']?.toString() ?? '';
     final governorate = data['governorate']?.toString() ?? '';

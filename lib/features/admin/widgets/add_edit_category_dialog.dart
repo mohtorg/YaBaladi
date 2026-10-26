@@ -1,17 +1,6 @@
 // lib/features/admin/widgets/add_edit_category_dialog.dart
 //
-// [Wave 10 — file 6/12] — 2026-10-24
-// Add / Edit Category dialog for admin dashboard.
-//
-// - Add mode: create new category (id is editable, unique check)
-// - Edit mode: modify existing category (id is readonly)
-//
-// Returns true if saved successfully, null otherwise.
-//
-// Depends on:
-//   - IconPickerDialog (file 7)
-//   - ColorPickerDialog (file 8)
-//   - CategoriesRepository (v2.0)
+// [v1.3 — 2026-10-26] — BULLETPROOF BUILD: SwitchListTile standard, strict analyzer compliance
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,7 +24,6 @@ class AddEditCategoryDialog extends StatefulWidget {
 
   bool get isEditMode => category != null;
 
-  /// Show dialog. Returns true if saved successfully.
   static Future<bool?> show(
     BuildContext context, {
     Category? category,
@@ -165,6 +153,7 @@ class _AddEditCategoryDialogState extends State<AddEditCategoryDialog> {
           'isFeatured': _isFeatured,
           'aliases': aliases,
           'searchKeywords': keywords,
+          'updatedAt': DateTime.now(),
         });
       } else {
         // Duplicate ID check
@@ -187,6 +176,9 @@ class _AddEditCategoryDialogState extends State<AddEditCategoryDialog> {
           isFeatured: _isFeatured,
           aliases: aliases,
           searchKeywords: keywords,
+          placesCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         await _repo.create(id, category);
       }
@@ -602,7 +594,9 @@ class _SwitchTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: SwitchListTile.adaptive(
+      // ✅ [FIX] استخدام SwitchListTile العادي بدلاً من adaptive
+      // لأن activeThumbColor مدعومة بشكل أفضل فيه.
+      child: SwitchListTile(
         value: value,
         onChanged: onChanged,
         secondary: Icon(

@@ -1,11 +1,9 @@
 // lib/features/reviews/controllers/my_reviews_controller.dart
 //
-// [v1.0 — 2026-10-14] — R2: MyReviewsController
-//   - يدير قائمة "تقييماتي" لمستخدم واحد.
-//   - يحمّل من ReviewsRepository.getByUser.
-//   - فلترة حسب النجوم + ترتيب (الأحدث / الأعلى تقييماً).
-//   - إحصائيات: متوسط + عدد.
-//   - حماية من Race Conditions عبر _loadGeneration.
+// [v1.1 — 2026-10-25] — FIX: Added missing 'break' statements in switch blocks
+//   - FIXED: 'case should not complete normally' compilation error
+//     in getter `reviews` for both _filter and _sort switches.
+//   - KEPT: all logic, race-condition protection, and getters identical.
 
 import 'package:flutter/foundation.dart';
 
@@ -59,18 +57,24 @@ class MyReviewsController extends ChangeNotifier {
   List<Review> get reviews {
     var result = _all;
 
+    // [FIX] إضافة break لمنع خطأ التجميع
     switch (_filter) {
       case MyReviewsFilter.all:
         break;
       case MyReviewsFilter.fiveStars:
         result = result.where((r) => r.rating >= 5).toList();
+        break;
       case MyReviewsFilter.fourStars:
         result = result.where((r) => r.rating >= 4 && r.rating < 5).toList();
+        break;
       case MyReviewsFilter.lowRating:
         result = result.where((r) => r.rating < 4).toList();
+        break;
     }
 
     final copy = List<Review>.from(result);
+
+    // [FIX] إضافة break لمنع خطأ التجميع
     switch (_sort) {
       case MyReviewsSort.newest:
         copy.sort((a, b) {
@@ -78,8 +82,10 @@ class MyReviewsController extends ChangeNotifier {
           final db = b.createdAt ?? DateTime(2000);
           return db.compareTo(da);
         });
+        break;
       case MyReviewsSort.highestRating:
         copy.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
     }
 
     return List.unmodifiable(copy);

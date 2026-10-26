@@ -1,8 +1,12 @@
 // lib/features/trip/screens/trip_detailed_screen.dart
-// [v1.3 — 2026-10-20] — AppBar uses LocationActionIcon.
+// [v1.3.1 — 2026-10-25] — FIX: num to int in DefaultTabController + removed unused import
+//   - FIXED: days.length.clamp(1, 3) returns num → added .toInt()
+//   - REMOVED: unused import 'package:go_router/go_router.dart'
+//   - ADDED: import 'dart:async' for unawaited()
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/trip_plan.dart';
@@ -59,10 +63,13 @@ class _TripDetailedScreenState extends State<TripDetailedScreen> {
       await ctrl.updateStatus(plan.id, TripStatus.completed);
       if (!mounted) return;
       final updated = plan.copyWith(status: TripStatus.completed);
-      // ignore: unawaited_futures
-      Navigator.of(context).pushReplacement<void, void>(
-        MaterialPageRoute<void>(
-            builder: (_) => TripSummaryScreen(plan: updated)),
+
+      // [FIX] استخدام unawaited بدلاً من ignore
+      unawaited(
+        Navigator.of(context).pushReplacement<void, void>(
+          MaterialPageRoute<void>(
+              builder: (_) => TripSummaryScreen(plan: updated)),
+        ),
       );
     } on Exception catch (e) {
       if (!mounted) return;
@@ -115,7 +122,8 @@ class _TripDetailedScreenState extends State<TripDetailedScreen> {
         }
 
         final days = plan.stopsByDay;
-        final tabCount = days.length.clamp(1, 3);
+        // [FIX] clamp ترجع num، يجب تحويلها لـ int
+        final tabCount = days.length.clamp(1, 3).toInt();
         final titles = List.generate(tabCount, (i) => 'اليوم ${i + 1}');
         final isCompleted = plan.status == TripStatus.completed;
 
@@ -125,7 +133,6 @@ class _TripDetailedScreenState extends State<TripDetailedScreen> {
             appBar: AppBar(
               title: Text(plan.title, overflow: TextOverflow.ellipsis),
               actions: [
-                // ✅ أيقونة صغيرة أنيقة
                 if (plan.firstStop != null)
                   LocationActionIcon(
                     lat: plan.firstStop!.lat,

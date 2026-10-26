@@ -1,13 +1,11 @@
 // lib/features/reviews/screens/add_review_screen.dart
 //
-// [v1.2 — 2026-10-22] — Wave 2: Null-safety lint fixes
-//   - FIX: استخدام isLoggedIn بدلاً من uid == null
-//   - FIX: استخراج الاسم بأمان عبر auth.user?.displayName
+// [v1.1 — 2026-10-26] — FIX: Null Safety in displayName (uses AuthController getter)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../features/auth/controllers/auth_controller.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../../../models/place.dart';
 import '../../../models/review.dart';
 import '../../../repositories/reviews_repository.dart';
@@ -54,7 +52,6 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
 
     final auth = context.read<AuthController>();
 
-    // ✅ FIX: استخدام isLoggedIn
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -70,21 +67,18 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     final isEditing = widget.existingReview != null;
     final repo = ReviewsRepository();
 
-    // ✅ FIX: استخراج الاسم بأمان
-    final rawName = auth.user?.displayName.trim() ?? '';
-    final safeName = rawName.isEmpty ? 'مستخدم' : rawName;
+    // ✅ [FIX] استخدام auth.displayName الآمن (غير قابل للـ null)
+    final safeName = auth.displayName;
 
     final review = Review(
       id: widget.existingReview?.id ?? '',
       placeId: widget.place.id,
-      userId: auth.uid, // ✅ لا حاجة لـ !
+      userId: auth.uid,
       userName: safeName,
       rating: _rating.toDouble(),
       comment: _commentController.text.trim(),
       createdAt: widget.existingReview?.createdAt,
       isVerified: widget.existingReview?.isVerified ?? false,
-      visitId: widget.existingReview?.visitId,
-      verifiedAt: widget.existingReview?.verifiedAt,
     );
 
     try {

@@ -1,4 +1,5 @@
 // lib/models/place.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Place {
@@ -7,18 +8,21 @@ class Place {
   final String nameEn;
   final String description;
   final String categoryId;
-  final List<String> categories;
-  final String ownerId;
-  final GeoPoint? location;
-  final String address;
-  final String city;
+  final List<String> categories; // 👈 [FIX] الحقل المفقود
   final String governorate;
+  final String city;
+  final String address;
   final String phone;
   final String whatsapp;
+  final GeoPoint? location;
   final List<String> imageUrls;
-  final List<String> tags;
   final double averageRating;
   final int reviewCount;
+  final bool isApproved;
+  final bool isActive;
+  final DateTime? createdAt;
+
+  // الفلاتر (Wave 11)
   final int priceLevel;
   final bool hasWifi;
   final bool hasParking;
@@ -28,32 +32,35 @@ class Place {
   final bool isHalal;
   final bool hasDelivery;
   final bool hasReservation;
-  final bool hasOffers;
-  final List<String> paymentMethods;
-  final bool isApproved;
-  final bool isActive;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+
+  // 🆕 حقول التاجر (Wave 13)
+  final String? ownerId;
+  final bool isVerifiedMerchant;
+  final String? businessPhone;
+  final String? businessEmail;
+  final Map<String, dynamic>? workingHours;
+  final bool requiresAdminReview;
 
   const Place({
     required this.id,
     required this.nameAr,
     required this.nameEn,
     this.description = '',
-    this.categoryId = '',
-    this.categories = const [],
-    this.ownerId = '',
-    this.location,
-    this.address = '',
+    required this.categoryId,
+    this.categories = const [], // 👈 [FIX]
+    required this.governorate,
     this.city = '',
-    this.governorate = '',
+    this.address = '',
     this.phone = '',
     this.whatsapp = '',
+    this.location,
     this.imageUrls = const [],
-    this.tags = const [],
     this.averageRating = 0.0,
     this.reviewCount = 0,
-    this.priceLevel = 0,
+    this.isApproved = false,
+    this.isActive = true,
+    this.createdAt,
+    this.priceLevel = 1,
     this.hasWifi = false,
     this.hasParking = false,
     this.hasRestroom = false,
@@ -62,150 +69,109 @@ class Place {
     this.isHalal = false,
     this.hasDelivery = false,
     this.hasReservation = false,
-    this.hasOffers = false,
-    this.paymentMethods = const [],
-    this.isApproved = false,
-    this.isActive = true,
-    this.createdAt,
-    this.updatedAt,
+    this.ownerId,
+    this.isVerifiedMerchant = false,
+    this.businessPhone,
+    this.businessEmail,
+    this.workingHours,
+    this.requiresAdminReview = false,
   });
 
-  static List<String> _parseStringList(dynamic raw) {
-    if (raw is List) {
-      return raw.map((e) => e.toString()).toList(growable: false);
-    }
-    return const [];
-  }
-
-  static String _parseString(dynamic raw) {
-    if (raw == null) return '';
-    if (raw is String) return raw;
-    if (raw is num) {
-      return raw.toString();
-    }
-    return '';
-  }
-
   factory Place.fromMap(String id, Map<String, dynamic> map) {
-    final parsedCategories = _parseStringList(map['categories']);
-
-    // ✅ دعم حقول OSM (category) وحقل التطبيق (categoryId)
-    final rawCategoryId = map['categoryId'] ?? map['category'];
-    final categoryIdFromMap = _parseString(rawCategoryId).trim();
-    final resolvedCategoryId = categoryIdFromMap.isNotEmpty
-        ? categoryIdFromMap
-        : (parsedCategories.isNotEmpty ? parsedCategories.first : '');
-
-    // ✅ دعم إحداثيات OSM (latitude/longitude) وتحويلها إلى GeoPoint
-    GeoPoint? resolvedLocation;
-    if (map['location'] is GeoPoint) {
-      resolvedLocation = map['location'] as GeoPoint;
-    } else if (map['latitude'] is num && map['longitude'] is num) {
-      resolvedLocation = GeoPoint(
-        (map['latitude'] as num).toDouble(),
-        (map['longitude'] as num).toDouble(),
-      );
-    }
-
-    // ✅ دعم اسم OSM (name) واسم التطبيق (nameAr)
-    final resolvedNameAr = _parseString(map['nameAr'] ?? map['name']);
-    final resolvedNameEn =
-        _parseString(map['nameEn'] ?? map['name_en'] ?? resolvedNameAr);
-
     return Place(
       id: id,
-      nameAr: resolvedNameAr,
-      nameEn: resolvedNameEn,
-      description: _parseString(map['description']),
-      categoryId: resolvedCategoryId,
-      categories: parsedCategories,
-      ownerId: _parseString(map['ownerId']),
-      location: resolvedLocation,
-      address: _parseString(map['address']),
-      city: _parseString(map['city']),
-      governorate: _parseString(map['governorate']),
-      phone: _parseString(map['phone']),
-      whatsapp: _parseString(map['whatsapp']),
-      imageUrls: _parseStringList(map['imageUrls']),
-      tags: _parseStringList(map['tags']),
+      nameAr: map['nameAr'] ?? '',
+      nameEn: map['nameEn'] ?? '',
+      description: map['description'] ?? '',
+      categoryId: map['categoryId'] ?? '',
+      categories: List<String>.from(map['categories'] ?? []), // 👈 [FIX]
+      governorate: map['governorate'] ?? '',
+      city: map['city'] ?? '',
+      address: map['address'] ?? '',
+      phone: map['phone'] ?? '',
+      whatsapp: map['whatsapp'] ?? '',
+      location: map['location'] as GeoPoint?,
+      imageUrls: List<String>.from(map['imageUrls'] ?? []),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
-      priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 0,
-      hasWifi: (map['hasWifi'] as bool?) ?? false,
-      hasParking: (map['hasParking'] as bool?) ?? false,
-      hasRestroom: (map['hasRestroom'] as bool?) ?? false,
-      hasAccessibility: (map['hasAccessibility'] as bool?) ?? false,
-      isFamilyFriendly: (map['isFamilyFriendly'] as bool?) ?? false,
-      isHalal: (map['isHalal'] as bool?) ?? false,
-      hasDelivery: (map['hasDelivery'] as bool?) ?? false,
-      hasReservation: (map['hasReservation'] as bool?) ?? false,
-      hasOffers: (map['hasOffers'] as bool?) ?? false,
-      paymentMethods: _parseStringList(map['paymentMethods']),
-      isApproved: (map['isApproved'] as bool?) ?? false,
-      isActive: (map['isActive'] as bool?) ?? true,
+      isApproved: map['isApproved'] ?? false,
+      isActive: map['isActive'] ?? true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 1,
+      hasWifi: map['hasWifi'] ?? false,
+      hasParking: map['hasParking'] ?? false,
+      hasRestroom: map['hasRestroom'] ?? false,
+      hasAccessibility: map['hasAccessibility'] ?? false,
+      isFamilyFriendly: map['isFamilyFriendly'] ?? false,
+      isHalal: map['isHalal'] ?? false,
+      hasDelivery: map['hasDelivery'] ?? false,
+      hasReservation: map['hasReservation'] ?? false,
+      ownerId: map['ownerId'],
+      isVerifiedMerchant: map['isVerifiedMerchant'] ?? false,
+      businessPhone: map['businessPhone'],
+      businessEmail: map['businessEmail'],
+      workingHours: map['workingHours'] as Map<String, dynamic>?,
+      requiresAdminReview: map['requiresAdminReview'] ?? false,
     );
   }
 
-  factory Place.fromFirestore(DocumentSnapshot doc) {
-    return Place.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+  Map<String, dynamic> toMap() {
+    return {
+      'nameAr': nameAr,
+      'nameEn': nameEn,
+      'description': description,
+      'categoryId': categoryId,
+      'categories': categories, // 👈 [FIX]
+      'governorate': governorate,
+      'city': city,
+      'address': address,
+      'phone': phone,
+      'whatsapp': whatsapp,
+      if (location != null) 'location': location,
+      'imageUrls': imageUrls,
+      'averageRating': averageRating,
+      'reviewCount': reviewCount,
+      'isApproved': isApproved,
+      'isActive': isActive,
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+      'priceLevel': priceLevel,
+      'hasWifi': hasWifi,
+      'hasParking': hasParking,
+      'hasRestroom': hasRestroom,
+      'hasAccessibility': hasAccessibility,
+      'isFamilyFriendly': isFamilyFriendly,
+      'isHalal': isHalal,
+      'hasDelivery': hasDelivery,
+      'hasReservation': hasReservation,
+      if (ownerId != null) 'ownerId': ownerId,
+      'isVerifiedMerchant': isVerifiedMerchant,
+      if (businessPhone != null) 'businessPhone': businessPhone,
+      if (businessEmail != null) 'businessEmail': businessEmail,
+      if (workingHours != null) 'workingHours': workingHours,
+      'requiresAdminReview': requiresAdminReview,
+    };
   }
 
-  Map<String, dynamic> toMap() => {
-        'nameAr': nameAr,
-        'nameEn': nameEn,
-        'description': description,
-        'categoryId': categoryId,
-        'categories': categories,
-        'ownerId': ownerId,
-        'location': location,
-        'address': address,
-        'city': city,
-        'governorate': governorate,
-        'phone': phone,
-        'whatsapp': whatsapp,
-        'imageUrls': imageUrls,
-        'tags': tags,
-        'averageRating': averageRating,
-        'reviewCount': reviewCount,
-        'priceLevel': priceLevel,
-        'hasWifi': hasWifi,
-        'hasParking': hasParking,
-        'hasRestroom': hasRestroom,
-        'hasAccessibility': hasAccessibility,
-        'isFamilyFriendly': isFamilyFriendly,
-        'isHalal': isHalal,
-        'hasDelivery': hasDelivery,
-        'hasReservation': hasReservation,
-        'hasOffers': hasOffers,
-        'paymentMethods': paymentMethods,
-        'isApproved': isApproved,
-        'isActive': isActive,
-        'createdAt': createdAt != null
-            ? Timestamp.fromDate(createdAt!)
-            : FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
   Place copyWith({
-    String? id,
     String? nameAr,
     String? nameEn,
     String? description,
     String? categoryId,
     List<String>? categories,
-    String? ownerId,
-    GeoPoint? location,
-    String? address,
-    String? city,
     String? governorate,
+    String? city,
+    String? address,
     String? phone,
     String? whatsapp,
+    GeoPoint? location,
     List<String>? imageUrls,
-    List<String>? tags,
     double? averageRating,
     int? reviewCount,
+    bool? isApproved,
+    bool? isActive,
+    DateTime? createdAt,
     int? priceLevel,
     bool? hasWifi,
     bool? hasParking,
@@ -215,48 +181,42 @@ class Place {
     bool? isHalal,
     bool? hasDelivery,
     bool? hasReservation,
-    bool? hasOffers,
-    List<String>? paymentMethods,
-    bool? isApproved,
-    bool? isActive,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) =>
-      Place(
-        id: id ?? this.id,
-        nameAr: nameAr ?? this.nameAr,
-        nameEn: nameEn ?? this.nameEn,
-        description: description ?? this.description,
-        categoryId: categoryId ?? this.categoryId,
-        categories: categories ?? this.categories,
-        ownerId: ownerId ?? this.ownerId,
-        location: location ?? this.location,
-        address: address ?? this.address,
-        city: city ?? this.city,
-        governorate: governorate ?? this.governorate,
-        phone: phone ?? this.phone,
-        whatsapp: whatsapp ?? this.whatsapp,
-        imageUrls: imageUrls ?? this.imageUrls,
-        tags: tags ?? this.tags,
-        averageRating: averageRating ?? this.averageRating,
-        reviewCount: reviewCount ?? this.reviewCount,
-        priceLevel: priceLevel ?? this.priceLevel,
-        hasWifi: hasWifi ?? this.hasWifi,
-        hasParking: hasParking ?? this.hasParking,
-        hasRestroom: hasRestroom ?? this.hasRestroom,
-        hasAccessibility: hasAccessibility ?? this.hasAccessibility,
-        isFamilyFriendly: isFamilyFriendly ?? this.isFamilyFriendly,
-        isHalal: isHalal ?? this.isHalal,
-        hasDelivery: hasDelivery ?? this.hasDelivery,
-        hasReservation: hasReservation ?? this.hasReservation,
-        hasOffers: hasOffers ?? this.hasOffers,
-        paymentMethods: paymentMethods ?? this.paymentMethods,
-        isApproved: isApproved ?? this.isApproved,
-        isActive: isActive ?? this.isActive,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
-
-  @override
-  String toString() => 'Place($id, $nameAr / $nameEn)';
+    String? ownerId,
+    bool? isVerifiedMerchant,
+    String? businessPhone,
+    String? businessEmail,
+    Map<String, dynamic>? workingHours,
+    bool? requiresAdminReview,
+  }) {
+    return Place(
+      id: id, nameAr: nameAr ?? this.nameAr, nameEn: nameEn ?? this.nameEn,
+      description: description ?? this.description,
+      categoryId: categoryId ?? this.categoryId,
+      categories: categories ?? this.categories, // 👈 [FIX]
+      governorate: governorate ?? this.governorate, city: city ?? this.city,
+      address: address ?? this.address, phone: phone ?? this.phone,
+      whatsapp: whatsapp ?? this.whatsapp, location: location ?? this.location,
+      imageUrls: imageUrls ?? this.imageUrls,
+      averageRating: averageRating ?? this.averageRating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      isApproved: isApproved ?? this.isApproved,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      priceLevel: priceLevel ?? this.priceLevel,
+      hasWifi: hasWifi ?? this.hasWifi,
+      hasParking: hasParking ?? this.hasParking,
+      hasRestroom: hasRestroom ?? this.hasRestroom,
+      hasAccessibility: hasAccessibility ?? this.hasAccessibility,
+      isFamilyFriendly: isFamilyFriendly ?? this.isFamilyFriendly,
+      isHalal: isHalal ?? this.isHalal,
+      hasDelivery: hasDelivery ?? this.hasDelivery,
+      hasReservation: hasReservation ?? this.hasReservation,
+      ownerId: ownerId ?? this.ownerId,
+      isVerifiedMerchant: isVerifiedMerchant ?? this.isVerifiedMerchant,
+      businessPhone: businessPhone ?? this.businessPhone,
+      businessEmail: businessEmail ?? this.businessEmail,
+      workingHours: workingHours ?? this.workingHours,
+      requiresAdminReview: requiresAdminReview ?? this.requiresAdminReview,
+    );
+  }
 }

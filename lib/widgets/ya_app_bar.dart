@@ -1,3 +1,5 @@
+// lib/widgets/ya_app_bar.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,6 +26,9 @@ class YaAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    // استخدام GoRouter.of(context) لضمان التوافقية
+    final router = GoRouter.of(context);
+
     return AppBar(
       title: Text(title),
       centerTitle: centerTitle,
@@ -31,10 +36,10 @@ class YaAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
-          if (context.canPop()) {
-            context.pop();
+          if (router.canPop()) {
+            router.pop();
           } else {
-            context.go(RoutePaths.home);
+            router.go(RoutePaths.home);
           }
         },
       ),

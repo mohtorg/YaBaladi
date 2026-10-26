@@ -1,11 +1,10 @@
 // lib/models/trip_plan.dart
 //
-// [v1.2 — 2026-10-18] — Wave 5.1: Geographic Day Split
-//   - NEW: stopsByDay getter (يوزع المحطات جغرافياً على الأيام)
-//   - NEW: totalDays getter (عدد الأيام للـ Tabs الديناميكية)
-//   - NOTE: backward-compatible — لا تغيير في الواجهة العامة
+// [v1.2.1 — 2026-10-25] — FIX: Build error in stopsByDay
+//   - FIX: .clamp() returns 'num' → added .toInt() for List.sublist()
+//   - REMOVED: unused import 'dart:math'
+//   - KEPT: all logic, enums, getters, and serialization identical
 
-import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -356,7 +355,8 @@ class TripPlan {
     final result = <List<TripStop>>[];
     for (var i = 0; i < days; i++) {
       final start = i * perDay;
-      final end = (start + perDay).clamp(0, sorted.length);
+      // [FIX] أضفنا .toInt() هنا لأن دالة clamp ترجع num
+      final end = (start + perDay).clamp(0, sorted.length).toInt();
       if (start >= sorted.length) break;
       result.add(sorted.sublist(start, end));
     }
