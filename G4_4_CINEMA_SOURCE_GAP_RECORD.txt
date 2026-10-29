@@ -1,0 +1,30 @@
+YA BALADI - G4.4 CINEMA SOURCE GAP RECORD
+==========================================
+
+Status: DOCUMENTED_ONLY
+
+Proven facts:
+1. Project experience/documentation approves Cinema as one of the six main content categories.
+2. G4.3 source audit searched C:\ya_baladi\lib for "Cinema", "cinema", and category references.
+3. No Cinema definition was found in the current Dart source.
+4. Current PlaceCategories.all contains no English label "Cinema".
+5. No source ID for Cinema is proven.
+6. No Home/Search/Firebase/Firestore code was modified in this stage.
+
+Decision:
+- Keep Cinema in the approved six-category registry as DOCUMENTED_ONLY.
+- Do not invent or assign a source ID.
+- Do not add Cinema to PlaceCategories yet.
+- Do not modify Home or Search routing yet.
+- Revisit only when an approved source definition/ID is established.
+
+Current category source status:
+Restaurants: SOURCE_PROVEN
+Cafes: SOURCE_PROVEN
+Events: SOURCE_PROVEN
+Historical Landmarks: SOURCE_PROVEN
+Cinema: DOCUMENTED_ONLY
+Clubs & Gyms: SOURCE_PROVEN
+
+Next required condition before Home implementation:
+An approved, source-backed Cinema category definition and ID.

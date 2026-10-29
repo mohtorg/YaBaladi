@@ -1,0 +1,67 @@
+=====================================
+يا بلادي — ابدأ من هنا على HOME
+=====================================
+
+آخر commit: ee0e618
+آخر tag: v0.1.0-g1-pass
+تاريخ: 2026-10-01
+
+-------------------------------------
+⚠️ خطوة إلزامية قبل أي شيء:
+-------------------------------------
+RAM جهاز HOME = 1.8 GB فقط
+يجب تخفيض ذاكرة JVM قبل البناء
+
+افتح:
+  android\gradle.properties
+
+وغيّر السطر الأول إلى:
+  org.gradle.jvmargs=-Xmx1024m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=192m -XX:+HeapDumpOnOutOfMemoryError
+
+لو فشل البناء، خفّض إلى 768m.
+
+-------------------------------------
+خطوات البدء:
+-------------------------------------
+
+1) استخرج الـZIP:
+   cd /d C:\
+   mkdir ya_baladi_rebuild 2>nul
+   cd ya_baladi_rebuild
+   tar -x -f "D:\YA_BALADI_BACKUPS\YaBaladi_G1_20261001_ee0e618.zip"
+
+2) تحقق من Git:
+   git log --oneline
+   git tag
+   git status
+   (المتوقع: 5 commits + 2 tags + clean)
+
+3) عدّل gradle.properties (كما فوق)
+
+4) flutter --version
+
+5) flutter pub get
+
+6) flutter analyze
+   (المتوقع: No issues found)
+
+7) flutter build apk --debug
+   (8-20 دقيقة)
+
+-------------------------------------
+عند الاستئناف في DeepSeek جديد:
+-------------------------------------
+1) افتح جلسة جديدة
+2) اكتب: "نكمل مشروع يا بلادي من G2"
+3) الصق محتوى هذا الملف
+4) الصق ناتج git log --oneline
+
+-------------------------------------
+قواعد مهمة:
+-------------------------------------
+- لا push على GitHub بدون تأكيد
+- لا git reset --hard
+- احفظ نسخة ZIP جديدة بعد أي تقدم
+- عند العودة لـWORK: استرجع من آخر commit فقط
+
+=====================================

@@ -1,0 +1,13 @@
+build/  
+.dart_tool/  
+.idea/  
+android/.gradle/  
+*.iml  
+android/local.properties 
+serviceAccountKey.json  
+*.apk  
+*.jar  
+*.bundle 
+node_modules/  
+**/serviceAccountKey.json  
+android/.kotlin/ 
