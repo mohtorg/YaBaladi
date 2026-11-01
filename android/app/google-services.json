@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "231838490815",
+    "project_id": "ya-baladi",
+    "storage_bucket": "ya-baladi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231838490815:android:2d5e39e5d244672236e60a",
+        "android_client_info": {
+          "package_name": "com.egypt.yabaladi_rebuild"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231838490815-km99bal35emt7i8qnu1mjj0n1vj23vh9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egypt.yabaladi_rebuild",
+            "certificate_hash": "c4bfce9660ee3b8aadd7eab55008901832cb5ba4"
+          }
+        },
+        {
+          "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhIi4IxjfTSw_aleoJbtKZsJYR35C_j7Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231838490815-n3t3qiv2sm3de8diuttgtqrmr0ksrjui.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.yaBaladi"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

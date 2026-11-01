@@ -1,0 +1,38 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+.env
+*.env
+node_modules/
+seed_node/
+_archive/
+*.log
+analyze_report.txt
+
+# === FIREBASE SECRETS ===
+serviceAccountKey.json
+ya-baladi-firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+firebase-adminsdk*.json
+
+# === BACKUP FILES ===
+*.bak
+*.backup
+*.old
+
+# === JUNK FILES ===
+cd
+findstr
+mkdir
+node
+notepad
+npm
