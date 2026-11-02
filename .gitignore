@@ -36,3 +36,17 @@ mkdir
 node
 notepad
 npm
+
+# === APK 
+*.apk
+*.aab
+*.jar
+ 
+# === FLUTLAB EXCLUDED (local only) === 
+test/ 
+tool/ 
+android/.gitignore 
+ios/.gitignore 
+linux/.gitignore 
+macos/.gitignore 
+windows/.gitignore 
