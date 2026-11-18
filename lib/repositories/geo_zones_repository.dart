@@ -1,8 +1,6 @@
 // lib/repositories/geo_zones_repository.dart
-// [v1.2 — 2026-10-29] — FIX: Return absolute smallest enclosing zone (e.g., Amr Ibn Al-Aas)
-//   - Instead of returning the first match after sorting, we now find ALL matches
-//     and pick the one with the smallest area. Ensures neighborhoods beat governorates.
-//   - KEPT: all v1.1 logic.
+// [v1.3.1 — 2026-11-15] — LINTER FIX: Converted districtName and govName to final.
+// [v1.3 — 2026-11-15] — RELATIONAL LINKING: Added `getFullLocationName`.
 
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,9 +38,46 @@ class GeoZonesRepository {
       return areaA.compareTo(areaB);
     });
 
-    // 3. إعادة أول منطقة (وهي الأصغر مساحة بالطبع)
-    // هذا يضمن أن "مساكن عمرو بن العاص" تُختار قبل "بورسعيد"
     return matchingZones.first;
+  }
+
+  /// ✅ v1.3: ربط المنطقة بالحي والمحافظة وإرجاع العنوان كاملاً
+  Future<String?> getFullLocationName(double lat, double lng) async {
+    final zone = await findZoneForPoint(lat, lng);
+    if (zone == null) return null;
+
+    // نقرأ البيانات الخام للحصول على المفاتيح الأجنبية (IDs)
+    final zoneDoc = await _zonesRef.doc(zone.id).get();
+    final zoneData = zoneDoc.data() ?? {};
+
+    final districtId = zoneData['districtId'] as String?;
+    final govId = zoneData['governorateId'] as String?;
+
+    // ✅ Linter Fix: استخدام final مع التعيين الشرطي
+    final String? districtName = districtId == null
+        ? null
+        : (await _db.collection('districts').doc(districtId).get())
+            .data()?['nameAr'] as String?;
+
+    final String? govName = govId == null
+        ? null
+        : (await _db.collection('governorates').doc(govId).get())
+            .data()?['nameAr'] as String?;
+
+    final parts = <String>[];
+    if (zone.nameAr.isNotEmpty) parts.add(zone.nameAr);
+
+    // تجنب التكرار (إذا كان اسم الحي هو نفسه اسم المنطقة)
+    if (districtName != null &&
+        districtName.isNotEmpty &&
+        districtName != zone.nameAr) {
+      parts.add(districtName);
+    }
+    if (govName != null && govName.isNotEmpty && govName != districtName) {
+      parts.add(govName);
+    }
+
+    return parts.join(' - ');
   }
 
   /// استيراد البيانات من ملف GeoJSON إلى Firestore.

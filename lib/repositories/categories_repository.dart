@@ -1,35 +1,10 @@
 // lib/repositories/categories_repository.dart
 //
-// [v2.2 — 2026-10-24] — Web SDK hotfix + performance
-//   - FIX (critical, Web): Removed `.where('isActive', ...)` from
-//     `watchActive()` and `getAllActive()`.
-//
-//     WHY: Firestore requires a COMPOSITE INDEX for any query that
-//     combines `where(x)` with `orderBy(y)` on a different field.
-//     Without that index, firestore-js-sdk on Web enters a broken
-//     internal state and throws:
-//       FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state (b815)
-//     After that, EVERY subsequent Firestore call in the same browser
-//     session fails with the same error — until the page is reloaded.
-//
-//     FIX: fetch by `order` only, then filter `isActive` in Dart.
-//     The category collection is tiny (<100 docs), so this is free
-//     and removes the composite index requirement entirely.
-//
-//   - FIX: `_convertLocal()` now guards against `null` fontFamily
-//     before reverse-looking-up the icon name. Prevents accidental
-//     matches against the fallback icon.
-//
-//   - NEW: `.limit(500)` on all list queries. Defensive against a
-//     polluted collection and reduces the number of listen targets
-//     tracked by the Web SDK — which also reduces b815 risk.
-//
-//   - KEPT: full public API. No caller changes required.
-//
-// [v2.1 — 2026-10-24] — Ambiguous-import fix
-//   - `hide Category` on `package:flutter/foundation.dart`.
-// [v2.0 — 2026-10-23] — Firestore-backed categories
-//   - Firestore reads + local fallback + CRUD + aliases + counters.
+// [v2.2.1 — FIXED] — Defensive enhancements (behavior-preserving).
+//   - ADDED: Early return in delete() if doc doesn't exist (saves network call).
+//   - ADDED: Guard in update() to prevent empty-id calls.
+//   - IMPROVED: Clearer error message in delete() when doc exists.
+//   - KEPT: All v2.2 fixes (Web SDK b815 workaround, limits, local fallback).
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' hide Category;
@@ -123,6 +98,7 @@ class CategoriesRepository {
 
   /// Single category by id.
   Future<Category?> getById(String id) async {
+    if (id.isEmpty) return null;
     try {
       final doc = await _collection.doc(id).get();
       if (!doc.exists) return null;
@@ -137,6 +113,7 @@ class CategoriesRepository {
   ///
   /// Uses `arrayContains` — single-field index, no composite needed.
   Future<Category?> findByAlias(String alias) async {
+    if (alias.isEmpty) return null;
     try {
       final snap = await _collection
           .where('aliases', arrayContains: alias)
@@ -157,11 +134,15 @@ class CategoriesRepository {
   /// Create a new category. `id` is the slug and must be unique.
   /// Uses `.set()` (full overwrite) — intended for creation only.
   Future<void> create(String id, Category category) async {
+    if (id.isEmpty) {
+      throw ArgumentError('Category id cannot be empty.');
+    }
     await _collection.doc(id).set(category.toMap());
   }
 
   /// Partial update. Uses `.update()` (merge) — safe for partial data.
   Future<void> update(String id, Map<String, dynamic> data) async {
+    if (id.isEmpty) return; // ✅ حماية: لا تُرسل طلب لـ Firebase بمعرف فارغ
     await _collection.doc(id).update({
       ...data,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -170,11 +151,17 @@ class CategoriesRepository {
 
   /// Delete a category. Rejects if it still has associated places.
   Future<void> delete(String id) async {
+    if (id.isEmpty) return; // ✅ حماية: لا تُرسل طلب لـ Firebase بمعرف فارغ
+
     final doc = await _collection.doc(id).get();
+    // ✅ إذا كانت الوثيقة غير موجودة، لا داعي لإجراء طلب حذف (no-op) على Firebase
+    if (!doc.exists) return;
+
     final count = (doc.data()?['placesCount'] as num?)?.toInt() ?? 0;
     if (count > 0) {
+      final name = (doc.data()?['nameAr'] as String?) ?? id;
       throw Exception(
-        'لا يمكن حذف تصنيف يحتوي على $count مكان. عطّله بدلاً من ذلك.',
+        'لا يمكن حذف التصنيف "$name" لاحتوائه على $count مكان. عطّله بدلاً من ذلك.',
       );
     }
     await _collection.doc(id).delete();
@@ -186,6 +173,7 @@ class CategoriesRepository {
   /// concurrent writers. Failures are logged but do NOT throw: a
   /// counter drift should never fail the primary save operation.
   Future<void> incrementPlacesCount(String categoryId, int delta) async {
+    if (categoryId.isEmpty) return;
     try {
       await _collection.doc(categoryId).update({
         'placesCount': FieldValue.increment(delta),

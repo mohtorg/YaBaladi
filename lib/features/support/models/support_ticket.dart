@@ -1,3 +1,4 @@
+// lib/models/support_ticket.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SupportTicket {
@@ -31,7 +32,6 @@ class SupportTicket {
 
   /// ✅ Factory آمن: يتعامل مع البيانات الناقصة أو التالفة بدون رمي استثناءات
   factory SupportTicket.fromDoc(DocumentSnapshot doc) {
-    // حماية: إذا كان المستند بلا بيانات، نستخدم خريطة فارغة
     final d = (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
 
     return SupportTicket(
@@ -44,7 +44,6 @@ class SupportTicket {
       stackTrace: d['stackTrace'] as String?,
       appVersion: (d['appVersion'] ?? '1.0.0').toString(),
       platform: (d['platform'] ?? 'unknown').toString(),
-      // ✅ تحويل آمن للحالة لضمان عدم حدوث خطأ إذا كانت القيمة غير نصية
       status: (d['status'] ?? 'open').toString(),
       createdAt: (d['createdAt'] is Timestamp)
           ? (d['createdAt'] as Timestamp).toDate()
@@ -53,7 +52,6 @@ class SupportTicket {
     );
   }
 
-  // ─── Convenience Getters (تسهل كتابة الشاشات) ───
   bool get isOpen => status == 'open';
   bool get isInProgress => status == 'in_progress';
   bool get isResolved => status == 'resolved';
@@ -71,7 +69,6 @@ class SupportTicket {
     }
   }
 
-  /// ✅ copyWith لسهولة تحديث الكائن محلياً (إن احتجته لاحقاً)
   SupportTicket copyWith({
     String? status,
     String? adminNote,
@@ -92,7 +89,6 @@ class SupportTicket {
     );
   }
 
-  /// ✅ toMap للاختبارات أو إعادة الإرسال
   Map<String, dynamic> toMap() => {
         'userId': userId,
         'userName': userName,

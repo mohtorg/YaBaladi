@@ -1,7 +1,9 @@
 // lib/features/admin/widgets/district_form_dialog.dart
-// [v1.0 — 2026-10-29] — WAVE 17: نافذة إضافة/تعديل حي (جديد كلياً)
-//   - تعيد Map{'nameAr': ..., 'nameEn': ...} عند التأكيد.
-//   - تعيد null عند الإلغاء.
+// [v1.2 — 2026-11-15] — LINTER FIX: Added curly braces to single-line if statement in _submit.
+// [v1.1 — FIXED] — UI & UX ENHANCEMENTS:
+//   - ADDED: SingleChildScrollView to prevent keyboard overflow.
+//   - ADDED: Unfocus keyboard on submit.
+//   - KEPT: All validation, return types, and logic intact.
 
 import 'package:flutter/material.dart';
 
@@ -46,7 +48,12 @@ class _DistrictFormDialogState extends State<DistrictFormDialog> {
   }
 
   void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+    // ✅ إخفاء الكيبورد قبل التحقق والحفظ
+    FocusScope.of(context).unfocus();
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     Navigator.of(context).pop({
       'nameAr': _nameArCtrl.text.trim(),
       'nameEn': _nameEnCtrl.text.trim(),
@@ -60,32 +67,35 @@ class _DistrictFormDialogState extends State<DistrictFormDialog> {
       title: Text(isEdit ? 'تعديل الحي' : 'إضافة حي جديد'),
       content: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _nameArCtrl,
-              decoration: const InputDecoration(
-                labelText: 'الاسم بالعربية *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_city),
+        // ✅ تغليف المحتوى بـ SingleChildScrollView لمنع الانكسار عند ظهور الكيبورد
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameArCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم بالعربية *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_city),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                textInputAction: TextInputAction.next,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nameEnCtrl,
-              decoration: const InputDecoration(
-                labelText: 'الاسم بالإنجليزية (اختياري)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.language),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nameEnCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم بالإنجليزية (اختياري)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.language),
+                ),
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
               ),
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

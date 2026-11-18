@@ -1,9 +1,11 @@
 // lib/models/place.dart
-// [v2.2 — 2026-11-01] — ADMIN PERMISSIONS FOR OFFERS
-//   - ADDED: isOfferFeatureEnabled, offerRequestPending for admin control.
-//   - KEPT: All previous fields (branches, offers, filters, etc.).
+// [v3.4 — 2026-11-15] — LINTER FIX: Converted formattedCity to final in fullAddress.
+// [v3.3 — 2026-11-15] — ADDED: `fullAddress` getter to format address as
+//   "Street - District - Governorate", auto-prefixing "حي" to city if missing.
+// [v3.2 — 2026-11-15] — No logic change. Version bump only.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/services/adjusted_score_service.dart';
 
 class Place {
   final String id;
@@ -21,11 +23,18 @@ class Place {
   final List<String> imageUrls;
   final double averageRating;
   final int reviewCount;
+  final int viewCount;
   final bool isApproved;
   final bool isActive;
   final DateTime? createdAt;
 
-  // الفلاتر (Wave 11)
+  // ✅ Phase 12
+  final bool isRankable;
+
+  final double? adjustedScore;
+  final double? sampleQuality;
+  final String? confidenceLabel;
+
   final int priceLevel;
   final bool hasWifi;
   final bool hasParking;
@@ -36,7 +45,6 @@ class Place {
   final bool hasDelivery;
   final bool hasReservation;
 
-  // 🆕 حقول التاجر (Wave 13)
   final String? ownerId;
   final bool isVerifiedMerchant;
   final String? businessPhone;
@@ -44,24 +52,25 @@ class Place {
   final Map<String, dynamic>? workingHours;
   final bool requiresAdminReview;
 
-  // 🆕 Rich profile (Wave 19 — image-free fallback)
   final String? website;
   final List<String> tags;
   final String? facebookPage;
 
-  // 🆕 الفروع (Branches)
-  final String? parentId; // إذا كان هذا فرعاً، هنا معرف المركز الرئيسي
-  final bool isBranch; // هل هذا المكان مجرد فرع؟
+  final String? parentId;
+  final bool isBranch;
 
-  // 🆕 العروض والخصومات (Offers)
   final bool hasActiveOffer;
   final String? offerTitle;
   final String? offerDetails;
   final DateTime? offerExpiryDate;
+  final DateTime? offerCreatedAt;
 
-  // 🆕 صلاحيات العروض (Admin Permissions)
-  final bool isOfferFeatureEnabled; // هل سمح الأدمن للتاجر بالعروض؟
-  final bool offerRequestPending; // هل التاجر طلب التفعيل؟
+  final bool isOfferFeatureEnabled;
+  final bool offerRequestPending;
+
+  final String? banReason;
+  final DateTime? bannedAt;
+  final String? bannedBy;
 
   const Place({
     required this.id,
@@ -79,9 +88,14 @@ class Place {
     this.imageUrls = const [],
     this.averageRating = 0.0,
     this.reviewCount = 0,
+    this.viewCount = 0,
     this.isApproved = false,
     this.isActive = true,
     this.createdAt,
+    this.isRankable = false,
+    this.adjustedScore,
+    this.sampleQuality,
+    this.confidenceLabel,
     this.priceLevel = 1,
     this.hasWifi = false,
     this.hasParking = false,
@@ -106,8 +120,12 @@ class Place {
     this.offerTitle,
     this.offerDetails,
     this.offerExpiryDate,
+    this.offerCreatedAt,
     this.isOfferFeatureEnabled = false,
     this.offerRequestPending = false,
+    this.banReason,
+    this.bannedAt,
+    this.bannedBy,
   });
 
   factory Place.fromMap(String id, Map<String, dynamic> map) {
@@ -115,6 +133,11 @@ class Place {
       if (val is List) return val.map((e) => e.toString()).toList();
       return [];
     }
+
+    final reviewCount = (map['reviewCount'] as num?)?.toInt() ?? 0;
+    // fallback: derive from reviewCount if the mirror flag is absent
+    final isRankable = (map['isRankable'] as bool?) ??
+        (reviewCount >= AdjustedScoreService.minRatingsForRanking);
 
     return Place(
       id: id,
@@ -132,12 +155,17 @@ class Place {
           map['location'] is GeoPoint ? map['location'] as GeoPoint : null,
       imageUrls: safeList(map['imageUrls']),
       averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
-      reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
+      reviewCount: reviewCount,
+      viewCount: (map['viewCount'] as num?)?.toInt() ?? 0,
       isApproved: map['isApproved'] == true,
       isActive: map['isActive'] != false,
       createdAt: map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : null,
+      isRankable: isRankable,
+      adjustedScore: (map['adjustedScore'] as num?)?.toDouble(),
+      sampleQuality: (map['sampleQuality'] as num?)?.toDouble(),
+      confidenceLabel: map['confidenceLabel']?.toString(),
       priceLevel: (map['priceLevel'] as num?)?.toInt() ?? 1,
       hasWifi: map['hasWifi'] == true,
       hasParking: map['hasParking'] == true,
@@ -158,19 +186,24 @@ class Place {
       website: map['website']?.toString(),
       tags: safeList(map['tags']),
       facebookPage: map['facebookPage']?.toString(),
-      // 🆕 الفروع
       parentId: map['parentId']?.toString(),
       isBranch: map['isBranch'] == true,
-      // 🆕 العروض
       hasActiveOffer: map['hasActiveOffer'] == true,
       offerTitle: map['offerTitle']?.toString(),
       offerDetails: map['offerDetails']?.toString(),
       offerExpiryDate: map['offerExpiryDate'] is Timestamp
           ? (map['offerExpiryDate'] as Timestamp).toDate()
           : null,
-      // 🆕 صلاحيات العروض
+      offerCreatedAt: map['offerCreatedAt'] is Timestamp
+          ? (map['offerCreatedAt'] as Timestamp).toDate()
+          : null,
       isOfferFeatureEnabled: map['isOfferFeatureEnabled'] == true,
       offerRequestPending: map['offerRequestPending'] == true,
+      banReason: map['banReason']?.toString(),
+      bannedAt: map['bannedAt'] is Timestamp
+          ? (map['bannedAt'] as Timestamp).toDate()
+          : null,
+      bannedBy: map['bannedBy']?.toString(),
     );
   }
 
@@ -190,11 +223,16 @@ class Place {
       'imageUrls': imageUrls,
       'averageRating': averageRating,
       'reviewCount': reviewCount,
+      'viewCount': viewCount,
       'isApproved': isApproved,
       'isActive': isActive,
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
           : FieldValue.serverTimestamp(),
+      'isRankable': isRankable,
+      if (adjustedScore != null) 'adjustedScore': adjustedScore,
+      if (sampleQuality != null) 'sampleQuality': sampleQuality,
+      if (confidenceLabel != null) 'confidenceLabel': confidenceLabel,
       'priceLevel': priceLevel,
       'hasWifi': hasWifi,
       'hasParking': hasParking,
@@ -214,19 +252,68 @@ class Place {
       if (tags.isNotEmpty) 'tags': tags,
       if (facebookPage != null && facebookPage!.isNotEmpty)
         'facebookPage': facebookPage,
-      // 🆕 الفروع
       if (parentId != null) 'parentId': parentId,
       'isBranch': isBranch,
-      // 🆕 العروض
       'hasActiveOffer': hasActiveOffer,
       if (offerTitle != null) 'offerTitle': offerTitle,
       if (offerDetails != null) 'offerDetails': offerDetails,
       if (offerExpiryDate != null)
         'offerExpiryDate': Timestamp.fromDate(offerExpiryDate!),
-      // 🆕 صلاحيات العروض
+      if (offerCreatedAt != null)
+        'offerCreatedAt': Timestamp.fromDate(offerCreatedAt!),
       'isOfferFeatureEnabled': isOfferFeatureEnabled,
       'offerRequestPending': offerRequestPending,
+      if (banReason != null) 'banReason': banReason,
+      if (bannedAt != null) 'bannedAt': Timestamp.fromDate(bannedAt!),
+      if (bannedBy != null) 'bannedBy': bannedBy,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ✅ v3.4: Smart Address Formatting
+  // ═══════════════════════════════════════════════════════════════
+
+  /// يعيد العنوان الكامل بالتنسيق الهرمي الصحيح:
+  /// "شارع الجمهورية - حي الشرق - بورسعيد"
+  ///
+  /// - يتجاهل الحقول الفارغة تلقائياً.
+  /// - يضيف بادئة "حي " لحقل المدينة إذا لم تكن موجودة.
+  /// - يمنع التكرار أو الأخطاء الإملائية.
+  String get fullAddress {
+    final List<String> parts = [];
+
+    // 1. المنطقة / الشارع (الأصغر)
+    final trimmedAddress = address.trim();
+    if (trimmedAddress.isNotEmpty) {
+      parts.add(trimmedAddress);
+    }
+
+    // 2. الحي (نضيف "حي" بذكاء)
+    final trimmedCity = city.trim();
+    if (trimmedCity.isNotEmpty) {
+      final String formattedCity;
+      if (!trimmedCity.startsWith('حي ')) {
+        if (trimmedCity.startsWith('حي')) {
+          // التعامل مع حالة "حيالشرق" (بدون مسافة)
+          formattedCity = 'حي ${trimmedCity.substring(2).trim()}';
+        } else {
+          // التعامل مع حالة "الشرق" (إضافة حي)
+          formattedCity = 'حي $trimmedCity';
+        }
+      } else {
+        formattedCity = trimmedCity;
+      }
+      parts.add(formattedCity);
+    }
+
+    // 3. المحافظة (الأكبر)
+    final trimmedGov = governorate.trim();
+    if (trimmedGov.isNotEmpty) {
+      parts.add(trimmedGov);
+    }
+
+    // دمج الأجزاء بفاصل " - "
+    return parts.join(' - ');
   }
 
   Place copyWith({
@@ -244,9 +331,14 @@ class Place {
     List<String>? imageUrls,
     double? averageRating,
     int? reviewCount,
+    int? viewCount,
     bool? isApproved,
     bool? isActive,
     DateTime? createdAt,
+    bool? isRankable,
+    double? adjustedScore,
+    double? sampleQuality,
+    String? confidenceLabel,
     int? priceLevel,
     bool? hasWifi,
     bool? hasParking,
@@ -271,8 +363,12 @@ class Place {
     String? offerTitle,
     String? offerDetails,
     DateTime? offerExpiryDate,
+    DateTime? offerCreatedAt,
     bool? isOfferFeatureEnabled,
     bool? offerRequestPending,
+    String? banReason,
+    DateTime? bannedAt,
+    String? bannedBy,
   }) {
     return Place(
       id: id,
@@ -290,9 +386,14 @@ class Place {
       imageUrls: imageUrls ?? this.imageUrls,
       averageRating: averageRating ?? this.averageRating,
       reviewCount: reviewCount ?? this.reviewCount,
+      viewCount: viewCount ?? this.viewCount,
       isApproved: isApproved ?? this.isApproved,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      isRankable: isRankable ?? this.isRankable,
+      adjustedScore: adjustedScore ?? this.adjustedScore,
+      sampleQuality: sampleQuality ?? this.sampleQuality,
+      confidenceLabel: confidenceLabel ?? this.confidenceLabel,
       priceLevel: priceLevel ?? this.priceLevel,
       hasWifi: hasWifi ?? this.hasWifi,
       hasParking: hasParking ?? this.hasParking,
@@ -317,9 +418,13 @@ class Place {
       offerTitle: offerTitle ?? this.offerTitle,
       offerDetails: offerDetails ?? this.offerDetails,
       offerExpiryDate: offerExpiryDate ?? this.offerExpiryDate,
+      offerCreatedAt: offerCreatedAt ?? this.offerCreatedAt,
       isOfferFeatureEnabled:
           isOfferFeatureEnabled ?? this.isOfferFeatureEnabled,
       offerRequestPending: offerRequestPending ?? this.offerRequestPending,
+      banReason: banReason ?? this.banReason,
+      bannedAt: bannedAt ?? this.bannedAt,
+      bannedBy: bannedBy ?? this.bannedBy,
     );
   }
 }

@@ -1,5 +1,6 @@
 // lib/services/location_cache_service.dart
 //
+// [v1.1 — 2026-11-11] — INTEGRITY: Added isMocked field to cache to prevent storing fake locations.
 // [v1.0 — 2026-10-19] — Wave 5.5c: Cache مستقل (ADR-1)
 //   - يحفظ/يقرأ LocationData من SharedPreferences
 //   - يتحقق من صلاحية البيانات (validate)
@@ -13,6 +14,7 @@ class LocationCacheService {
   static const _kLng = 'loc_cache_lng';
   static const _kNameAr = 'loc_cache_nameAr';
   static const _kAccuracy = 'loc_cache_accuracy';
+  static const _kIsMocked = 'loc_cache_isMocked';
   static const _kTimestamp = 'loc_cache_timestamp';
 
   /// صلاحية الـ cache — 7 أيام
@@ -23,6 +25,7 @@ class LocationCacheService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_kLat, data.latitude);
     await prefs.setDouble(_kLng, data.longitude);
+    await prefs.setBool(_kIsMocked, data.isMocked);
     await prefs.setInt(_kTimestamp, DateTime.now().millisecondsSinceEpoch);
 
     if (data.nameAr != null) {
@@ -44,6 +47,7 @@ class LocationCacheService {
     final lat = prefs.getDouble(_kLat);
     final lng = prefs.getDouble(_kLng);
     final ts = prefs.getInt(_kTimestamp);
+    final isMocked = prefs.getBool(_kIsMocked) ?? false;
 
     if (lat == null || lng == null || ts == null) return null;
 
@@ -62,6 +66,7 @@ class LocationCacheService {
       longitude: lng,
       nameAr: prefs.getString(_kNameAr),
       accuracyMeters: prefs.getDouble(_kAccuracy),
+      isMocked: isMocked,
     );
   }
 
@@ -72,6 +77,7 @@ class LocationCacheService {
     await prefs.remove(_kLng);
     await prefs.remove(_kNameAr);
     await prefs.remove(_kAccuracy);
+    await prefs.remove(_kIsMocked);
     await prefs.remove(_kTimestamp);
   }
 

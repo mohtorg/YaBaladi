@@ -1,4 +1,7 @@
 // lib/features/merchant/screens/merchant_application_screen.dart
+// [v1.1 — 2026-11-15] — LINTER FIX: Added curly braces to all single-line if statements.
+// [v1.0 — Initial] — Merchant application form.
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -32,7 +35,9 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     final auth = context.read<AuthController>();
     final controller = context.read<MerchantApplicationController>();
@@ -52,7 +57,9 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
       address: _addressCtrl.text.trim(),
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     if (success) {
       // عرض نافذة نجاح
@@ -150,8 +157,12 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
                 border: OutlineInputBorder(),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'اسم النشاط مطلوب';
-                if (v.trim().length < 2) return 'الاسم قصير جداً';
+                if (v == null || v.trim().isEmpty) {
+                  return 'اسم النشاط مطلوب';
+                }
+                if (v.trim().length < 2) {
+                  return 'الاسم قصير جداً';
+                }
                 return null;
               },
             ),
@@ -168,8 +179,12 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
                 border: OutlineInputBorder(),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'رقم الهاتف مطلوب';
-                if (v.trim().length < 8) return 'رقم هاتف غير صالح';
+                if (v == null || v.trim().isEmpty) {
+                  return 'رقم الهاتف مطلوب';
+                }
+                if (v.trim().length < 8) {
+                  return 'رقم هاتف غير صالح';
+                }
                 return null;
               },
             ),
@@ -185,7 +200,9 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
                 border: OutlineInputBorder(),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'المحافظة مطلوبة';
+                if (v == null || v.trim().isEmpty) {
+                  return 'المحافظة مطلوبة';
+                }
                 return null;
               },
             ),
@@ -203,8 +220,12 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> {
                 alignLabelWithHint: true,
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'العنوان مطلوب';
-                if (v.trim().length < 5) return 'يرجى كتابة عنوان أوضح';
+                if (v == null || v.trim().isEmpty) {
+                  return 'العنوان مطلوب';
+                }
+                if (v.trim().length < 5) {
+                  return 'يرجى كتابة عنوان أوضح';
+                }
                 return null;
               },
             ),

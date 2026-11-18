@@ -10,6 +10,54 @@ import 'app_localizations_en.dart';
 
 // ignore_for_file: type=lint
 
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'l10n/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item, then choose the
+/// locale or locales your application supports and add them to the list.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
       : localeName = intl.Intl.canonicalizedLocale(locale.toString());
@@ -23,6 +71,16 @@ abstract class AppLocalizations {
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
     delegate,
@@ -31,15 +89,15 @@ abstract class AppLocalizations {
     GlobalWidgetsLocalizations.delegate,
   ];
 
+  /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
     Locale('en'),
   ];
 
   // =====================================================================
-  // النصوص الأصلية
+  // 1. النصوص العامة (General)
   // =====================================================================
-
   String get appName;
   String get welcome;
   String get home;
@@ -127,6 +185,11 @@ abstract class AppLocalizations {
   String get no;
   String get apply;
   String get select;
+  String get delete;
+  String get edit;
+  String get done;
+  String get copy;
+  String get copiedToClipboard;
   String get loginTitle;
   String get loginSubtitle;
   String get registerTitle;
@@ -200,19 +263,136 @@ abstract class AppLocalizations {
   String get tripsTitle;
 
   // =====================================================================
-  // 👈 [NEW] النصوص المفقودة التي تمت إضافتها لحل مشكلة home_screen
+  // 2. Location & Governorate Picker
   // =====================================================================
+  String get chooseGovernorate;
+  String get useCurrentLocation;
+  String get fromGps;
+  String get orChooseAnotherGovernorate;
+  String get chooseYourGovernorate;
+  String get defaultBadge;
+  String get determineMyLocation;
+  String get locationDefined;
+  String get searchPlaceTitle;
+  String get searchPlaceHint;
+  String get noMatchingResults;
+  String get locationSourceGps;
+  String get locationSourceGpsSub;
+  String get locationSourceNetwork;
+  String get locationSourceNetworkSub;
+  String get locationSourceLastKnown;
+  String get locationSourceLastKnownSub;
+  String get locationSourceManual;
+  String get locationSourceManualSub;
+  String get locationSourceOnline;
+  String get locationSourceOnlineSub;
 
-  /// 'خطط رحلتك'
+  // =====================================================================
+  // 3. Trip Planner
+  // =====================================================================
+  String get planYourTrip;
+  String get whereToGo;
+  String get chooseGovernorateToStart;
+  String foundInBasket(String count);
+  String tripIn(String govName);
+  String get governorate;
+  String get duration;
+  String get halfDay;
+  String get halfDaySub;
+  String get fullDay;
+  String get fullDaySub;
+  String get weekend;
+  String get weekendSub;
+  String get customDates;
+  String tripDurationDays(int days);
+  String get transportMode;
+  String get transportDriving;
+  String get transportWalking;
+  String get transportBus;
+  String get preparingBestOrder;
+  String get notEnoughPlaces;
+  String get modifyOptions;
+  String get modifyPlacesManually;
+  String get finalTouches;
+  String get addTripTitle;
+  String get tripTitleField;
+  String get previous;
+  String get generateTrip;
+  String get next;
+  String get saveTrip;
+  String get tripSavedSuccess;
+  String get loginRequiredForSave;
+  String get saveFailed;
+  String dayNumber(int day);
+  String get minutes;
+  String get minutesDual;
+  String get minutesPlural;
+  String get stations;
+  String get stationsDual;
+  String get stationsPlural;
+  String get hours;
+  String get hoursPlural;
+  String get places;
+  String get placesDual;
+  String get placesPlural;
+  String get newTrip;
+  String tripTo(String govName);
+
+  // =====================================================================
+  // 4. Bulk Import (Excel)
+  // =====================================================================
+  String get bulkImportTitle;
+  String get bulkImportIntro;
+  String get downloadExcelTemplate;
+  String get pickExcelFile;
+  String confirmUploadPlaces(int count);
+  String get preparingTemplate;
+  String get templateReady;
+  String templateError(String error);
+  String get readingFile;
+  String get fileSelectionCancelled;
+  String get noValidDataFound;
+  String get fileReadSuccess;
+  String get uploadingData;
+  String uploadSuccess(int count);
+  String duplicatesSkipped(int count);
+  String get sortReport;
+  String validPlaces(int count);
+  String errorLines(int count);
+  String get bulkUploadSuccessMsg;
+  String get noDataToUpload;
+  String get allPlacesAlreadyRegistered;
+  String databaseConnectionError(String error);
+  String fileReadError(String error);
+  String get templateGenerationFailed;
+  String get templateShareText;
+  String get templateShareSubject;
+
+  // =====================================================================
+  // 5. Notifications & FCM
+  // =====================================================================
+  String get noValidFcmTokens;
+  String get pushSentSuccess;
+  String get pushFailed;
+  String get notificationPlaceBlockedTitle;
+  String notificationPlaceBlockedBody(String placeName, String reason);
+  String get notificationPlaceUnblockedTitle;
+  String notificationPlaceUnblockedBody(String placeName);
+  String get notificationSupportReplyTitle;
+  String notificationSupportReplyBody(String code);
+  String get notificationMerchantApprovedTitle;
+  String get notificationMerchantApprovedBody;
+  String get notificationMerchantRejectedTitle;
+  String notificationMerchantRejectedBody(String reason);
+  String notificationNewReviewTitle(String placeName);
+  String notificationNewReviewBody(String rating, String comment);
+
+  // =====================================================================
+  // 6. Home Screen Actions (المضافة حديثاً)
+  // =====================================================================
   String get planTripAction;
-
-  /// 'رحلاتي'
   String get myTripsAction;
-
-  /// 'الأعلى تقييماً في [governorateName]'
   String topRatedIn(String governorateName);
-
-  /// 'سجل دخولك لتجربة أفضل!'
   String get guestBannerTitle;
 }
 

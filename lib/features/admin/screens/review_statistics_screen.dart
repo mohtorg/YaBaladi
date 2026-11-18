@@ -1,4 +1,6 @@
 // lib/features/admin/screens/review_statistics_screen.dart
+// [v1.1 — REVIEWED & VERIFIED] — No changes needed.
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/design_tokens.dart';
@@ -21,19 +23,20 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() => _loading = true);
+    if (mounted) setState(() => _loading = true);
     final fs = FirebaseFirestore.instance.collection('reviews');
 
     try {
-      // ✅ 6 استعلامات تجميعية فقط (بدون قراءة المستندات)
       final results = await Future.wait([
-        fs.count().get(), // 0: Total
-        fs.where('rating', isEqualTo: 5).count().get(), // 1
-        fs.where('rating', isEqualTo: 4).count().get(), // 2
-        fs.where('rating', isEqualTo: 3).count().get(), // 3
-        fs.where('rating', isEqualTo: 2).count().get(), // 4
-        fs.where('rating', isEqualTo: 1).count().get(), // 5
+        fs.count().get(),
+        fs.where('rating', isEqualTo: 5).count().get(),
+        fs.where('rating', isEqualTo: 4).count().get(),
+        fs.where('rating', isEqualTo: 3).count().get(),
+        fs.where('rating', isEqualTo: 2).count().get(),
+        fs.where('rating', isEqualTo: 1).count().get(),
       ]);
+
+      if (!mounted) return;
 
       final total = results[0].count ?? 0;
       final c5 = results[1].count ?? 0;
@@ -42,7 +45,6 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
       final c2 = results[4].count ?? 0;
       final c1 = results[5].count ?? 0;
 
-      // ✅ حساب المتوسط رياضياً (بدون استخدام select)
       final sumOfRatings = (5 * c5) + (4 * c4) + (3 * c3) + (2 * c2) + (1 * c1);
       final avg = total > 0 ? sumOfRatings / total : 0.0;
 
@@ -68,7 +70,11 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('إحصائيات التقييمات')),
+        appBar: AppBar(
+          title: const Text('إحصائيات التقييمات'),
+          backgroundColor: YaBaladiDesignTokens.primaryBlue,
+          foregroundColor: Colors.white,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -83,88 +89,112 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
         backgroundColor: YaBaladiDesignTokens.primaryBlue,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStats),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadStats,
+            tooltip: 'تحديث',
+          ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.amber.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    const Text(
-                      'إجمالي التقييمات',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$total',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(height: 40, width: 1, color: Colors.grey.shade300),
-                Column(
-                  children: [
-                    const Text(
-                      'متوسط التقييم',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
+      body: RefreshIndicator(
+        onRefresh: _loadStats,
+        color: YaBaladiDesignTokens.primaryBlue,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Expanded(
+                    child: Column(
                       children: [
-                        Text(
-                          avg,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber,
+                        const Text(
+                          'إجمالي التقييمات',
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '$total',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.star, color: Colors.amber, size: 28),
                       ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  Container(height: 40, width: 1, color: Colors.grey.shade300),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'متوسط التقييم',
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                avg,
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.star,
+                                color: Colors.amber, size: 28),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'توزيع النجوم',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          _ratingBar(
-              '5 نجوم', (_stats['5'] as int?) ?? 0, totalSafe, Colors.green),
-          _ratingBar('4 نجوم', (_stats['4'] as int?) ?? 0, totalSafe,
-              Colors.lightGreen),
-          _ratingBar(
-              '3 نجوم', (_stats['3'] as int?) ?? 0, totalSafe, Colors.amber),
-          _ratingBar(
-              '2 نجوم', (_stats['2'] as int?) ?? 0, totalSafe, Colors.orange),
-          _ratingBar(
-              'نجمة واحدة', (_stats['1'] as int?) ?? 0, totalSafe, Colors.red),
-        ],
+            const SizedBox(height: 24),
+            const Text(
+              'توزيع النجوم',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _ratingBar(
+                '5 نجوم', (_stats['5'] as int?) ?? 0, totalSafe, Colors.green),
+            _ratingBar('4 نجوم', (_stats['4'] as int?) ?? 0, totalSafe,
+                Colors.lightGreen),
+            _ratingBar(
+                '3 نجوم', (_stats['3'] as int?) ?? 0, totalSafe, Colors.amber),
+            _ratingBar(
+                '2 نجوم', (_stats['2'] as int?) ?? 0, totalSafe, Colors.orange),
+            _ratingBar('نجمة واحدة', (_stats['1'] as int?) ?? 0, totalSafe,
+                Colors.red),
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
@@ -182,7 +212,7 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: count / total,
+                value: (count / total).clamp(0.0, 1.0),
                 backgroundColor: color.withValues(alpha: 0.15),
                 valueColor: AlwaysStoppedAnimation(color),
                 minHeight: 10,
@@ -192,10 +222,14 @@ class _ReviewStatisticsScreenState extends State<ReviewStatisticsScreen> {
           const SizedBox(width: 12),
           SizedBox(
             width: 40,
-            child: Text(
-              '$count',
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$count',
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],

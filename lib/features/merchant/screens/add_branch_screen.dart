@@ -1,8 +1,12 @@
 // lib/features/merchant/screens/add_branch_screen.dart
-//
-// [v1.0 — 2026-11-01] — ADD BRANCH SCREEN
-//   - Allows merchant to add a sub-branch inheriting main branch data.
-//   - Saves to Firestore with parentId and isBranch = true.
+// [v1.2 — 2026-11-15] — LINTER FIX: Added curly braces to all single-line if statements.
+// [v1.1 — FIXED] — CRITICAL BUGS & CONTEXT SAFETY FIXES:
+//   - FIXED: Branch name field was dead code (typed value was ignored). Now properly saved.
+//   - FIXED: Added geohash to match main branch search behavior.
+//   - FIXED: Added category count increment to prevent counter drift.
+//   - FIXED: Added updatedAt for consistency.
+//   - FIXED: Captured ScaffoldMessenger/Navigator before async gaps.
+//   - KEPT: All inheritance logic, GPS handling, and UI intact.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +16,7 @@ import 'package:provider/provider.dart';
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../models/place.dart';
 import '../../../core/services/zone_service.dart';
+import '../../../repositories/categories_repository.dart';
 
 class AddBranchScreen extends StatefulWidget {
   final Place mainBranch;
@@ -24,6 +29,7 @@ class AddBranchScreen extends StatefulWidget {
 
 class _AddBranchScreenState extends State<AddBranchScreen> {
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameCtrl;
   final _addressCtrl = TextEditingController();
   final _latCtrl = TextEditingController();
   final _lngCtrl = TextEditingController();
@@ -37,10 +43,15 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     super.initState();
     // نسخ البيانات الأساسية من المركز الرئيسي كقيم افتراضية
     _phoneCtrl.text = widget.mainBranch.phone;
+    // ✅ الاسم الافتراضي للفرع (يمكن للمستخدم تعديله)
+    _nameCtrl = TextEditingController(
+      text: '${widget.mainBranch.nameAr} - فرع',
+    );
   }
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _addressCtrl.dispose();
     _latCtrl.dispose();
     _lngCtrl.dispose();
@@ -49,6 +60,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   }
 
   Future<void> _fetchCurrentLocation() async {
+    // ✅ تأمين السياق
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() => _isFetchingLocation = true);
     try {
       final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -81,7 +95,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           _lngCtrl.text = position.longitude.toStringAsFixed(6);
           _fetchedZoneName = zoneName ?? 'غير معروف';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
           SnackBar(
             content: Text('✅ تم جلب الموقع: $_fetchedZoneName'),
             backgroundColor: Colors.green,
@@ -90,17 +105,22 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
           SnackBar(content: Text('❌ $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) setState(() => _isFetchingLocation = false);
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
     }
   }
 
   Future<void> _saveBranch() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     final auth = context.read<AuthController>();
     if (!auth.isLoggedIn) {
@@ -110,6 +130,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       return;
     }
 
+    // ✅ تأمين السياق
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() => _isSaving = true);
 
     try {
@@ -117,10 +141,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       final lng = double.parse(_lngCtrl.text.trim());
       final geoPoint = GeoPoint(lat, lng);
 
-      // نسخ الخصائص من المركز الرئيسي
+      // ✅ نسخ الخصائص من المركز الرئيسي + القيم المدخلة للفرع
       final branchData = {
         // البيانات المنسوخة
-        'nameAr': widget.mainBranch.nameAr,
+        'nameAr': _nameCtrl.text.trim().isEmpty
+            ? widget.mainBranch.nameAr
+            : _nameCtrl.text.trim(),
         'nameEn': widget.mainBranch.nameEn,
         'description': widget.mainBranch.description,
         'categoryId': widget.mainBranch.categoryId,
@@ -148,38 +174,95 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         'location': geoPoint,
         'latitude': lat,
         'longitude': lng,
+        // ✅ إضافة geohash لضمان ظهور الفرع في البحث الجغرافي
+        'geohash': _encodeGeohash(lat, lng),
         'phone': _phoneCtrl.text.trim(),
         'businessPhone': _phoneCtrl.text.trim(),
         'geoZoneName': _fetchedZoneName,
         'ownerId': auth.uid,
         'isBranch': true,
         'parentId': widget.mainBranch.id,
-        'isApproved': true, // الموافقة تلقائياً للفروع التابعة لتاجر معتمد
+        'isApproved': true,
         'isActive': true,
         'averageRating': 0.0,
         'reviewCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(), // ✅ للاتساق
         'requiresAdminReview': false,
       };
 
       await FirebaseFirestore.instance.collection('places').add(branchData);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      // ✅ تحديث عداد التصنيف (الريبو يحتوي على try-catch داخلي، لن يُفشل العملية)
+      if (widget.mainBranch.categoryId.isNotEmpty) {
+        await CategoriesRepository()
+            .incrementPlacesCount(widget.mainBranch.categoryId, 1);
+      }
+
+      if (!mounted) {
+        return;
+      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('✅ تم إضافة الفرع بنجاح'),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.of(context).pop(true);
+      navigator.pop(true);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) {
+        return;
+      }
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(content: Text('❌ فشل الحفظ: $e'), backgroundColor: Colors.red),
       );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
+  }
+
+  // ✅ Geohash encoder (مطابق للـ add_place_screen)
+  String _encodeGeohash(double latitude, double longitude,
+      {int precision = 7}) {
+    const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+    var isEven = true;
+    var bit = 0;
+    var ch = 0;
+    final sb = StringBuffer();
+    var latMin = -90.0, latMax = 90.0;
+    var lonMin = -180.0, lonMax = 180.0;
+    while (sb.length < precision) {
+      if (isEven) {
+        final mid = (lonMin + lonMax) / 2;
+        if (longitude > mid) {
+          ch |= 1 << (4 - bit);
+          lonMin = mid;
+        } else {
+          lonMax = mid;
+        }
+      } else {
+        final mid = (latMin + latMax) / 2;
+        if (latitude > mid) {
+          ch |= 1 << (4 - bit);
+          latMin = mid;
+        } else {
+          latMax = mid;
+        }
+      }
+      isEven = !isEven;
+      if (bit < 4) {
+        bit++;
+      } else {
+        sb.write(base32[ch]);
+        bit = 0;
+        ch = 0;
+      }
+    }
+    return sb.toString();
   }
 
   @override
@@ -226,19 +309,15 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             ),
             const SizedBox(height: 24),
 
-            // اسم الفرع (يمكن تعديله أو تركه فارغاً ليأخذ اسم المركز)
+            // اسم الفرع (يمكن تعديله)
             TextFormField(
-              initialValue: '${widget.mainBranch.nameAr} - فرع',
+              controller: _nameCtrl,
               decoration: const InputDecoration(
                 labelText: 'اسم الفرع (اختياري)',
+                hintText: 'مثال: ميدان الشهداء - فرع',
                 prefixIcon: Icon(Icons.storefront),
                 border: OutlineInputBorder(),
               ),
-              onSaved: (v) {
-                if (v != null && v.trim().isNotEmpty) {
-                  // يمكن إضافة اسم مخصص للفرع لاحقاً
-                }
-              },
             ),
             const SizedBox(height: 16),
 

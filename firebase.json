@@ -8,11 +8,27 @@
           "fileOutput": "android/app/google-services.json"
         }
       },
+      "ios": {
+        "default": {
+          "projectId": "ya-baladi",
+          "appId": "1:231838490815:ios:PLACEHOLDER_REPLACE_WITH_YOUR_IOS_APP_ID",
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "web": {
+        "default": {
+          "projectId": "ya-baladi",
+          "appId": "1:231838490815:web:PLACEHOLDER_REPLACE_WITH_YOUR_WEB_APP_ID",
+          "fileOutput": "lib/firebase_options.dart"
+        }
+      },
       "dart": {
         "lib/firebase_options.dart": {
           "projectId": "ya-baladi",
           "configurations": {
-            "android": "1:231838490815:android:2d5e39e5d244672236e60a"
+            "android": "1:231838490815:android:2d5e39e5d244672236e60a",
+            "ios": "1:231838490815:ios:PLACEHOLDER_REPLACE_WITH_YOUR_IOS_APP_ID",
+            "web": "1:231838490815:web:PLACEHOLDER_REPLACE_WITH_YOUR_WEB_APP_ID"
           }
         }
       }

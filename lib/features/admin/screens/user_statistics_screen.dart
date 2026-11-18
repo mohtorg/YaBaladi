@@ -1,4 +1,11 @@
 // lib/features/admin/screens/user_statistics_screen.dart
+// [v1.1 — FIXED] — SAFETY & UI ENHANCEMENTS:
+//   - FIXED: Added 'mounted' check after Future.wait to prevent crashes.
+//   - FIXED: Wrapped count in FittedBox to prevent UI overflow with large numbers.
+//   - ADDED: Pull-to-refresh functionality (RefreshIndicator).
+//   - ADDED: Error handling UI with retry button.
+//   - KEPT: All aggregation logic and UI colors intact.
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/design_tokens.dart';
@@ -12,6 +19,7 @@ class UserStatisticsScreen extends StatefulWidget {
 
 class _UserStatisticsScreenState extends State<UserStatisticsScreen> {
   bool _loading = true;
+  String? _error;
   Map<String, int> _stats = {};
 
   @override
@@ -21,7 +29,13 @@ class _UserStatisticsScreenState extends State<UserStatisticsScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
     final fs = FirebaseFirestore.instance.collection('users');
 
     try {
@@ -33,6 +47,9 @@ class _UserStatisticsScreenState extends State<UserStatisticsScreen> {
         fs.where('role', isEqualTo: 'member').count().get(),
         fs.where('isBanned', isEqualTo: true).count().get(),
       ]);
+
+      // ✅ فحص mounted لمنع الانهيار إذا خرج المستخدم من الشاشة
+      if (!mounted) return;
 
       setState(() {
         _stats = {
@@ -47,30 +64,79 @@ class _UserStatisticsScreenState extends State<UserStatisticsScreen> {
       });
     } catch (e) {
       debugPrint('❌ Error loading user stats: $e');
-      if (mounted) setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('إحصائيات المستخدمين')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('إحصائيات المستخدمين'),
         backgroundColor: YaBaladiDesignTokens.primaryBlue,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStats),
+          if (!_loading)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadStats,
+              tooltip: 'تحديث',
+            ),
         ],
       ),
-      body: ListView(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'حدث خطأ أثناء تحميل الإحصائيات',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _loadStats,
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: YaBaladiDesignTokens.primaryBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadStats,
+      color: YaBaladiDesignTokens.primaryBlue,
+      child: ListView(
         padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           _statCard('إجمالي المستخدمين', _stats['total'] ?? 0, Colors.blue,
               Icons.people),
@@ -107,14 +173,21 @@ class _UserStatisticsScreenState extends State<UserStatisticsScreen> {
             child: Text(
               title,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
+          const SizedBox(width: 8),
+          // ✅ تغليف الرقم بـ FittedBox لمنع انهيار الواجهة إذا كان الرقم ضخماً
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
         ],

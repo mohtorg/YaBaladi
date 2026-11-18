@@ -1,8 +1,9 @@
 // lib/features/trip/controllers/trip_plans_controller.dart
 //
-// [v1.5.1 — 2026-10-19] — FIX: Restored missing getters from v1.1
-//   - Restored: isLoading, hasError, isEmpty, hasPlans, activePlans, completedPlans, upcomingPlans, count.
-//   - KEPT: save() forcing userId and null dates for serverTimestamp.
+// [v1.5.2 - HARDENED] - Safety and performance fixes:
+//   - FIXED: notifyListeners() called after dispose (added _disposed guard).
+//   - IMPROVED: updateStatus now updates the local list optimistically.
+//   - KEPT: All public API, generation guards, and save logic.
 
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -26,6 +27,7 @@ class TripPlansController extends ChangeNotifier {
   TripPlan? _selectedPlan;
   int _loadGeneration = 0;
   StreamSubscription<List<TripPlan>>? _plansSub;
+  bool _disposed = false;
 
   // ═══════════════════════════════════════════════════════════════
   // GETTERS
@@ -60,6 +62,12 @@ class TripPlansController extends ChangeNotifier {
         .toList();
   }
 
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // LOAD
   // ═══════════════════════════════════════════════════════════════
@@ -76,7 +84,7 @@ class TripPlansController extends ChangeNotifier {
     _userId = userId;
     _status = TripPlansStatus.loading;
     _error = null;
-    notifyListeners();
+    _safeNotify();
 
     try {
       _plansSub = _repo.watchByUser(userId).listen(
@@ -85,14 +93,14 @@ class TripPlansController extends ChangeNotifier {
           _plans = list;
           _status = TripPlansStatus.loaded;
           _autoSelectPlan();
-          notifyListeners();
+          _safeNotify();
         },
         onError: (Object e) {
           if (myGen != _loadGeneration) return;
           _error = e.toString();
           _status = TripPlansStatus.error;
           debugPrint('TripPlansController stream error: $e');
-          notifyListeners();
+          _safeNotify();
         },
       );
     } on Exception catch (e) {
@@ -100,7 +108,7 @@ class TripPlansController extends ChangeNotifier {
       _error = e.toString();
       _status = TripPlansStatus.error;
       debugPrint('TripPlansController.load error: $e');
-      notifyListeners();
+      _safeNotify();
     }
   }
 
@@ -112,22 +120,22 @@ class TripPlansController extends ChangeNotifier {
     _userId = null;
     _selectedPlan = null;
     _status = TripPlansStatus.idle;
-    notifyListeners();
+    _safeNotify();
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SAVE (create or update) — ✅ FIXED FOR RULES v3.4
+  // SAVE (create or update)
   // ═══════════════════════════════════════════════════════════════
 
   Future<bool> save(TripPlan trip) async {
     final user = _auth.currentUser;
     if (user == null) {
       _error = 'يجب تسجيل الدخول أولاً';
-      notifyListeners();
+      _safeNotify();
       return false;
     }
 
-    // ✅ بناء الكائن يدوياً لتجنب مشكلة copyWith مع القيم الفارغة
+    // Build manually to force userId and handle nulls safely for new trips.
     final safeTrip = TripPlan(
       id: trip.id,
       userId: user.uid,
@@ -137,13 +145,13 @@ class TripPlansController extends ChangeNotifier {
       transportMode: trip.transportMode,
       durationType: trip.durationType,
       interests: trip.interests,
-      status: trip.status, // تأكد أن الويزارد يرسلها active
+      status: trip.status,
       stops: trip.stops,
       totalDistanceKm: trip.totalDistanceKm,
       totalDurationMin: trip.totalDurationMin,
       startDate: trip.startDate,
       endDate: trip.endDate,
-      createdAt: trip.id.isEmpty ? null : trip.createdAt, // ✅ null عند الإنشاء
+      createdAt: trip.id.isEmpty ? null : trip.createdAt,
       updatedAt: trip.id.isEmpty ? null : trip.updatedAt,
     );
 
@@ -156,12 +164,12 @@ class TripPlansController extends ChangeNotifier {
         _selectedPlan = safeTrip;
       }
       _error = null;
-      notifyListeners();
+      _safeNotify();
       return true;
     } on Exception catch (e) {
       _error = e.toString();
       debugPrint('❌ TripPlansController.save error: $e');
-      notifyListeners();
+      _safeNotify();
       return false;
     }
   }
@@ -176,12 +184,12 @@ class TripPlansController extends ChangeNotifier {
       _plans = _plans.where((p) => p.id != tripId).toList();
       if (_selectedPlan?.id == tripId) _selectedPlan = null;
       _error = null;
-      notifyListeners();
+      _safeNotify();
       return true;
     } on Exception catch (e) {
       _error = e.toString();
       debugPrint('TripPlansController.delete error: $e');
-      notifyListeners();
+      _safeNotify();
       return false;
     }
   }
@@ -189,11 +197,25 @@ class TripPlansController extends ChangeNotifier {
   Future<bool> updateStatus(String tripId, TripStatus status) async {
     try {
       await _repo.updateStatus(tripId, status);
+
+      // ✅ Optimistic local update (Instant UI response)
+      _plans = _plans.map((p) {
+        if (p.id == tripId) {
+          return p.copyWith(status: status);
+        }
+        return p;
+      }).toList();
+
+      if (_selectedPlan?.id == tripId) {
+        _selectedPlan = _selectedPlan!.copyWith(status: status);
+      }
+
+      _safeNotify();
       return true;
     } on Exception catch (e) {
       _error = e.toString();
       debugPrint('TripPlansController.updateStatus error: $e');
-      notifyListeners();
+      _safeNotify();
       return false;
     }
   }
@@ -205,7 +227,7 @@ class TripPlansController extends ChangeNotifier {
   void selectPlan(TripPlan? plan) {
     if (_selectedPlan?.id == plan?.id) return;
     _selectedPlan = plan;
-    notifyListeners();
+    _safeNotify();
   }
 
   void selectPlanById(String? id) {
@@ -224,7 +246,7 @@ class TripPlansController extends ChangeNotifier {
   void clearError() {
     if (_error == null) return;
     _error = null;
-    notifyListeners();
+    _safeNotify();
   }
 
   void _autoSelectPlan() {
@@ -244,6 +266,7 @@ class TripPlansController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _plansSub?.cancel();
     _plansSub = null;
     super.dispose();

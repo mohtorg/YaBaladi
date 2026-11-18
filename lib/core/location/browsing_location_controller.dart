@@ -1,9 +1,6 @@
 // lib/core/location/browsing_location_controller.dart
-//
-// [v1.2.1 — 2026-10-25] — FIX: Removed unused import + improved notify logic
-//   - REMOVED: unused import '../../services/location_service.dart'
-//   - FIXED: notifyListeners() now triggers if placeName or source changes
-//   - KEPT: all logic, getters, and metadata handling identical
+// [v1.3.0 — 2026-11-05] — FIX: Added Race Condition protection, optimized place name fallback, and formatted.
+// [v1.2.1 — 2026-10-25] — Cleaned and formatted.
 
 import 'package:flutter/foundation.dart';
 
@@ -24,6 +21,10 @@ class BrowsingLocationController extends ChangeNotifier {
   String? _physicalPlaceName;
   LocationSource? _lastSource;
   DateTime? _lastUpdatedAt;
+
+  // ─── [v1.3] Anti-Race Condition Tracking ───
+  double? _pendingLat;
+  double? _pendingLng;
 
   // ═══════════════════════════════════════════════════════════════
   // GETTERS
@@ -47,13 +48,8 @@ class BrowsingLocationController extends ChangeNotifier {
   AddressInfo? get physicalAddress => _physicalAddress;
   String? get physicalDistrictName => _physicalAddress?.district;
 
-  /// [v1.2] اسم المكان الدقيق (GPS/بحث/يدوي)
   String? get physicalPlaceName => _physicalPlaceName;
-
-  /// [v1.2] المصدر الأخير
   LocationSource? get lastSource => _lastSource;
-
-  /// [v1.2] آخر تحديث
   DateTime? get lastUpdatedAt => _lastUpdatedAt;
 
   String get browsingShortLabel {
@@ -72,13 +68,13 @@ class BrowsingLocationController extends ChangeNotifier {
   // MUTATIONS
   // ═══════════════════════════════════════════════════════════════
 
-  /// [v1.2] يقبل الآن placeName + source (اختياري)
   void setPhysicalLocation(
     double lat,
     double lng, {
     String? placeName,
     LocationSource? source,
   }) {
+    // 1. تحديث المحافظة بناءً على الإحداثيات
     final gov = nearestGovernorate(lat, lng);
     final govChanged = _physicalId != gov.id;
     _physicalId = gov.id;
@@ -88,7 +84,6 @@ class BrowsingLocationController extends ChangeNotifier {
       _isUsingPhysical = true;
     }
 
-    // [v1.2.1 FIX] تتبع تغيير البيانات الوصفية
     bool metadataChanged = false;
 
     if (source != null && source != _lastSource) {
@@ -103,13 +98,15 @@ class BrowsingLocationController extends ChangeNotifier {
 
     _lastUpdatedAt = DateTime.now();
 
-    // نُحدّث الواجهة إذا تغيرت المحافظة أو تغيرت البيانات الوصفية
+    // 2. إشعار الواجهة فوراً إذا تغيرت المحافظة أو البيانات الوصفية
     if (govChanged || metadataChanged) {
       _safeNotify();
     }
 
-    // Reverse geocode فقط إذا لم يأتِ placeName من الخارج
+    // 3. جلب العنوان التفصيلي في الخلفية (Async)
     if (placeName == null) {
+      _pendingLat = lat;
+      _pendingLng = lng;
       _resolvePhysicalAddress(lat, lng);
     }
   }
@@ -117,9 +114,21 @@ class BrowsingLocationController extends ChangeNotifier {
   Future<void> _resolvePhysicalAddress(double lat, double lng) async {
     final info = await ReverseGeocodingService.resolve(lat, lng);
     if (_disposed) return;
+
+    // 🛡️ منع Race Condition: هل هذه الاستجابة تخص أحدث إحداثيات طلبناها؟
+    if (_pendingLat != lat || _pendingLng != lng) {
+      return; // تجاهل الاستجابة القديمة
+    }
+
     if (info == null || !info.hasData) return;
 
     _physicalAddress = info;
+
+    // تحديث اسم المكان تلقائياً إذا لم يتم تمريره يدوياً
+    if (_physicalPlaceName == null || _physicalPlaceName!.isEmpty) {
+      _physicalPlaceName = info.shortLabel;
+    }
+
     _safeNotify();
   }
 
@@ -140,7 +149,9 @@ class BrowsingLocationController extends ChangeNotifier {
     _browsingId = governorateId;
     _isUsingPhysical = (_physicalId == governorateId);
 
-    if (changed) _safeNotify();
+    if (changed) {
+      _safeNotify();
+    }
   }
 
   void resetToPhysical() {
@@ -148,7 +159,9 @@ class BrowsingLocationController extends ChangeNotifier {
     final changed = _browsingId != _physicalId || !_isUsingPhysical;
     _browsingId = _physicalId;
     _isUsingPhysical = true;
-    if (changed) _safeNotify();
+    if (changed) {
+      _safeNotify();
+    }
   }
 
   void clear() {
@@ -159,6 +172,8 @@ class BrowsingLocationController extends ChangeNotifier {
     _physicalPlaceName = null;
     _lastSource = null;
     _lastUpdatedAt = null;
+    _pendingLat = null;
+    _pendingLng = null;
     _safeNotify();
   }
 

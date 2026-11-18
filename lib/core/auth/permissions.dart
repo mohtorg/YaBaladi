@@ -215,6 +215,7 @@ Set<Permission> defaultPermissionsFor(UserRole role) {
 
     // [FIX] تمت إضافة هذه الحالة لمنع خطأ التجميع (Non-exhaustive switch)
     // في حال كان الـ enum UserRole يحتوي على أدوار إضافية.
+    // ignore: unreachable_switch_default
     default:
       return {};
   }

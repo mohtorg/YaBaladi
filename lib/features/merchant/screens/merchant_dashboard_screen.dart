@@ -1,10 +1,9 @@
 // lib/features/merchant/screens/merchant_dashboard_screen.dart
-//
-// [v3.2 — 2026-11-01] — LINKED: Add Branch Screen
-//   - ADDED: Import for AddBranchScreen.
-//   - CHANGED: "Add Branch" button now navigates to the new screen.
-//   - KEPT: All v3.1 logic, offers linking, and multi-branch UI.
-// [v3.3 — 2026-11-01] — ANALYZER FIX: Removed 'TODO' comment from Branch Card.
+// [v3.8 — 2026-11-03] — UX REFACTOR: Consolidated reviews into a single clickable card.
+//   - REPLACED: 4 KPI cards + recent reviews list with a Master Reviews Card + 2 KPI cards.
+//   - ADDED: Navigation to MerchantReviewsScreen.
+//   - REMOVED: _ReviewMiniCard and unused imports.
+//   - KEPT: All offers and branches management logic.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -12,9 +11,10 @@ import 'package:provider/provider.dart';
 
 import '../../../features/auth/controllers/auth_controller.dart';
 import '../../../models/place.dart';
-import '../../../models/review.dart';
-import 'manage_offers_screen.dart';
+import 'merchant_all_offers_screen.dart';
 import 'add_branch_screen.dart';
+import 'branch_dashboard_screen.dart';
+import 'merchant_reviews_screen.dart'; // ✅ شاشة التقييمات الجديدة
 
 class MerchantDashboardScreen extends StatelessWidget {
   const MerchantDashboardScreen({super.key});
@@ -54,10 +54,14 @@ class MerchantDashboardScreen extends StatelessWidget {
 
         int totalReviews = 0;
         double totalRatingSum = 0.0;
+        int totalViews = 0;
+
         for (var p in allPlaces) {
           totalReviews += p.reviewCount;
           totalRatingSum += (p.averageRating * p.reviewCount);
+          totalViews += p.viewCount;
         }
+
         final double aggregateRating =
             totalReviews > 0 ? (totalRatingSum / totalReviews) : 0.0;
 
@@ -75,6 +79,7 @@ class MerchantDashboardScreen extends StatelessWidget {
             branches: branches,
             aggregateRating: aggregateRating,
             totalReviews: totalReviews,
+            totalViews: totalViews,
           ),
         );
       },
@@ -87,12 +92,14 @@ class _DashboardContent extends StatelessWidget {
   final List<Place> branches;
   final double aggregateRating;
   final int totalReviews;
+  final int totalViews;
 
   const _DashboardContent({
     required this.mainBranch,
     required this.branches,
     required this.aggregateRating,
     required this.totalReviews,
+    required this.totalViews,
   });
 
   @override
@@ -100,13 +107,12 @@ class _DashboardContent extends StatelessWidget {
     final theme = Theme.of(context);
     final bool isExcellence = aggregateRating >= 4.5 && totalReviews >= 10;
 
-    final allPlaceIds = [mainBranch.id, ...branches.map((b) => b.id)];
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ─── البانر الترحيبي ───
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -168,6 +174,8 @@ class _DashboardContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+
+          // ─── أزرار الإجراءات ───
           Row(
             children: [
               Expanded(
@@ -175,8 +183,7 @@ class _DashboardContent extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) =>
-                            ManageOffersScreen(place: mainBranch),
+                        builder: (context) => const MerchantAllOffersScreen(),
                       ),
                     );
                   },
@@ -213,12 +220,78 @@ class _DashboardContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _ExcellenceProgressCard(
-            currentRating: aggregateRating,
-            currentReviewCount: totalReviews,
+
+          // ─── بطاقة التقييمات (الماستر كارد) ───
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MerchantReviewsScreen(),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.shade300, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4))
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.star,
+                        color: Colors.amber.shade700, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('التقييمات',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(aggregateRating.toStringAsFixed(1),
+                                style: theme.textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 4),
+                            Icon(Icons.star,
+                                color: Colors.amber.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Text('($totalReviews تقييم)',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios,
+                      color: theme.colorScheme.outline, size: 16),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 24),
-          Text('نظرة عامة (كل الفروع)',
+
+          // ─── إحصائيات سريعة (المشاهدات + الفروع) ───
+          Text('نظرة عامة',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
@@ -226,26 +299,13 @@ class _DashboardContent extends StatelessWidget {
             children: [
               Expanded(
                 child: _KpiCard(
-                  icon: Icons.star,
-                  label: 'متوسط التقييم',
-                  value: aggregateRating.toStringAsFixed(1),
-                  color: Colors.amber.shade700,
+                  icon: Icons.visibility,
+                  label: 'المشاهدات',
+                  value: '$totalViews',
+                  color: Colors.purple,
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: _KpiCard(
-                  icon: Icons.comment,
-                  label: 'إجمالي التقييمات',
-                  value: '$totalReviews',
-                  color: Colors.green.shade600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
               Expanded(
                 child: _KpiCard(
                   icon: Icons.store,
@@ -254,18 +314,18 @@ class _DashboardContent extends StatelessWidget {
                   color: Colors.blue,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _KpiCard(
-                  icon: Icons.visibility,
-                  label: 'المشاهدات',
-                  value: '0',
-                  color: Colors.purple,
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 24),
+
+          // ─── رحلة التميز ───
+          _ExcellenceProgressCard(
+            currentRating: aggregateRating,
+            currentReviewCount: totalReviews,
+          ),
+          const SizedBox(height: 24),
+
+          // ─── قائمة الفروع ───
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -279,63 +339,6 @@ class _DashboardContent extends StatelessWidget {
           const SizedBox(height: 12),
           _BranchCard(place: mainBranch, isMain: true),
           ...branches.map((b) => _BranchCard(place: b, isMain: false)),
-          const SizedBox(height: 24),
-          Text('أحدث التقييمات',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('reviews')
-                .where('placeId', whereIn: allPlaceIds)
-                .where('status', isEqualTo: 'published')
-                .limit(5)
-                .snapshots(),
-            builder: (context, snap) {
-              if (!snap.hasData) {
-                return const Center(
-                    child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator()));
-              }
-
-              final docs = snap.data!.docs.toList()
-                ..sort((a, b) {
-                  final aT = a.data()['createdAt'] as Timestamp?;
-                  final bT = b.data()['createdAt'] as Timestamp?;
-                  if (aT == null) return 1;
-                  if (bT == null) return -1;
-                  return bT.compareTo(aT);
-                });
-
-              if (docs.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.rate_review_outlined,
-                          size: 48, color: theme.colorScheme.outline),
-                      const SizedBox(height: 12),
-                      Text('لا توجد تقييمات بعد',
-                          style: theme.textTheme.bodyMedium),
-                    ],
-                  ),
-                );
-              }
-
-              return Column(
-                children: docs.take(3).map((doc) {
-                  final review = Review.fromMap(doc.id, doc.data());
-                  return _ReviewMiniCard(review: review);
-                }).toList(),
-              );
-            },
-          ),
           const SizedBox(height: 32),
         ],
       ),
@@ -456,9 +459,11 @@ class _BranchCard extends StatelessWidget {
         trailing: IconButton(
           icon: const Icon(Icons.arrow_forward_ios, size: 16),
           onPressed: () {
-            // ملاحظة: شاشة إدارة الفرع قيد التطوير
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('إدارة فرع ${place.nameAr} قيد الإنشاء')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BranchDashboardScreen(branch: place),
+              ),
             );
           },
         ),
@@ -660,72 +665,6 @@ class _KpiCard extends StatelessWidget {
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewMiniCard extends StatelessWidget {
-  final Review review;
-  const _ReviewMiniCard({required this.review});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Text(
-                  review.userName.isNotEmpty ? review.userName[0] : '؟',
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  review.userName,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-              Row(
-                children: List.generate(
-                  5,
-                  (i) => Icon(
-                    i < review.rating ? Icons.star : Icons.star_border,
-                    size: 14,
-                    color: Colors.amber,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (review.comment.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              review.comment,
-              style: theme.textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
         ],
       ),
     );

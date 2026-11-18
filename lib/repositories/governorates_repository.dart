@@ -1,6 +1,8 @@
 // lib/repositories/governorates_repository.dart
-// [v1.0 — 2026-10-29] — جديد كلياً
-// طبقة وصول موحدة لبيانات المحافظات والأحياء.
+// [v1.1 — OPTIMIZED] — Performance fix:
+//   - FIXED: seedAllGovernorates() now uses 1 read + 1 batch write
+//     instead of up to 27 sequential reads + 27 sequential writes (27x faster).
+//   - KEPT: All public API, guards, and Firestore structure intact.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/location/egypt_governorates.dart';
@@ -80,30 +82,46 @@ class GovernoratesRepository {
     });
   }
 
+  /// [v1.1] Optimized seeding:
+  ///   1 single `get()` to fetch all existing names + 1 batch write.
+  ///   Previously: up to 27 sequential reads + up to 27 sequential writes.
   Future<int> seedAllGovernorates() async {
-    int created = 0;
+    // Step 1: Fetch ALL existing governorate names in ONE query.
+    final existingSnap = await _govRef.get();
+    final existingNames = <String>{
+      for (final doc in existingSnap.docs)
+        (doc.data()['nameAr'] as String? ?? '').trim(),
+    }..removeWhere((n) => n.isEmpty);
+
+    // Step 2: Build a single WriteBatch for missing governorates.
+    final batch = _db.batch();
+    int toCreate = 0;
+
     for (final entry in kEgyptGovernorates.asMap().entries) {
       final index = entry.key;
       final geo = entry.value;
 
-      final existing =
-          await _govRef.where('nameAr', isEqualTo: geo.nameAr).limit(1).get();
+      if (existingNames.contains(geo.nameAr)) continue;
 
-      if (existing.docs.isEmpty) {
-        await _govRef.doc(geo.id).set({
-          'nameAr': geo.nameAr,
-          'nameEn': geo.nameEn,
-          'order': index + 1,
-          'isActive': false,
-          'deliveryEnabled': false,
-          'tripsEnabled': false,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        created++;
-      }
+      final ref = _govRef.doc(geo.id);
+      batch.set(ref, {
+        'nameAr': geo.nameAr,
+        'nameEn': geo.nameEn,
+        'order': index + 1,
+        'isActive': false,
+        'deliveryEnabled': false,
+        'tripsEnabled': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      toCreate++;
     }
-    return created;
+
+    // Step 3: Commit once (no-op if nothing to create).
+    if (toCreate > 0) {
+      await batch.commit();
+    }
+    return toCreate;
   }
 
   // ═══════════════════════════════════════════════════════════════

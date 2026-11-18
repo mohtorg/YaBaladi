@@ -1,27 +1,31 @@
 // lib/features/places/controllers/places_controller.dart
-//
-// [v4.1 — 2026-10-25] — Wave 11 FIX: applyFilters() لمعاينة النتائج
-//   - ADD: applyFilters(Map) — read-only preview، يستعيد الحالة الأصلية فوراً.
-//   - REST unchanged.
+// [v5.1 — 2026-11-15] — Phase 12: rankable places sorted first.
+//   - In every sort branch, `isRankable == true` places precede `false` ones.
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../../../models/place.dart';
 import '../../../models/filter_definition.dart';
 import '../../../repositories/places_repository.dart';
+import '../../../core/helpers/location_url_helper.dart';
 
 enum PlacesStatus { initial, loading, loaded, error }
 
 enum PlacesMode { all, filtered, nearest }
 
-enum PlaceSort { recommended, ratingDesc, distance, newest }
+enum PlaceSort {
+  recommended,
+  adjustedScore,
+  ratingDesc,
+  trustedDesc,
+  distance,
+  newest,
+}
 
 class PlacesController extends ChangeNotifier {
   final PlacesRepository _repo = PlacesRepository();
 
-  // ─── State ───
   PlacesStatus _status = PlacesStatus.initial;
   PlacesStatus get status => _status;
 
@@ -34,7 +38,6 @@ class PlacesController extends ChangeNotifier {
   List<Place> _places = [];
   List<Place> get places => _places;
 
-  // ─── Legacy Filters (deprecated) ───
   String _query = '';
   String get query => _query;
 
@@ -53,12 +56,14 @@ class PlacesController extends ChangeNotifier {
   final Set<String> _features = {};
   Set<String> get features => _features;
 
-  // ─── [Wave 11] Dynamic Filters ───
   Map<String, FilterSelection> _activeDynamicFilters = {};
   Map<String, FilterDefinition> _filtersMetadata = {};
 
   Map<String, FilterSelection> get activeDynamicFilters =>
       Map.unmodifiable(_activeDynamicFilters);
+
+  Map<String, FilterDefinition> get filtersMetadata =>
+      Map.unmodifiable(_filtersMetadata);
 
   void setFiltersMetadata(List<FilterDefinition> filters) {
     _filtersMetadata = {for (final f in filters) f.id: f};
@@ -70,8 +75,6 @@ class PlacesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// [Wave 11 FIX] معاينة نتيجة الفلاتر دون تعديل الحالة الدائمة.
-  /// يُستخدم في PlacesFilterSheet لحساب count قبل التطبيق.
   List<Place> applyFilters(Map<String, FilterSelection> filters) {
     final previous = _activeDynamicFilters;
     _activeDynamicFilters = Map.from(filters);
@@ -82,7 +85,6 @@ class PlacesController extends ChangeNotifier {
     }
   }
 
-  // ─── Errors ───
   String? _error;
   String? get error => _error;
 
@@ -107,7 +109,6 @@ class PlacesController extends ChangeNotifier {
     return legacy + dynamic;
   }
 
-  // ─── Pagination ───
   bool _isLoadingMore = false;
   bool get isLoadingMore => _isLoadingMore;
 
@@ -117,8 +118,8 @@ class PlacesController extends ChangeNotifier {
   DocumentSnapshot? _lastDocument;
   String? _currentGovernorate;
   String? _currentCategoryId;
+  String? get currentCategoryId => _currentCategoryId;
 
-  // ─── User location ───
   double? _userLat;
   double? get userLat => _userLat;
 
@@ -127,7 +128,6 @@ class PlacesController extends ChangeNotifier {
 
   int _requestGeneration = 0;
 
-  // ─── Effective Sort ───
   PlaceSort get effectiveSort {
     for (final entry in _activeDynamicFilters.entries) {
       final filter = _filtersMetadata[entry.key];
@@ -135,21 +135,39 @@ class PlacesController extends ChangeNotifier {
         final v = entry.value.values.first;
         switch (v) {
           case 'rating_desc':
-            return PlaceSort.ratingDesc;
+            return PlaceSort.adjustedScore;
           case 'newest':
             return PlaceSort.newest;
           case 'distance':
             return PlaceSort.distance;
+          case 'trusted':
+            return PlaceSort.trustedDesc;
           case 'recommended':
           default:
-            return PlaceSort.recommended;
+            return PlaceSort.adjustedScore;
         }
       }
     }
+    if (_sort == PlaceSort.recommended) return PlaceSort.adjustedScore;
     return _sort;
   }
 
-  // ─── Dynamic Filter Engine ───
+  String get sortLabel {
+    switch (effectiveSort) {
+      case PlaceSort.recommended:
+      case PlaceSort.adjustedScore:
+        return 'الأعلى جودة';
+      case PlaceSort.ratingDesc:
+        return 'الأعلى تقييماً';
+      case PlaceSort.trustedDesc:
+        return 'الأكثر ثقة';
+      case PlaceSort.distance:
+        return 'الأقرب';
+      case PlaceSort.newest:
+        return 'الأحدث';
+    }
+  }
+
   List<Place> _applyDynamicFilters(List<Place> input) {
     var result = input;
 
@@ -167,7 +185,6 @@ class PlacesController extends ChangeNotifier {
             return (v == true) == wanted;
           }).toList();
           break;
-
         case FilterType.singleChoice:
           final value = selection.values.first;
           result = result.where((p) {
@@ -175,7 +192,6 @@ class PlacesController extends ChangeNotifier {
             return v?.toString() == value;
           }).toList();
           break;
-
         case FilterType.multiChoice:
           result = result.where((p) {
             final raw = p.toMap()[filter.fieldKey];
@@ -185,7 +201,6 @@ class PlacesController extends ChangeNotifier {
             return selection.values.every((s) => list.contains(s));
           }).toList();
           break;
-
         case FilterType.range:
           final rawValue = selection.values.first;
           final min = double.tryParse(rawValue) ?? 0;
@@ -194,7 +209,6 @@ class PlacesController extends ChangeNotifier {
             return v >= min;
           }).toList();
           break;
-
         case FilterType.sort:
           break;
       }
@@ -203,7 +217,6 @@ class PlacesController extends ChangeNotifier {
     return result;
   }
 
-  // ─── Filtered Places ───
   List<Place> get filteredPlaces {
     var result = [..._places];
 
@@ -249,22 +262,53 @@ class PlacesController extends ChangeNotifier {
     }
 
     final sort = effectiveSort;
-    if (sort == PlaceSort.ratingDesc) {
-      result.sort((a, b) => b.averageRating.compareTo(a.averageRating));
+
+    // ✅ Phase 12: قاعدة مشتركة — rankable قبل non-rankable
+    int rankableFirst(Place a, Place b) {
+      if (a.isRankable == b.isRankable) return 0;
+      return a.isRankable ? -1 : 1;
+    }
+
+    if (sort == PlaceSort.adjustedScore) {
+      result.sort((a, b) {
+        final r = rankableFirst(a, b);
+        if (r != 0) return r;
+        final sa = a.adjustedScore ?? a.averageRating;
+        final sb = b.adjustedScore ?? b.averageRating;
+        return sb.compareTo(sa);
+      });
+    } else if (sort == PlaceSort.ratingDesc) {
+      result.sort((a, b) {
+        final r = rankableFirst(a, b);
+        if (r != 0) return r;
+        return b.averageRating.compareTo(a.averageRating);
+      });
+    } else if (sort == PlaceSort.trustedDesc) {
+      result.sort((a, b) {
+        final r = rankableFirst(a, b);
+        if (r != 0) return r;
+        final qa = a.sampleQuality ?? 0.0;
+        final qb = b.sampleQuality ?? 0.0;
+        return qb.compareTo(qa);
+      });
     } else if (sort == PlaceSort.distance &&
         _userLat != null &&
         _userLng != null) {
       result.sort((a, b) {
+        final r = rankableFirst(a, b);
+        if (r != 0) return r;
         if (a.location == null) return 1;
         if (b.location == null) return -1;
-        final dA = Geolocator.distanceBetween(
+        final dA = LocationUrlHelper.calculateDistanceMeters(
             _userLat!, _userLng!, a.location!.latitude, a.location!.longitude);
-        final dB = Geolocator.distanceBetween(
+        final dB = LocationUrlHelper.calculateDistanceMeters(
             _userLat!, _userLng!, b.location!.latitude, b.location!.longitude);
         return dA.compareTo(dB);
       });
     } else if (sort == PlaceSort.newest) {
       result.sort((a, b) {
+        final r = rankableFirst(a, b);
+        if (r != 0) return r;
         final da = a.createdAt ?? DateTime(2000);
         final db = b.createdAt ?? DateTime(2000);
         return db.compareTo(da);
@@ -274,7 +318,6 @@ class PlacesController extends ChangeNotifier {
     return result;
   }
 
-  // ─── LOAD ───
   Future<void> load() async {
     final myGen = ++_requestGeneration;
     _status = PlacesStatus.loading;
@@ -296,7 +339,6 @@ class PlacesController extends ChangeNotifier {
 
   Future<void> refresh() => load();
 
-  // ─── CLEAR ───
   void clearAll({bool notify = true}) {
     _query = '';
     _minRating = null;
@@ -320,7 +362,6 @@ class PlacesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── SETTERS (legacy) ───
   void setQuery(String q) {
     _query = q;
     notifyListeners();
@@ -356,23 +397,29 @@ class PlacesController extends ChangeNotifier {
   }
 
   void toggleAmenity(String key) {
-    _amenities.contains(key) ? _amenities.remove(key) : _amenities.add(key);
+    if (_amenities.contains(key)) {
+      _amenities.remove(key);
+    } else {
+      _amenities.add(key);
+    }
     notifyListeners();
   }
 
   void toggleFeature(String key) {
-    _features.contains(key) ? _features.remove(key) : _features.add(key);
+    if (_features.contains(key)) {
+      _features.remove(key);
+    } else {
+      _features.add(key);
+    }
     notifyListeners();
   }
 
-  // ─── PAGINATION ───
   Future<void> loadPaginated({
     required String governorateNameAr,
     String? categoryId,
     int limit = 20,
   }) async {
     final myGen = ++_requestGeneration;
-
     _status = PlacesStatus.loading;
     _mode = PlacesMode.all;
     _hasMore = true;
@@ -436,13 +483,11 @@ class PlacesController extends ChangeNotifier {
     }
   }
 
-  // ─── NEAREST ───
   Future<void> loadNearest({
     required double userLat,
     required double userLng,
   }) async {
     final myGen = ++_requestGeneration;
-
     _status = PlacesStatus.loading;
     _mode = PlacesMode.nearest;
     _places = [];

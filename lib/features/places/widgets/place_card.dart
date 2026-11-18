@@ -1,8 +1,12 @@
 // lib/features/places/widgets/place_card.dart
+// [v3.3 — 2026-11-15] — LINTER FIX: Converted `formattedCity` to final with
+//   definite assignment in _formatAddress.
+// [v3.2 — 2026-11-15] — ADDRESS FORMAT: Replaced LocationHelper with a local
+//   formatter to display "Street - District - Governorate" with smart "حي" prefix.
+// [v3.1 — 2026-11-15] — Phase 12: shows "جديد" badge if !isRankable.
 
 import 'package:flutter/material.dart';
 import '../../places/screens/place_details_screen.dart';
-import '../../../core/utils/location_helper.dart';
 
 class PlaceCard extends StatelessWidget {
   final String placeId;
@@ -11,14 +15,14 @@ class PlaceCard extends StatelessWidget {
   final String? imageUrl;
   final double rating;
   final int reviewCount;
+  final double? sampleQuality;
+  final bool isRankable;
   final String? categoryId;
   final String? geoZoneName;
   final String? city;
   final String? governorate;
   final String? address;
   final double? distanceInKm;
-
-  // ✅ الحقول الجديدة للعروض
   final bool hasActiveOffer;
   final String? offerTitle;
 
@@ -30,6 +34,8 @@ class PlaceCard extends StatelessWidget {
     this.imageUrl,
     this.rating = 0.0,
     this.reviewCount = 0,
+    this.sampleQuality,
+    this.isRankable = true,
     this.categoryId,
     this.geoZoneName,
     this.city,
@@ -63,15 +69,47 @@ class PlaceCard extends StatelessWidget {
     }
   }
 
+  /// ✅ v3.3: تنسيق العنوان "الشارع - الحي - المحافظة"
+  String _formatAddress(String? address, String? city, String? governorate) {
+    final List<String> parts = [];
+
+    // 1. المنطقة / الشارع (الأصغر)
+    final trimmedAddress = address?.trim() ?? '';
+    if (trimmedAddress.isNotEmpty) {
+      parts.add(trimmedAddress);
+    }
+
+    // 2. الحي (نضيف "حي" بذكاء)
+    final trimmedCity = city?.trim() ?? '';
+    if (trimmedCity.isNotEmpty) {
+      final String formattedCity;
+      if (!trimmedCity.startsWith('حي ')) {
+        if (trimmedCity.startsWith('حي')) {
+          formattedCity = 'حي ${trimmedCity.substring(2).trim()}';
+        } else {
+          formattedCity = 'حي $trimmedCity';
+        }
+      } else {
+        formattedCity = trimmedCity;
+      }
+      parts.add(formattedCity);
+    }
+
+    // 3. المحافظة (الأكبر)
+    final trimmedGov = governorate?.trim() ?? '';
+    if (trimmedGov.isNotEmpty) {
+      parts.add(trimmedGov);
+    }
+
+    return parts.join(' - ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final locationText = LocationHelper.formatLocation(
-      geoZoneName: geoZoneName,
-      city: city,
-      governorate: governorate,
-      address: address,
-    );
+
+    // ✅ v3.3: استخدام دالة التنسيق الجديدة
+    final locationText = _formatAddress(address, city, governorate);
 
     return InkWell(
       onTap: () {
@@ -95,7 +133,6 @@ class PlaceCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الصورة
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: imageUrl != null && imageUrl!.isNotEmpty
@@ -109,7 +146,6 @@ class PlaceCard extends StatelessWidget {
                     : _buildPlaceholder(theme),
               ),
               const SizedBox(width: 12),
-              // التفاصيل
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,8 +174,6 @@ class PlaceCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-
-                    // ✅ شارة العرض النشط
                     if (hasActiveOffer && offerTitle != null) ...[
                       const SizedBox(height: 4),
                       Container(
@@ -170,34 +204,39 @@ class PlaceCard extends StatelessWidget {
                         ),
                       ),
                     ],
-
                     const SizedBox(height: 6),
-                    // الموقع
-                    Row(
-                      children: [
-                        Icon(Icons.location_on,
-                            size: 14, color: theme.colorScheme.secondary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            locationText,
-                            style: theme.textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    if (locationText.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 14, color: theme.colorScheme.secondary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              locationText,
+                              style: theme.textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     const SizedBox(height: 6),
-                    // التقييم والمسافة
                     Row(
                       children: [
-                        Icon(Icons.star, size: 14, color: Colors.amber),
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
                         const SizedBox(width: 4),
                         Text(
                           '${rating.toStringAsFixed(1)} ($reviewCount)',
                           style: theme.textTheme.bodySmall,
                         ),
+                        if (!isRankable) ...[
+                          const SizedBox(width: 6),
+                          _buildNewBadge(),
+                        ] else if (sampleQuality != null) ...[
+                          const SizedBox(width: 6),
+                          _buildConfidenceBadge(sampleQuality!),
+                        ],
                         const Spacer(),
                         if (distanceInKm != null)
                           Container(
@@ -222,6 +261,87 @@ class PlaceCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// ✅ Phase 12: شارة "جديد" — تُظهر أن المكان لم يبلغ حد الترتيب بعد.
+  Widget _buildNewBadge() {
+    return Tooltip(
+      message: 'مكان جديد — لا توجد بيانات كافية للترتيب بعد',
+      triggerMode: TooltipTriggerMode.tap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.blue.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.fiber_new, size: 10, color: Colors.blue.shade800),
+            const SizedBox(width: 2),
+            Text(
+              'جديد',
+              style: TextStyle(
+                color: Colors.blue.shade800,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfidenceBadge(double quality) {
+    final Color bg;
+    final Color fg;
+
+    if (quality >= 0.75) {
+      bg = Colors.green.shade50;
+      fg = Colors.green.shade800;
+    } else if (quality >= 0.4) {
+      bg = Colors.amber.shade50;
+      fg = Colors.amber.shade900;
+    } else {
+      bg = Colors.grey.shade100;
+      fg = Colors.grey.shade700;
+    }
+
+    final pct = (quality * 100).round().clamp(0, 100);
+
+    return Tooltip(
+      message: quality >= 0.75
+          ? 'ثقة عالية — التقييم مبني على عينة وفيرة وحديثة'
+          : quality >= 0.4
+              ? 'ثقة متوسطة — قد تحتاج المزيد من التقييمات'
+              : 'ثقة منخفضة — التقييم مبني على عينة صغيرة',
+      triggerMode: TooltipTriggerMode.tap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: fg.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.verified_user, size: 10, color: fg),
+            const SizedBox(width: 3),
+            Text(
+              '$pct%',
+              style: TextStyle(
+                color: fg,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );

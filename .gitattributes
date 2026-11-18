@@ -1,3 +1,37 @@
-* text=auto eol=lf 
-*.bat text eol=crlf 
-*.ps1 text eol=crlf 
+# =================================================================
+# YaBaladi .gitattributes
+# يضمن هذا الملف توحيد نهايات الأسطر (Line Endings) بين جميع المطورين
+# =================================================================
+
+# 1. القاعدة الأساسية: اكتشاف النص تلقائياً واستخدام LF في المستودع
+* text=auto eol=lf
+
+# 2. ملفات يجب أن تبقى LF (لينكس/ماك/دارت)
+*.dart text eol=lf
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# 3. ملفات ويندوز يجب أن تستخدم CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# 4. الملفات الثنائية (Binary) - يمنع Git من محاولة دمجها أو عمل Diff لها
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.xls binary
+*.pdf binary
+*.zip binary
+*.jar binary
+*.keystore binary

@@ -1,6 +1,12 @@
 // lib/features/auth/screens/login_screen.dart
 //
-// [v4.1 — FINAL UI RESTORE + CORRECT LOGO PATH]
+// [v4.3 — 2026-11-15] — LINTER FIX: Added curly braces to all single-line if statements.
+// [v4.2 — CLEAN] — Small hardening fixes:
+//   - FIXED: Captured messenger before async gap in _showBeautifulErrorSnackBar.
+//   - FIXED: Removed cascade chain (..); replaced with sequential calls.
+//   - FIXED: _isLoading reset guaranteed via finally in both flows.
+//   - FIXED: Removed potential ZWJ emoji from comments.
+//   - KEPT: All UI, validation, and Google/Guest flows intact.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -30,82 +36,116 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submitEmailPassword() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_isLoading) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() => _isLoading = true);
 
-    final auth = context.read<AuthController>();
-    final result = await auth.signInWithEmail(
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text,
-    );
+    try {
+      final auth = context.read<AuthController>();
+      final result = await auth.signInWithEmail(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (!mounted) {
+        return;
+      }
 
-    if (result.isSuccess) {
-      context.go('/home');
-    } else {
-      _showBeautifulErrorSnackBar(result.error ?? 'حدث خطأ أثناء تسجيل الدخول');
+      if (result.isSuccess) {
+        context.go('/home');
+      } else {
+        _showBeautifulErrorSnackBar(
+          messenger,
+          result.error ?? 'حدث خطأ أثناء تسجيل الدخول',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
-    final auth = context.read<AuthController>();
-    final result = await auth.signInWithGoogle();
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    if (_isLoading) {
+      return;
+    }
 
-    if (result.isSuccess) {
-      context.go('/home');
-    } else if (!result.isCancelled) {
-      _showBeautifulErrorSnackBar(result.error ?? 'فشل تسجيل الدخول بجوجل');
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() => _isLoading = true);
+
+    try {
+      final auth = context.read<AuthController>();
+      final result = await auth.signInWithGoogle();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (result.isSuccess) {
+        context.go('/home');
+      } else if (!result.isCancelled) {
+        _showBeautifulErrorSnackBar(
+          messenger,
+          result.error ?? 'فشل تسجيل الدخول بجوجل',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _continueAsGuest() {
     context.read<AuthController>().continueAsGuest();
-    if (mounted) context.go('/home');
+    if (mounted) {
+      context.go('/home');
+    }
   }
 
-  // ✅ شريط الخطأ الأنيق
-  void _showBeautifulErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'تنبيه',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      message,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
+  void _showBeautifulErrorSnackBar(
+    ScaffoldMessengerState messenger,
+    String message,
+  ) {
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'تنبيه',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(message, style: const TextStyle(fontSize: 13)),
+                ],
               ),
-            ],
-          ),
-          backgroundColor: Colors.redAccent.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 5),
+            ),
+          ],
         ),
-      );
+        backgroundColor: Colors.redAccent.shade400,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   @override
@@ -128,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ─── اللوجو ───
+                  // Logo
                   Center(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
@@ -149,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ─── العناوين ───
+                  // Titles
                   Text(
                     'تسجيل الدخول',
                     textAlign: TextAlign.center,
@@ -169,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // ─── البريد الإلكتروني ───
+                  // Email
                   TextFormField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
@@ -189,14 +229,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'البريد مطلوب';
-                      if (!v.contains('@')) return 'بريد غير صالح';
+                      if (v == null || v.trim().isEmpty) {
+                        return 'البريد مطلوب';
+                      }
+                      if (!v.contains('@')) {
+                        return 'بريد غير صالح';
+                      }
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
 
-                  // ─── كلمة المرور ───
+                  // Password
                   TextFormField(
                     controller: _passwordCtrl,
                     obscureText: _obscurePassword,
@@ -224,15 +268,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'كلمة المرور مطلوبة';
-                      if (v.length < 6) return '6 أحرف على الأقل';
+                      if (v == null || v.isEmpty) {
+                        return 'كلمة المرور مطلوبة';
+                      }
+                      if (v.length < 6) {
+                        return '6 أحرف على الأقل';
+                      }
                       return null;
                     },
                   ),
 
                   const SizedBox(height: 12),
 
-                  // ─── نسيت كلمة المرور ───
+                  // Forgot password
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: TextButton(
@@ -245,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ─── زر الدخول ───
+                  // Login button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _submitEmailPassword,
                     style: ElevatedButton.styleFrom(
@@ -272,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── فاصل "أو" ───
+                  // Divider "أو"
                   Row(
                     children: [
                       Expanded(
@@ -297,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ─── زر جوجل ───
+                  // Google
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _signInWithGoogle,
                     icon: const Icon(Icons.g_mobiledata,
@@ -323,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ─── زر إنشاء حساب ───
+                  // Register
                   OutlinedButton.icon(
                     onPressed:
                         _isLoading ? null : () => context.push('/register'),
@@ -350,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ─── زر الزائر ───
+                  // Guest
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _continueAsGuest,
                     icon: const Icon(Icons.person_outline, size: 20),

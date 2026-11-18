@@ -1,6 +1,9 @@
 // lib/features/favorites/favorites_screen.dart
-// [v2.2 — 2026-11-01] — FIXED IMPORT: Corrected the relative path to PlaceDetailsScreen.
-//   - FIXED: Changed '../../places/...' to '../places/...' to resolve URI error.
+// [v2.5 — 2026-11-15] — SMART ADDRESS FORMATTING:
+//   - Passed address, city, and governorate to _FavoriteCard.
+//   - Added _formatAddress to display "Street - District - Governorate".
+//   - Added curly braces to if statements.
+// [v2.4 — FINAL: Layout Fix + Orphaned Data Cleanup]
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../features/auth/controllers/auth_controller.dart';
-import '../places/screens/place_details_screen.dart'; // ✅ تم تصحيح المسار هنا
+import '../places/screens/place_details_screen.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
@@ -84,7 +87,9 @@ class FavoritesScreen extends StatelessWidget {
               final favDoc = docs[index];
               final placeId = favDoc.data()['placeId']?.toString() ?? '';
 
-              if (placeId.isEmpty) return const SizedBox.shrink();
+              if (placeId.isEmpty) {
+                return const SizedBox.shrink();
+              }
 
               // ✅ جلب بيانات المكان المرتبط
               return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -96,8 +101,14 @@ class FavoritesScreen extends StatelessWidget {
                   if (placeSnap.connectionState == ConnectionState.waiting) {
                     return _buildLoadingCard(theme);
                   }
+
+                  // ✅ تنظيف البيانات اليتيمة: إذا كان المكان غير موجود، نحذف المفضلة
                   if (!placeSnap.hasData || !placeSnap.data!.exists) {
-                    return const SizedBox.shrink(); // المكان محذوف
+                    FirebaseFirestore.instance
+                        .collection('favorites')
+                        .doc(favDoc.id)
+                        .delete();
+                    return const SizedBox.shrink();
                   }
 
                   final placeData = placeSnap.data!.data()!;
@@ -108,9 +119,11 @@ class FavoritesScreen extends StatelessWidget {
                   final rating =
                       (placeData['averageRating'] as num?)?.toDouble() ?? 0.0;
 
-                  final geoZoneName =
-                      placeData['geoZoneName']?.toString() ?? '';
+                  // ✅ جلب حقول العنوان الثلاثة
+                  final address = placeData['address']?.toString() ?? '';
                   final city = placeData['city']?.toString() ?? '';
+                  final governorate =
+                      placeData['governorate']?.toString() ?? '';
 
                   return _FavoriteCard(
                     favoriteDocId: favDoc.id,
@@ -118,8 +131,9 @@ class FavoritesScreen extends StatelessWidget {
                     name: name,
                     categoryId: categoryId,
                     rating: rating,
-                    geoZoneName: geoZoneName,
+                    address: address,
                     city: city,
+                    governorate: governorate,
                   );
                 },
               );
@@ -162,7 +176,7 @@ class FavoritesScreen extends StatelessWidget {
 
   Widget _buildLoadingCard(ThemeData theme) {
     return Container(
-      height: 110,
+      height: 80,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -173,7 +187,7 @@ class FavoritesScreen extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ويدجت بطاقة المكان المفضل (مضغوطة وأنيقة)
+// ويدجت بطاقة المكان المفضل (مضغوطة وأنيقة - صف أفقي)
 // ═══════════════════════════════════════════════════════════════
 class _FavoriteCard extends StatelessWidget {
   final String favoriteDocId;
@@ -181,8 +195,9 @@ class _FavoriteCard extends StatelessWidget {
   final String name;
   final String categoryId;
   final double rating;
-  final String geoZoneName;
+  final String address;
   final String city;
+  final String governorate;
 
   const _FavoriteCard({
     required this.favoriteDocId,
@@ -190,8 +205,9 @@ class _FavoriteCard extends StatelessWidget {
     required this.name,
     required this.categoryId,
     required this.rating,
-    required this.geoZoneName,
+    required this.address,
     required this.city,
+    required this.governorate,
   });
 
   IconData _iconForCategory(String? id) {
@@ -217,10 +233,44 @@ class _FavoriteCard extends StatelessWidget {
     }
   }
 
+  // ✅ دالة تنسيق العنوان (الشارع - حي الشرق - بورسعيد)
+  String _formatAddress(String? address, String? city, String? gov) {
+    final List<String> parts = [];
+
+    final trimmedAddress = address?.trim() ?? '';
+    if (trimmedAddress.isNotEmpty) {
+      parts.add(trimmedAddress);
+    }
+
+    final trimmedCity = city?.trim() ?? '';
+    if (trimmedCity.isNotEmpty) {
+      final String formattedCity;
+      if (!trimmedCity.startsWith('حي ')) {
+        if (trimmedCity.startsWith('حي')) {
+          formattedCity = 'حي ${trimmedCity.substring(2).trim()}';
+        } else {
+          formattedCity = 'حي $trimmedCity';
+        }
+      } else {
+        formattedCity = trimmedCity;
+      }
+      parts.add(formattedCity);
+    }
+
+    final trimmedGov = gov?.trim() ?? '';
+    if (trimmedGov.isNotEmpty) {
+      parts.add(trimmedGov);
+    }
+
+    return parts.join(' - ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final locationText = geoZoneName.isNotEmpty ? geoZoneName : city;
+
+    // ✅ استخدام الدالة الجديدة بدلاً من geoZoneName
+    final locationText = _formatAddress(address, city, governorate);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -233,7 +283,6 @@ class _FavoriteCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          // ✅ إصلاح جذري: استخدام Navigator بدلاً من context.push
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => PlaceDetailsScreen(placeId: placeId),
@@ -241,86 +290,83 @@ class _FavoriteCard extends StatelessWidget {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
-              // 1. Icon + Rating + Delete Button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _iconForCategory(categoryId),
-                      color: theme.colorScheme.primary,
-                      size: 18,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.star, size: 14, color: Colors.amber.shade700),
-                      const SizedBox(width: 2),
-                      Text(rating.toStringAsFixed(1),
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.favorite,
-                            color: Colors.red, size: 20),
-                        onPressed: () async {
-                          // ✅ حذف من المفضلة
-                          await FirebaseFirestore.instance
-                              .collection('favorites')
-                              .doc(favoriteDocId)
-                              .delete();
-                        },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // 2. Name
-              Text(
-                name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              // 1. الأيقونة (يسار) - تم تحديد الحجم لمنع التمدد
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                child: Icon(
+                  _iconForCategory(categoryId),
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
               ),
+              const SizedBox(width: 12),
 
-              const SizedBox(height: 8),
-
-              // 3. Location
-              if (locationText.isNotEmpty)
-                Row(
+              // 2. الاسم والموقع (وسط)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on,
-                        size: 14, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        locationText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.star,
+                            size: 14, color: Colors.amber.shade700),
+                        const SizedBox(width: 2),
+                        Text(
+                          rating.toStringAsFixed(1),
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (locationText.isNotEmpty) ...[
+                          const SizedBox(width: 10),
+                          Icon(Icons.location_on,
+                              size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            child: Text(
+                              locationText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
+              ),
+
+              // 3. زر القلب (يمين)
+              IconButton(
+                icon: const Icon(Icons.favorite, color: Colors.red, size: 24),
+                tooltip: 'إزالة من المفضلة',
+                onPressed: () async {
+                  await FirebaseFirestore.instance
+                      .collection('favorites')
+                      .doc(favoriteDocId)
+                      .delete();
+                },
+              ),
             ],
           ),
         ),

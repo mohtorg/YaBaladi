@@ -1,19 +1,16 @@
 // lib/services/trip_planner_service.dart
 //
-// [v1.3 — 2026-10-18] — Category Normalization
-//   - FIX (CRITICAL): جميع مقارنات التصنيفات تستخدم PlaceCategories.normalizeId
-//     → يحل مشكلة 'beach' (singular) ≠ 'beaches' (plural)
-//     → يحل مشكلة Place.categories المخزّنة بصيغ مختلفة
-//   - FIX: _visitDurationForCategory يستخدم normalizeId (إزالة التكرار)
-//   - FIX: توحيد كل مقارنات interests/preferred/avoided/place categories
-//   - NOTE: backward-compatible — لا تغيير في signature
-//
-// [v1.2 — 2026-10-18] — Wave 5.1: Companion-Aware Generation
-//   - NEW: companion param (default: family)
-//   - NEW: _rankCandidates — boost +30% / -30%
-//   - NEW: _selectStops — 3 مجموعات
-//
-// [v1.1 — 2026-10-18] — Resilience Fixes
+// [v1.5 - LOCATION SAFETY + CLARITY]
+//   - FIXED (CRITICAL): Places without coordinates were given the BEST
+//     proximity score (distance fallback to startLat/startLng → distance=0
+//     → proximityScore=1.0). Now they are excluded in _filterCandidates.
+//   - IMPROVED: _haversineKm now computes rad(lat1), rad(lat2) once each.
+//   - DOCUMENTED: Priority boost affects SELECTION, not ordering; the
+//     final order is always nearest-neighbor optimized.
+//   - DOCUMENTED: _estimateTimes starts at 9:00 AM on today as a provisional
+//     estimate; the actual date range is set later by the user.
+//   - KEPT: All scoring weights, category durations, tie-breaking, and the
+//     exact public API signature.
 
 import 'dart:math' as math;
 
@@ -30,10 +27,15 @@ class TripPlannerService {
   static const double _proximityWeight = 0.4;
   static const double _proximityRadiusKm = 10.0;
 
-  // ═══════════════════════════════════════════════════════════════
-  // MAIN
-  // ═══════════════════════════════════════════════════════════════
-
+  /// Generates a draft trip plan.
+  ///
+  /// Pipeline:
+  ///   filter → rank → select → optimize route → estimate times → totals
+  ///
+  /// Priority semantics:
+  ///   [priorityPlaceIds] heavily boosts the candidate's rank score,
+  ///   ensuring it gets SELECTED. The final ORDER of stops is always
+  ///   nearest-neighbor optimized, regardless of priority.
   static TripPlan generateTrip({
     required List<Place> allPlaces,
     required String governorateId,
@@ -44,39 +46,36 @@ class TripPlannerService {
     required double startLng,
     String userId = 'guest',
     CompanionType companion = CompanionType.family,
+    Set<String> priorityPlaceIds = const {},
   }) {
     final governorate = governorateById(governorateId) ?? kDefaultGovernorate;
 
-    // 1. جمع المرشحين
     final candidates = _filterCandidates(
       allPlaces: allPlaces,
       governorateNameAr: governorate.nameAr,
       interests: interests,
     );
 
-    // 2. ترتيب حسب score (مع companion)
     final ranked = _rankCandidates(
       candidates: candidates,
       startLat: startLat,
       startLng: startLng,
       companion: companion,
+      priorityPlaceIds: priorityPlaceIds,
     );
 
-    // 3. اختيار Top N (مع companion preference)
     final selected = _selectStops(
       ranked: ranked,
       durationType: durationType,
       companion: companion,
     );
 
-    // 4. تحسين المسار
     final optimized = _optimizeRoute(
       places: selected,
       startLat: startLat,
       startLng: startLng,
     );
 
-    // 5. حساب الأوقات
     final stops = _estimateTimes(
       places: optimized,
       startLat: startLat,
@@ -84,7 +83,6 @@ class TripPlannerService {
       transportMode: transportMode,
     );
 
-    // 6. الإجماليات
     final totalDistance = _totalDistance(
       stops: stops,
       startLat: startLat,
@@ -120,13 +118,9 @@ class TripPlannerService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // NORMALIZATION HELPERS
+  // FILTER
   // ═══════════════════════════════════════════════════════════════
 
-  /// استخراج تصنيفات المكان — موحّدة (normalized lowercase + aliases).
-  ///
-  /// يشمل `categories` + `categoryId` (fallback) لضمان عدم إهمال
-  /// الأماكن القديمة التي تحتوي فقط على `categoryId`.
   static Set<String> _placeCategorySet(Place place) {
     final raw = place.categories.isNotEmpty
         ? place.categories
@@ -134,24 +128,17 @@ class TripPlannerService {
     return raw.map(PlaceCategories.normalizeId).toSet();
   }
 
-  /// توحيد مجموعة تصنيفات (interests / preferred / avoided).
   static Set<String> _normalizeSet(Set<String> raw) =>
       raw.map(PlaceCategories.normalizeId).toSet();
 
-  /// توحيد قائمة تصنيفات (companion.preferredCategories يعيد List).
   static Set<String> _normalizeList(List<String> raw) =>
       raw.map(PlaceCategories.normalizeId).toSet();
-
-  // ═══════════════════════════════════════════════════════════════
-  // 1. FILTER
-  // ═══════════════════════════════════════════════════════════════
 
   static List<Place> _filterCandidates({
     required List<Place> allPlaces,
     required String governorateNameAr,
     required Set<String> interests,
   }) {
-    // مطابقة مرنة للمحافظة (عربي/إنجليزي)
     bool matchesGov(String placeGov, String targetGov) {
       final pg = placeGov.trim().toLowerCase();
       final tg = targetGov.trim().toLowerCase();
@@ -166,9 +153,12 @@ class TripPlannerService {
 
     var list = allPlaces
         .where((p) => matchesGov(p.governorate, governorateNameAr))
+        // ✅ Exclude places without valid coordinates. Otherwise they'd
+        //    fall back to startLat/startLng downstream, causing distance=0
+        //    and a falsely perfect proximity score.
+        .where((p) => p.location != null)
         .toList();
 
-    // ✅ فلترة حسب الاهتمامات — مع normalization
     if (interests.isNotEmpty) {
       final normalizedInterests = _normalizeSet(interests);
 
@@ -182,25 +172,25 @@ class TripPlannerService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 2. RANK
+  // RANK
   // ═══════════════════════════════════════════════════════════════
 
-  /// ترتيب المرشحين — مع companion boost/penalty (normalized).
   static List<Place> _rankCandidates({
     required List<Place> candidates,
     required double startLat,
     required double startLng,
     required CompanionType companion,
+    Set<String> priorityPlaceIds = const {},
   }) {
-    // ✅ توحيد التصنيفات قبل المقارنة
     final preferred = _normalizeList(companion.preferredCategories);
     final avoided = _normalizeList(companion.avoidedCategories);
 
     final scored = candidates.map((p) {
       final ratingScore = (p.averageRating / 5.0).clamp(0.0, 1.0);
 
-      final pLat = p.location?.latitude ?? startLat;
-      final pLng = p.location?.longitude ?? startLng;
+      // Safe cast — candidates already filtered to have non-null location.
+      final pLat = p.location!.latitude;
+      final pLng = p.location!.longitude;
       final distance = _haversineKm(startLat, startLng, pLat, pLng);
       final proximityScore = 1.0 / (1.0 + distance / _proximityRadiusKm);
 
@@ -209,13 +199,16 @@ class TripPlannerService {
 
       final placeCats = _placeCategorySet(p);
 
-      // ✅ Boost للتصنيفات المفضلة
       if (placeCats.intersection(preferred).isNotEmpty) {
         score *= 1.3;
       }
-      // ✅ Penalty للتصنيفات المتجنبة
       if (placeCats.intersection(avoided).isNotEmpty) {
         score *= 0.7;
+      }
+
+      // Priority boost for user-selected bag items.
+      if (priorityPlaceIds.contains(p.id)) {
+        score *= 5.0;
       }
 
       return _ScoredPlace(place: p, score: score);
@@ -226,10 +219,9 @@ class TripPlannerService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 3. SELECT
+  // SELECT
   // ═══════════════════════════════════════════════════════════════
 
-  /// اختيار Top N — يحترم companion.preferredCategories (normalized).
   static List<Place> _selectStops({
     required List<Place> ranked,
     required TripDurationType durationType,
@@ -238,11 +230,9 @@ class TripPlannerService {
     final maxStops = durationType.maxStops;
     if (ranked.length <= maxStops) return ranked;
 
-    // ✅ توحيد قبل التقسيم
     final preferred = _normalizeList(companion.preferredCategories);
     final avoided = _normalizeList(companion.avoidedCategories);
 
-    // قسم إلى 3 مجموعات
     final preferredList = <Place>[];
     final neutralList = <Place>[];
     final avoidedList = <Place>[];
@@ -261,33 +251,38 @@ class TripPlannerService {
     final selected = <Place>[];
     final usedIds = <String>{};
 
-    // 1. أولاً: من المفضلة
     for (final p in preferredList) {
       if (selected.length >= maxStops) break;
       if (usedIds.add(p.id)) selected.add(p);
     }
 
-    // 2. ثانياً: من المحايدة
     for (final p in neutralList) {
       if (selected.length >= maxStops) break;
       if (usedIds.add(p.id)) selected.add(p);
     }
 
-    // 3. أخيراً: من المتجنبة (فقط إذا لم نكمل)
     for (final p in avoidedList) {
       if (selected.length >= maxStops) break;
       if (usedIds.add(p.id)) selected.add(p);
     }
 
-    // أعد الترتيب حسب score الأصلي
-    selected.sort((a, b) => ranked.indexOf(a).compareTo(ranked.indexOf(b)));
+    // Preserve original ranked order.
+    final rankIndex = <String, int>{};
+    for (var i = 0; i < ranked.length; i++) {
+      rankIndex[ranked[i].id] = i;
+    }
+    selected
+        .sort((a, b) => (rankIndex[a.id] ?? 0).compareTo(rankIndex[b.id] ?? 0));
     return selected;
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 4. OPTIMIZE ROUTE (بدون تغيير)
+  // OPTIMIZE ROUTE (Greedy nearest-neighbor)
   // ═══════════════════════════════════════════════════════════════
 
+  /// Greedy nearest-neighbor reordering from the start point.
+  /// For ≤ 8 stops this is fast and good enough. Optimal TSP requires
+  /// brute force (n!) or 2-opt heuristics — overkill for this use case.
   static List<Place> _optimizeRoute({
     required List<Place> places,
     required double startLat,
@@ -307,8 +302,8 @@ class TripPlannerService {
 
       for (var i = 0; i < remaining.length; i++) {
         final p = remaining[i];
-        final pLat = p.location?.latitude ?? startLat;
-        final pLng = p.location?.longitude ?? startLng;
+        final pLat = p.location!.latitude;
+        final pLng = p.location!.longitude;
         final d = _haversineKm(curLat, curLng, pLat, pLng);
 
         if (d < nearestDist) {
@@ -319,17 +314,23 @@ class TripPlannerService {
 
       final next = remaining.removeAt(nearestIdx);
       result.add(next);
-      curLat = next.location?.latitude ?? startLat;
-      curLng = next.location?.longitude ?? startLng;
+      curLat = next.location!.latitude;
+      curLng = next.location!.longitude;
     }
 
     return result;
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 5. TIMES
+  // ESTIMATE TIMES
   // ═══════════════════════════════════════════════════════════════
 
+  /// Provisional time estimates.
+  ///
+  /// Starts at **9:00 AM today** as a reasonable default. The actual date
+  /// range is picked by the user in the Save step and stored separately
+  /// in `TripPlan.startDate/endDate`. Times here are relative and only
+  /// used for display order.
   static List<TripStop> _estimateTimes({
     required List<Place> places,
     required double startLat,
@@ -345,14 +346,13 @@ class TripPlannerService {
     var curLng = startLng;
 
     for (final place in places) {
-      final pLat = place.location?.latitude ?? startLat;
-      final pLng = place.location?.longitude ?? startLng;
+      final pLat = place.location!.latitude;
+      final pLng = place.location!.longitude;
 
       final travelKm = _haversineKm(curLat, curLng, pLat, pLng);
       final travelMin = (travelKm / transportMode.speedKmH * 60).round();
       currentTime = currentTime.add(Duration(minutes: travelMin));
 
-      // ✅ نستخدم التصنيف الأساسي من categories (الأول) أو categoryId
       final primaryCategory = place.categories.isNotEmpty
           ? place.categories.first
           : place.categoryId;
@@ -381,16 +381,6 @@ class TripPlannerService {
     return stops;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // VISIT DURATIONS — normalized (إزالة التكرار)
-  // ═══════════════════════════════════════════════════════════════
-
-  /// مدة الزيارة حسب التصنيف — مع normalization.
-  ///
-  /// ✅ يستخدم `PlaceCategories.normalizeId` أولاً
-  /// → `'beach'` و `'beaches'` يعطيان نفس المدة (120 دقيقة)
-  /// → `'restaurant'` و `'restaurants'` يعطيان 75 دقيقة
-  /// → لا حاجة لسرد كل صيغة في switch
   static int _visitDurationForCategory(String categoryId) {
     final normalized = PlaceCategories.normalizeId(categoryId);
     return switch (normalized) {
@@ -404,17 +394,13 @@ class TripPlannerService {
       'family' || 'kids' => 120,
       'events' || 'nightlife' || 'entertainment' => 90,
       'trips' => 180,
-      'beauty_centers' ||
-      'women_salons' ||
-      'men_salons' ||
-      'clubs_gyms' =>
-        60,
+      'beauty_centers' || 'women_salons' || 'men_salons' || 'clubs_gyms' => 60,
       _ => 60,
     };
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 6. TOTALS
+  // TOTALS
   // ═══════════════════════════════════════════════════════════════
 
   static double _totalDistance({
@@ -454,7 +440,7 @@ class TripPlannerService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // HELPERS
+  // TITLE
   // ═══════════════════════════════════════════════════════════════
 
   static String _generateTitle(
@@ -469,20 +455,27 @@ class TripPlannerService {
     return 'رحلة $governorateNameAr — $suffix';
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // HAVERSINE
+  // ═══════════════════════════════════════════════════════════════
+
   static double _haversineKm(
     double lat1,
     double lng1,
     double lat2,
     double lng2,
   ) {
-    double rad(double d) => d * math.pi / 180.0;
-    final dLat = rad(lat2 - lat1);
-    final dLng = rad(lng2 - lng1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(rad(lat1)) *
-            math.cos(rad(lat2)) *
-            math.sin(dLng / 2) *
-            math.sin(dLng / 2);
+    // Compute rad() of each latitude once (was computed twice before).
+    final rLat1 = lat1 * math.pi / 180.0;
+    final rLat2 = lat2 * math.pi / 180.0;
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLng = (lng2 - lng1) * math.pi / 180.0;
+
+    final sinDLat = math.sin(dLat / 2);
+    final sinDLng = math.sin(dLng / 2);
+
+    final a = sinDLat * sinDLat +
+        math.cos(rLat1) * math.cos(rLat2) * sinDLng * sinDLng;
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return 6371.0 * c;
   }
@@ -492,6 +485,7 @@ class _ScoredPlace {
   const _ScoredPlace({required this.place, required this.score});
   final Place place;
   final double score;
+
   @override
   String toString() =>
       '_ScoredPlace(${place.nameAr}, ${score.toStringAsFixed(2)})';

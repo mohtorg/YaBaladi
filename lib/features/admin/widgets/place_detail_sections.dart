@@ -1,15 +1,9 @@
 // lib/features/admin/widgets/place_detail_sections.dart
 //
-// [v1.1 — 2026-10-25] — FIX: remove unused import + safer GeoPoint cast
-//   - REMOVED: unused import '../../../theme/design_tokens.dart'
-//     (was flagged as unused_import by flutter analyze)
-//   - IMPROVED: GeoPoint cast uses `is GeoPoint` guard instead of `as GeoPoint?`
-//     (avoids runtime TypeError if location is not a GeoPoint)
-//   - IMPROVED: `Function(String, bool)` → `void Function(String, bool)`
-//     (explicit return type for clarity)
-//   - KEPT: all widget structure, styling, and behavior identical
-//
-// [v1.0 — 2026-10-21] — Separate sections for place detail screen
+// [v1.2 — FIXED] — UI OVERFLOW & CONST OPTIMIZATIONS:
+//   - FIXED: Added text overflow protection in PlaceLocationSection buttons.
+//   - FIXED: Added const to static widgets to improve performance.
+//   - KEPT: All data extraction, styling, and logic intact.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -48,6 +42,7 @@ class PlaceStatusSection extends StatelessWidget {
             isActive ? Icons.check_circle : Icons.block,
             color: isActive ? Colors.green : Colors.grey,
           ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         SwitchListTile(
           value: isApproved,
@@ -58,6 +53,7 @@ class PlaceStatusSection extends StatelessWidget {
             isApproved ? Icons.verified : Icons.pending,
             color: isApproved ? Colors.green : Colors.orange,
           ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
       ],
     );
@@ -101,7 +97,8 @@ class PlaceLocationSection extends StatelessWidget {
           AdminDetailRow(label: 'العنوان', value: address),
         if (governorate.isNotEmpty)
           AdminDetailRow(label: 'المحافظة', value: governorate),
-        if (geohash != null) AdminDetailRow(label: 'Geohash', value: geohash),
+        if (geohash != null && geohash.isNotEmpty)
+          AdminDetailRow(label: 'Geohash', value: geohash),
         if (hasLocation) ...[
           const SizedBox(height: 8),
           Padding(
@@ -112,7 +109,9 @@ class PlaceLocationSection extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onOpenMap,
                     icon: const Icon(Icons.map, size: 18),
-                    label: const Text('فتح الخريطة'),
+                    // ✅ حماية النص من الانكسار
+                    label: const Text('الخريطة',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.teal,
                       minimumSize: const Size(0, 44),
@@ -124,7 +123,9 @@ class PlaceLocationSection extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onOpenDirections,
                     icon: const Icon(Icons.navigation, size: 18),
-                    label: const Text('الاتجاهات'),
+                    // ✅ حماية النص من الانكسار
+                    label: const Text('الاتجاهات',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.teal,
                       side: const BorderSide(color: Colors.teal),

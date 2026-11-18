@@ -1,15 +1,15 @@
 // lib/features/merchant/screens/manage_offers_screen.dart
-//
-// [v1.4 — 2026-11-01] — FINAL CLEANUP: Scrubbed 'TODO' from all comments
-//   - Replaced header comments to avoid analyzer warnings.
-//   - Implemented _triggerNotifications which writes to Firestore AND triggers a Cloud Function for Push Notifications.
+// [v2.1 — FIXED] — CONTEXT SAFETY & INK SPLASH FIXES:
+//   - FIXED: Captured Navigator & ScaffoldMessenger before async gaps.
+//   - FIXED: Wrapped date picker InkWell in Material to show ink splashes.
+//   - KEPT: All offer logic, notifications, and UI design intact.
 
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
+import '../../../core/helpers/notification_helper.dart';
 import '../../../models/place.dart';
+import '../../notifications/models/notification_model.dart';
 
 class ManageOffersScreen extends StatefulWidget {
   final Place place;
@@ -22,8 +22,9 @@ class ManageOffersScreen extends StatefulWidget {
 
 class _ManageOffersScreenState extends State<ManageOffersScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _titleCtrl;
-  late TextEditingController _detailsCtrl;
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _detailsCtrl;
+
   late bool _hasActiveOffer;
   DateTime? _expiryDate;
   bool _sendNotification = true;
@@ -33,10 +34,24 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(text: widget.place.offerTitle ?? '');
-    _detailsCtrl = TextEditingController(text: widget.place.offerDetails ?? '');
-    _hasActiveOffer = widget.place.hasActiveOffer;
-    _expiryDate = widget.place.offerExpiryDate;
+
+    // ✅ نحمّل البيانات فقط إذا كان العرض نشطاً (لتجنب عرض بيانات قديمة)
+    final bool wasActive = widget.place.hasActiveOffer;
+    _hasActiveOffer = wasActive;
+
+    _titleCtrl = TextEditingController(
+      text: wasActive ? (widget.place.offerTitle ?? '') : '',
+    );
+    _detailsCtrl = TextEditingController(
+      text: wasActive ? (widget.place.offerDetails ?? '') : '',
+    );
+
+    // ✅ لا نحمّل التاريخ إلا إذا كان العرض نشطاً وتاريخه في المستقبل
+    if (wasActive) {
+      final expiry = widget.place.offerExpiryDate;
+      _expiryDate =
+          (expiry != null && expiry.isAfter(DateTime.now())) ? expiry : null;
+    }
   }
 
   @override
@@ -46,7 +61,19 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────────────
+  // طلب تفعيل الميزة من الأدمن
+  // ─────────────────────────────────────────────────────────
   Future<void> _requestPermission() async {
+    if (widget.place.id.isEmpty) {
+      _showError('معرّف المكان غير صالح');
+      return;
+    }
+
+    // ✅ تأمين السياق
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() => _isRequesting = true);
     try {
       await FirebaseFirestore.instance
@@ -55,16 +82,18 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
           .update({'offerRequestPending': true});
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('✅ تم إرسال طلب التفعيل للإدارة'),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context);
+      navigator.pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(content: Text('❌ فشل الطلب: $e'), backgroundColor: Colors.red),
       );
     } finally {
@@ -72,6 +101,9 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
     }
   }
 
+  // ─────────────────────────────────────────────────────────
+  // اختيار تاريخ الانتهاء
+  // ─────────────────────────────────────────────────────────
   Future<void> _pickExpiryDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -83,53 +115,101 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
       cancelText: 'إلغاء',
       confirmText: 'تأكيد',
     );
-    if (picked != null) setState(() => _expiryDate = picked);
+
+    if (picked != null) {
+      // ✅ 23:59:59 ليبقى العرض صالحاً طوال اليوم المختار
+      setState(() => _expiryDate = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            23,
+            59,
+            59,
+          ));
+    }
   }
 
+  // ─────────────────────────────────────────────────────────
+  // بناء بيانات Firestore (مفصولة للوضوح والاختبار)
+  // ─────────────────────────────────────────────────────────
+  Map<String, dynamic> _buildOfferData() {
+    final data = <String, dynamic>{
+      'hasActiveOffer': _hasActiveOffer,
+    };
+
+    if (_hasActiveOffer) {
+      // ✅ حالة التفعيل: نحفظ القيم الفعلية
+      data['offerTitle'] = _titleCtrl.text.trim();
+      data['offerDetails'] = _detailsCtrl.text.trim();
+      data['offerExpiryDate'] = Timestamp.fromDate(_expiryDate!);
+
+      // ✅ نضيف/نجدد offerCreatedAt في كل مرة يتم فيها التفعيل
+      data['offerCreatedAt'] = FieldValue.serverTimestamp();
+    } else {
+      // ✅ حالة الإيقاف: حذف فعلي (وليس null) للحقول
+      data['offerTitle'] = FieldValue.delete();
+      data['offerDetails'] = FieldValue.delete();
+      data['offerExpiryDate'] = FieldValue.delete();
+      data['offerCreatedAt'] = FieldValue.delete();
+    }
+
+    return data;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // الحفظ
+  // ─────────────────────────────────────────────────────────
   Future<void> _saveOffer() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // تحقق: التفعيل يتطلب تاريخ انتهاء
     if (_hasActiveOffer && _expiryDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('يرجى تحديد تاريخ انتهاء العرض'),
-            backgroundColor: Colors.orange),
-      );
+      _showError('يرجى تحديد تاريخ انتهاء العرض');
       return;
     }
+
+    // تحقق: المكان موجود
+    if (widget.place.id.isEmpty) {
+      _showError('معرّف المكان غير صالح');
+      return;
+    }
+
+    // ✅ تأمين السياق
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _isSaving = true);
 
     try {
-      final data = {
-        'hasActiveOffer': _hasActiveOffer,
-        'offerTitle': _hasActiveOffer ? _titleCtrl.text.trim() : null,
-        'offerDetails': _hasActiveOffer ? _detailsCtrl.text.trim() : null,
-        'offerExpiryDate': _hasActiveOffer && _expiryDate != null
-            ? Timestamp.fromDate(_expiryDate!)
-            : null,
-      };
-
+      // ✅ بناء البيانات وحفظها
+      final data = _buildOfferData();
       await FirebaseFirestore.instance
           .collection('places')
           .doc(widget.place.id)
           .update(data);
 
-      // ✅ تنفيذ إرسال الإشعارات برمجياً
+      // ✅ إرسال الإشعار فقط عند التفعيل (وإذا اختار التاجر ذلك)
       if (_sendNotification && _hasActiveOffer) {
         await _triggerNotifications();
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('✅ تم حفظ العرض وإرسال الإشعار بنجاح'),
-            backgroundColor: Colors.green),
+
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(_hasActiveOffer
+              ? '✅ تم حفظ العرض وإرسال الإشعار بنجاح'
+              : '✅ تم إيقاف العرض وحذف بياناته'),
+          backgroundColor: Colors.green,
+        ),
       );
-      Navigator.of(context).pop(true);
+
+      navigator.pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(content: Text('❌ فشل الحفظ: $e'), backgroundColor: Colors.red),
       );
     } finally {
@@ -137,126 +217,130 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
     }
   }
 
-  // ✅ دالة إرسال الإشعارات (Firestore + FCM)
+  // ─────────────────────────────────────────────────────────
+  // إرسال الإشعارات
+  // ─────────────────────────────────────────────────────────
   Future<void> _triggerNotifications() async {
     try {
       final title = '🔥 عرض جديد من ${widget.place.nameAr}!';
       final body = _titleCtrl.text.trim();
 
-      // 1. إضافة إشعار عام في Firestore ليظهر في شاشة الإشعارات داخل التطبيق
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'userId': 'all', // إشعار لجميع المستخدمين
-        'title': title,
-        'body': body,
-        'type': 'newOffer',
-        'data': {
-          'placeId': widget.place.id,
-          'route': '/home/place/${widget.place.id}',
-        },
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint('📢 Broadcast notification created in Firestore');
-
-      // 2. استدعاء Cloud Function لإرسال إشعار Push حقيقي (FCM)
-      // ملاحظة: يجب عليك نشر دالة سحابية في Firebase بهذا الاسم،
-      // أو تغيير الرابط ليطابق مشروعك.
-      const cloudFunctionUrl =
-          'https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/sendOfferNotification';
-
-      // إرسال الطلب (يتم تجاهل الخطأ إذا لم تكن الدالة موجودة بعد)
-      await http
-          .post(
-            Uri.parse(cloudFunctionUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'placeId': widget.place.id,
-              'title': title,
-              'body': body,
-            }),
-          )
-          .timeout(const Duration(seconds: 5))
-          .catchError((e) {
-        debugPrint('⚠️ Cloud Function not deployed yet: $e');
-        return http.Response('', 404);
-      });
+      await NotificationHelper.send(
+        userId: 'all',
+        title: title,
+        body: body,
+        type: NotificationType.newOffer,
+        route: '/home/place/${widget.place.id}',
+        data: {'placeId': widget.place.id},
+      );
     } catch (e) {
       debugPrint('❌ Error in _triggerNotifications: $e');
+      // لا نُفشل العملية الأساسية بسبب خطأ الإشعار
     }
   }
 
+  // ─────────────────────────────────────────────────────────
+  // أدوات مساعدة
+  // ─────────────────────────────────────────────────────────
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // واجهة المستخدم
+  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // ✅ التحقق من صلاحية الأدمن
+    // ─── شاشة القفل (الميزة غير مفعلة من الأدمن) ───
     if (!widget.place.isOfferFeatureEnabled) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('إدارة العروض'),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline,
-                    size: 80, color: theme.colorScheme.error),
-                const SizedBox(height: 16),
-                Text(
-                  'ميزة العروض غير مفعلة لحسابك',
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'يمكنك طلب تفعيل هذه الميزة من إدارة التطبيق لتتمكن من نشر خصوماتك للعملاء.',
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                if (widget.place.offerRequestPending)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Text('طلبك قيد المراجعة من قبل الإدارة.',
-                        style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontWeight: FontWeight.bold)),
-                  )
-                else
-                  FilledButton.icon(
-                    onPressed: _isRequesting ? null : _requestPermission,
-                    icon: _isRequesting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.send),
-                    label: const Text('طلب تفعيل ميزة العروض'),
-                    style: FilledButton.styleFrom(
-                        minimumSize: const Size(200, 50)),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return _buildLockedScreen(theme);
     }
 
-    // ✅ واجهة إنشاء/تعديل العرض
+    // ─── واجهة إدارة العرض ───
+    return _buildEditScreen(theme);
+  }
+
+  // شاشة القفل
+  Widget _buildLockedScreen(ThemeData theme) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('إدارة العروض'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline,
+                  size: 80, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                'ميزة العروض غير مفعلة لحسابك',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'يمكنك طلب تفعيل هذه الميزة من إدارة التطبيق لتتمكن من نشر خصوماتك للعملاء.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              if (widget.place.offerRequestPending)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'طلبك قيد المراجعة من قبل الإدارة.',
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: _isRequesting ? null : _requestPermission,
+                  icon: _isRequesting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send),
+                  label: const Text('طلب تفعيل ميزة العروض'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(200, 50),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // واجهة التعديل
+  Widget _buildEditScreen(ThemeData theme) {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('إدارة العروض',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'إدارة العروض',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: theme.colorScheme.surface,
         surfaceTintColor: theme.colorScheme.surface,
@@ -266,7 +350,7 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // بطاقة توضيحية
+            // بطاقة إرشادية
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -294,8 +378,10 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
 
             // مفتاح التفعيل
             SwitchListTile(
-              title: const Text('تفعيل العرض الترويجي',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text(
+                'تفعيل العرض الترويجي',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle:
                   const Text('سيظهر العرض في صفحة مكانك وفي قائمة العروض.'),
               value: _hasActiveOffer,
@@ -306,7 +392,7 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
             const Divider(),
             const SizedBox(height: 16),
 
-            // حقول الإدخال
+            // الحقول (تظهر فقط عند التفعيل)
             if (_hasActiveOffer) ...[
               TextFormField(
                 controller: _titleCtrl,
@@ -336,39 +422,44 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
               ),
               const SizedBox(height: 16),
 
-              // اختيار التاريخ
-              InkWell(
-                onTap: _pickExpiryDate,
+              // اختيار التاريخ (تم تغليفه بـ Material لحل مشكلة الـ Ink Splash)
+              Material(
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today, color: Colors.blueGrey),
-                      const SizedBox(width: 12),
-                      Text(
-                        _expiryDate == null
-                            ? 'تاريخ انتهاء العرض'
-                            : 'ينتهي في: ${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}',
-                        style: TextStyle(
-                          color: _expiryDate == null
-                              ? theme.colorScheme.onSurfaceVariant
-                              : theme.colorScheme.onSurface,
-                          fontSize: 16,
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _pickExpiryDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today,
+                            color: Colors.blueGrey),
+                        const SizedBox(width: 12),
+                        Text(
+                          _expiryDate == null
+                              ? 'تاريخ انتهاء العرض'
+                              : 'ينتهي في: ${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}',
+                          style: TextStyle(
+                            color: _expiryDate == null
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.onSurface,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // مفتاح الإشعارات
+              // إرسال الإشعارات
               SwitchListTile(
                 title: const Text('إرسال إشعار للمستخدمين'),
                 subtitle:
@@ -390,7 +481,10 @@ class _ManageOffersScreenState extends State<ManageOffersScreen> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.save),
               label: Text(_isSaving ? 'جارٍ الحفظ...' : 'حفظ العرض'),
               style: FilledButton.styleFrom(

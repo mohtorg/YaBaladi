@@ -1,5 +1,8 @@
 // lib/features/admin/screens/place_statistics_screen.dart
-// [v1.2 — 2026-10-21] — Removed unnecessary cast + finalized medalColor
+// [v1.4 — DYNAMIC FILTERS STATISTICS]
+//   - CHANGED: _loadStats now fetches active boolean filters from Firebase.
+//   - CHANGED: _buildServicesSection now renders dynamically based on fetched filters.
+//   - ADDED: _getIconData helper for dynamic icons.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,31 +27,70 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
     _loadStats();
   }
 
+  IconData _getIconData(String? iconName) {
+    switch (iconName?.toLowerCase()) {
+      case 'wifi':
+        return Icons.wifi;
+      case 'parking':
+        return Icons.local_parking;
+      case 'restroom':
+        return Icons.wc;
+      case 'accessibility':
+        return Icons.accessible;
+      case 'family_friendly':
+        return Icons.family_restroom;
+      case 'shade':
+        return Icons.beach_access;
+      case 'delivery':
+        return Icons.delivery_dining;
+      case 'reservation':
+        return Icons.event_seat;
+      case 'halal':
+        return Icons.restaurant_menu;
+      default:
+        return Icons.check_circle_outline;
+    }
+  }
+
   Future<void> _loadStats() async {
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     final fs = FirebaseFirestore.instance.collection('places');
+    final db = FirebaseFirestore.instance;
 
     try {
-      final results = await Future.wait([
+      // 1. جلب الفلاتر النشطة من قاعدة البيانات
+      final filtersSnap = await db
+          .collection('filters')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final List<Map<String, dynamic>> booleanFilters = filtersSnap.docs
+          .map((d) => d.data())
+          .where((f) => f['type'] == 'boolean')
+          .toList();
+
+      // 2. بناء الاستعلامات (الأساسية + الفلاتر الديناميكية)
+      final List<Future<AggregateQuerySnapshot>> queries = [
         fs.count().get(),
         fs.where('isApproved', isEqualTo: true).count().get(),
         fs.where('isApproved', isEqualTo: false).count().get(),
         fs.where('isActive', isEqualTo: true).count().get(),
         fs.where('isActive', isEqualTo: false).count().get(),
-        fs.where('hasWifi', isEqualTo: true).count().get(),
-        fs.where('hasParking', isEqualTo: true).count().get(),
-        fs.where('hasRestroom', isEqualTo: true).count().get(),
-        fs.where('hasAccessibility', isEqualTo: true).count().get(),
-        fs.where('isFamilyFriendly', isEqualTo: true).count().get(),
-        fs.where('isHalal', isEqualTo: true).count().get(),
-        fs.where('hasDelivery', isEqualTo: true).count().get(),
-        fs.where('hasReservation', isEqualTo: true).count().get(),
-      ]);
+      ];
 
+      for (var filter in booleanFilters) {
+        final key = filter['fieldKey'] as String;
+        queries.add(fs.where(key, isEqualTo: true).count().get());
+      }
+
+      final results = await Future.wait(queries);
+
+      // 3. أعلى 10 أماكن تقييماً
       final topRated = await fs
           .where('averageRating', isGreaterThan: 0)
           .orderBy('averageRating', descending: true)
@@ -56,6 +98,13 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
           .get();
 
       if (mounted) {
+        // تجميع نتائج الفلاتر في Map
+        final Map<String, int> filterCounts = {};
+        for (int i = 0; i < booleanFilters.length; i++) {
+          final key = booleanFilters[i]['fieldKey'] as String;
+          filterCounts[key] = results[5 + i].count ?? 0;
+        }
+
         setState(() {
           _stats = {
             'total': results[0].count ?? 0,
@@ -63,16 +112,9 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
             'unapproved': results[2].count ?? 0,
             'active': results[3].count ?? 0,
             'inactive': results[4].count ?? 0,
-            'hasWifi': results[5].count ?? 0,
-            'hasParking': results[6].count ?? 0,
-            'hasRestroom': results[7].count ?? 0,
-            'hasAccessibility': results[8].count ?? 0,
-            'isFamilyFriendly': results[9].count ?? 0,
-            'isHalal': results[10].count ?? 0,
-            'hasDelivery': results[11].count ?? 0,
-            'hasReservation': results[12].count ?? 0,
+            'filtersList': booleanFilters,
+            'filtersCounts': filterCounts,
             'topRated': topRated.docs.map((d) {
-              // ✅ FIX: لا يوجد cast زائد
               final data = d.data();
               return <String, dynamic>{'id': d.id, ...data};
             }).toList(),
@@ -99,6 +141,7 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
   }
 
   int _getInt(String key) => (_stats[key] as int?) ?? 0;
+
   double _safeRatio(int count, int total) {
     final t = total > 0 ? total : 1;
     return (count / t).clamp(0.0, 1.0);
@@ -367,21 +410,30 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            '$percent%',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$percent%',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: const TextStyle(fontSize: 12, color: Colors.grey),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          Text(
-            '($count من $total)',
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '($count من $total)',
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
           ),
         ],
       ),
@@ -390,6 +442,27 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
 
   Widget _buildServicesSection() {
     final total = _getInt('total');
+    final filtersList =
+        (_stats['filtersList'] as List<Map<String, dynamic>>?) ?? [];
+    final filtersCounts = (_stats['filtersCounts'] as Map<String, int>?) ?? {};
+
+    if (filtersList.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final List<Color> colors = [
+      Colors.blue,
+      Colors.purple,
+      Colors.indigo,
+      Colors.cyan,
+      Colors.pink,
+      Colors.green,
+      Colors.red,
+      Colors.brown,
+      Colors.orange,
+      Colors.teal
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -403,22 +476,23 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
           style: TextStyle(color: Colors.grey[600], fontSize: 12),
         ),
         const SizedBox(height: 12),
-        _serviceCard(
-            'واي فاي', _getInt('hasWifi'), total, Icons.wifi, Colors.blue),
-        _serviceCard('موقف سيارات', _getInt('hasParking'), total,
-            Icons.local_parking, Colors.purple),
-        _serviceCard('دورة مياه', _getInt('hasRestroom'), total, Icons.wc,
-            Colors.indigo),
-        _serviceCard('سهولة الوصول', _getInt('hasAccessibility'), total,
-            Icons.accessible, Colors.cyan),
-        _serviceCard('مناسب للعائلات', _getInt('isFamilyFriendly'), total,
-            Icons.family_restroom, Colors.pink),
-        _serviceCard('حلال', _getInt('isHalal'), total, Icons.restaurant_menu,
-            Colors.green),
-        _serviceCard('توصيل', _getInt('hasDelivery'), total,
-            Icons.delivery_dining, Colors.red),
-        _serviceCard('حجز مسبق', _getInt('hasReservation'), total,
-            Icons.event_seat, Colors.brown),
+        ...filtersList.asMap().entries.map((entry) {
+          final index = entry.key;
+          final filter = entry.value;
+          final key = filter['fieldKey'] as String;
+          final name = filter['nameAr'] ?? key;
+          final iconName = filter['icon'] ?? 'check_circle';
+          final count = filtersCounts[key] ?? 0;
+          final color = colors[index % colors.length];
+
+          return _serviceCard(
+            name,
+            count,
+            total,
+            _getIconData(iconName),
+            color,
+          );
+        }),
       ],
     );
   }
@@ -451,17 +525,20 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            width: 100,
+          Expanded(
+            flex: 2,
             child: Text(
               label,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Expanded(
+            flex: 3,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -475,12 +552,16 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
           const SizedBox(width: 12),
           SizedBox(
             width: 70,
-            child: Text(
-              '$count ($percent%)',
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '$count ($percent%)',
+                textAlign: TextAlign.end,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -549,7 +630,6 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
     double rating,
     int reviews,
   ) {
-    // ✅ FIX: final بدلاً من Color (لا يُعاد تعيينه)
     final medalColor = rank == 1
         ? Colors.amber
         : rank == 2
@@ -610,6 +690,8 @@ class _PlaceStatisticsScreenState extends State<PlaceStatisticsScreen> {
                   Text(
                     governorate,
                     style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),

@@ -1,5 +1,7 @@
 // lib/core/location/reverse_geocoding_service.dart
 //
+// [v1.2.0 — 2026-11-05] — ENHANCEMENT: Added cache size limit (prevent memory leak),
+//                         JSON structural validation.
 // [v1.1 — 2026-10-25] — FIX: Web User-Agent exception + Math domain error
 //   - FIXED: User-Agent header is now conditionally added only on non-web
 //     platforms (browsers forbid setting it, which throws a ClientException).
@@ -21,6 +23,9 @@ class ReverseGeocodingService {
   static const String _baseUrl = 'https://nominatim.openstreetmap.org/reverse';
   static const Duration _cacheDuration = Duration(minutes: 30);
   static const Duration _timeout = Duration(seconds: 5);
+
+  /// حد أقصى لعدد العناصر في الكاش لمنع استهلاك الذاكرة.
+  static const int _maxCacheSize = 50;
 
   /// User-Agent مطلوب من Nominatim (سياسة استخدامهم).
   static const String _userAgent = 'YaBaladi/1.0 (ya-baladi.app)';
@@ -76,8 +81,20 @@ class ReverseGeocodingService {
         return null;
       }
 
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final info = AddressInfo.fromNominatim(json, lat: lat, lng: lng);
+      final decoded = jsonDecode(response.body);
+
+      // 🛡️ التحقق من أن الاستجابة هي كائن (Map) وليست مصفوفة أو نصاً.
+      if (decoded is! Map<String, dynamic>) {
+        debugPrint('Nominatim invalid response format');
+        return null;
+      }
+
+      final info = AddressInfo.fromNominatim(decoded, lat: lat, lng: lng);
+
+      // إدارة حجم الكاش
+      if (_cache.length >= _maxCacheSize) {
+        _cache.clear(); // مسح الكاش بالكامل عند الوصول للحد الأقصى
+      }
 
       _cache[key] = _CacheEntry(info, DateTime.now());
       return info;

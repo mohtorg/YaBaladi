@@ -1,6 +1,6 @@
 // lib/features/merchant/screens/merchant_reviews_screen.dart
 //
-// [v2.0 — 2026-10-28] — ENHANCEMENT: Rating Summary, Filters, Merchant Reply Feature
+// [v2.1 — 2026-11-05] — LINTER FIX: Added braces for all if/else-if statements.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -64,8 +64,12 @@ class _MerchantReviewsScreenState extends State<MerchantReviewsScreen> {
                 ..sort((a, b) {
                   final aT = a.data()['createdAt'] as Timestamp?;
                   final bT = b.data()['createdAt'] as Timestamp?;
-                  if (aT == null) return 1;
-                  if (bT == null) return -1;
+                  if (aT == null) {
+                    return 1;
+                  }
+                  if (bT == null) {
+                    return -1;
+                  }
                   return bT.compareTo(aT);
                 });
 
@@ -87,8 +91,12 @@ class _MerchantReviewsScreenState extends State<MerchantReviewsScreen> {
               // تصفية التقييمات حسب الفلتر المختار
               final filteredDocs = allDocs.where((doc) {
                 final rating = (doc.data()['rating'] as num?)?.toInt() ?? 0;
-                if (_filter == 'positive') return rating >= 4;
-                if (_filter == 'negative') return rating <= 2;
+                if (_filter == 'positive') {
+                  return rating >= 4;
+                }
+                if (_filter == 'negative') {
+                  return rating <= 2;
+                }
                 return true;
               }).toList();
 
@@ -173,15 +181,18 @@ class _RatingSummaryHeader extends StatelessWidget {
     for (var doc in reviews) {
       final rating = (doc.data()['rating'] as num?)?.toInt() ?? 0;
       totalRating += rating;
-      if (rating == 5)
+      // ✅ FIX: Added braces to if/else-if statements
+      if (rating == 5) {
         count5++;
-      else if (rating == 4)
+      } else if (rating == 4) {
         count4++;
-      else if (rating == 3)
+      } else if (rating == 3) {
         count3++;
-      else if (rating == 2)
+      } else if (rating == 2) {
         count2++;
-      else if (rating == 1) count1++;
+      } else if (rating == 1) {
+        count1++;
+      }
     }
 
     final avg = reviews.isEmpty ? 0.0 : totalRating / reviews.length;
@@ -330,7 +341,9 @@ class _ReviewCardState extends State<_ReviewCard> {
           );
         }
       } finally {
-        if (mounted) setState(() => _isReplying = false);
+        if (mounted) {
+          setState(() => _isReplying = false);
+        }
       }
     }
   }
@@ -462,9 +475,15 @@ class _ReviewCardState extends State<_ReviewCard> {
 
   String _formatDate(DateTime d) {
     final diff = DateTime.now().difference(d);
-    if (diff.inDays > 0) return 'منذ ${diff.inDays} يوم';
-    if (diff.inHours > 0) return 'منذ ${diff.inHours} ساعة';
-    if (diff.inMinutes > 0) return 'منذ ${diff.inMinutes} دقيقة';
+    if (diff.inDays > 0) {
+      return 'منذ ${diff.inDays} يوم';
+    }
+    if (diff.inHours > 0) {
+      return 'منذ ${diff.inHours} ساعة';
+    }
+    if (diff.inMinutes > 0) {
+      return 'منذ ${diff.inMinutes} دقيقة';
+    }
     return 'الآن';
   }
 }

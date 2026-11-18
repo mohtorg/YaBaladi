@@ -21,10 +21,9 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     // ✅ [v5 — 2026-10-27] AGP 8.11.1 — الحد الأدنى المطلوب من Flutter الجديد
     id("com.android.application") version "8.11.1" apply false
-    // [v4 — 2026-10-21] Kotlin 2.1.20 — حل نهائي لخطأ metadata
-    //  → متوافق مع kotlin-stdlib-2.1.20 و annotation-jvm-1.10.0
-    //  → متوافق مع AGP 8.11.1 و Flutter 3.47
-    id("org.jetbrains.kotlin.android") version "2.1.20" apply false
+    // [v6 — 2026-11-02] Kotlin 2.3.10 — مواءمة مع kotlin-stdlib-2.3.10 المفروضة من الاعتماديات
+    //  → يعالج: Module was compiled with an incompatible version of Kotlin
+    id("org.jetbrains.kotlin.android") version "2.3.10" apply false
 }
 
 include(":app")

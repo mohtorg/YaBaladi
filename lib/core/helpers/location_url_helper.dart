@@ -1,34 +1,55 @@
 // lib/core/helpers/location_url_helper.dart
 //
-// [v2.2 — 2026-10-29] — BUILD FIX: إزالة RegExp كلياً (تحذيرات الإهمال)
-//   - استُبدل استخراج الإحداثيات بماسح نصي يدوي يطابق سلوك الأنماط الخمسة السابقة
-//     وبالترتيب نفسه (النمط الأول المطابق ثم التحقق من الصلاحية، وإلا الانتقال للتالي).
-//   - استُبدل تنقية الأرقام ([^\d]) بدالة _digitsOnly.
-//   - KEPT: جميع الواجهات العامة وتواقيعها دون تغيير.
-// [v2.1 — 2026-10-26] — BUILD FIX: Strict Raw Strings for RegExp (No deprecation warnings)
+// [v3.2 — 2026-11-11] — BACKWARD COMPATIBILITY: Added mapUrl, directionsUrl, and open aliases for older screens.
+// [v3.1 — 2026-11-11] — LINTER FIX: Replaced RegExp in openSmart with string methods.
+// [v3.0 — 2026-11-11] — HIGH-LEVEL GIS HUB: Smart routing, Haversine, Advanced Scanner.
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'dart:io' show Platform;
+import 'dart:math' show cos, sin, sqrt, atan2, pi;
+
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LocationUrlHelper {
   LocationUrlHelper._();
 
   // ═══════════════════════════════════════════════════════════════
-  // URL Generators (تعمل بشكل كامل)
+  // 1. SMART MAPS & NAVIGATION (التوجيه الذكي للخرائط)
   // ═══════════════════════════════════════════════════════════════
 
-  static String? mapUrl({
+  /// ينشئ رابط خريطة ذكي يدرك نوع المنصة (iOS/Android/Web).
+  static String? getSmartMapUrl({
     double? lat,
     double? lng,
     GeoPoint? location,
+    String? label,
   }) {
     final finalLat = lat ?? location?.latitude;
     final finalLng = lng ?? location?.longitude;
     if (finalLat == null || finalLng == null) return null;
+
+    final encodedLabel =
+        label != null ? Uri.encodeComponent(label) : '$finalLat,$finalLng';
+
+    if (kIsWeb) {
+      return 'https://www.google.com/maps/search/?api=1&query=$finalLat,$finalLng';
+    }
+
+    if (Platform.isAndroid) {
+      // Android Geo Intent (يفتح التطبيق مباشرة أو المتصفح)
+      return 'geo:$finalLat,$finalLng?q=$finalLat,$finalLng($encodedLabel)';
+    } else if (Platform.isIOS) {
+      // Apple Maps Deep Link
+      return 'https://maps.apple.com/?q=$encodedLabel&ll=$finalLat,$finalLng';
+    }
+
+    // Fallback for Desktop (Windows/Mac/Linux)
     return 'https://www.google.com/maps/search/?api=1&query=$finalLat,$finalLng';
   }
 
-  static String? directionsUrl({
+  /// ينشئ رابط الاتجاهات (Navigation) الذكي.
+  static String? getSmartDirectionsUrl({
     double? lat,
     double? lng,
     GeoPoint? location,
@@ -36,39 +57,91 @@ class LocationUrlHelper {
     final finalLat = lat ?? location?.latitude;
     final finalLng = lng ?? location?.longitude;
     if (finalLat == null || finalLng == null) return null;
+
+    if (!kIsWeb && Platform.isIOS) {
+      return 'https://maps.apple.com/?daddr=$finalLat,$finalLng';
+    }
     return 'https://www.google.com/maps/dir/?api=1&destination=$finalLat,$finalLng';
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Coordinate Extraction
+  // 2. HAVERSINE ENGINE (محرك المسافات الدقيق)
   // ═══════════════════════════════════════════════════════════════
 
-  /// الأنماط المدعومة (بالترتيب):
-  ///  1. ...!3d<lat>!4d<lng>
-  ///  2. ?q= | &query= | &ll= | &destination=  <lat> (, أو %2C) [مسافات] [+] <lng>
-  ///  3. @<lat>,<lng>
-  ///  4. place/<lat>,[+]<lng>
-  ///  5. "<lat>, <lng>" أو "<lat>; <lng>" (النص كله)
+  /// يحسب المسافة بالأمتار بين نقطتين (يُستخدم في Geofencing ونظام التقييم).
+  static double calculateDistanceMeters(
+    double startLat,
+    double startLng,
+    double endLat,
+    double endLng,
+  ) {
+    const double earthRadius = 6371000.0; // Meters
+    final dLat = _toRadians(endLat - startLat);
+    final dLng = _toRadians(endLng - startLng);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(startLat)) *
+            cos(_toRadians(endLat)) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  /// يحول المسافة لصيغة مقروءة للمستخدم (مثال: 150 م، 2.5 كم).
+  static String formatDistance(double meters) {
+    if (meters < 1000) {
+      return '${meters.round()} م';
+    }
+    return '${(meters / 1000).toStringAsFixed(1)} كم';
+  }
+
+  static double _toRadians(double degree) => degree * pi / 180;
+
+  // ═══════════════════════════════════════════════════════════════
+  // 3. ADVANCED COORDINATE EXTRACTION (الماسح النصي المتقدم)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// يستخرج الإحداثيات من أي رابط خرائط معقد (Google/Apple/OSM).
   static ({double lat, double lng})? extractCoordinates(String url) {
     final input = url.trim();
     if (input.isEmpty) return null;
 
+    // 1. المحاولة الأولى: استخدام محلل الروابط القياسي (لروابط الاستعلام)
+    try {
+      final uri = Uri.parse(input);
+      final q = uri.queryParameters['q'] ?? uri.queryParameters['ll'];
+      if (q != null) {
+        final parts = q.split(',');
+        if (parts.length == 2) {
+          final lat = double.tryParse(parts[0]);
+          final lng = double.tryParse(parts[1]);
+          if (lat != null && lng != null && _isValidCoordinate(lat, lng)) {
+            return (lat: lat, lng: lng);
+          }
+        }
+      }
+    } catch (_) {
+      // تجاهل الخطأ والانتقال للماسح اليدوي
+    }
+
+    // 2. الماسح اليدوي (للروابط التي لا تدعم Uri.parse بشكل جيد مثل !3d!4d)
     final matchers = <(String, String)? Function(String)>[
-      _matchDataParams,
-      _matchQueryParam,
-      _matchAtSign,
-      _matchPlacePath,
-      _matchPlainPair,
+      _matchDataParams, // !3d<lat>!4d<lng>
+      _matchAtSign, // @<lat>,<lng>
+      _matchPlacePath, // place/<lat>,<lng>
+      _matchPlainPair, // <lat>, <lng>
     ];
 
     for (final matcher in matchers) {
       final match = matcher(input);
-      if (match == null) continue;
-
-      final lat = double.tryParse(match.$1);
-      final lng = double.tryParse(match.$2);
-      if (lat != null && lng != null && _isValidCoordinate(lat, lng)) {
-        return (lat: lat, lng: lng);
+      if (match != null) {
+        final lat = double.tryParse(match.$1);
+        final lng = double.tryParse(match.$2);
+        if (lat != null && lng != null && _isValidCoordinate(lat, lng)) {
+          return (lat: lat, lng: lng);
+        }
       }
     }
     return null;
@@ -89,46 +162,7 @@ class LocationUrlHelper {
     }
   }
 
-  // ── 2) [?&](q|query|ll|destination)=<lat>(,|%2C)\s*\+?<lng> ──
-  static (String, String)? _matchQueryParam(String s) {
-    const keys = ['q', 'query', 'll', 'destination'];
-    for (var i = 0; i < s.length; i++) {
-      final c = s.codeUnitAt(i);
-      if (c != 63 && c != 38) continue; // '?' أو '&'
-
-      for (final key in keys) {
-        var p = i + 1;
-        if (!_matchesIgnoreCase(s, p, key)) continue;
-        p += key.length;
-        if (p >= s.length || s.codeUnitAt(p) != 61) continue; // '='
-        p++;
-
-        final a = _scanNumber(s, p);
-        if (a == null) continue;
-        p = a.end;
-
-        if (p < s.length && s.codeUnitAt(p) == 44) {
-          p++; // ','
-        } else if (_matchesIgnoreCase(s, p, '%2c')) {
-          p += 3;
-        } else {
-          continue;
-        }
-
-        while (p < s.length && _isSpace(s.codeUnitAt(p))) {
-          p++;
-        }
-        if (p < s.length && s.codeUnitAt(p) == 43) p++; // '+'
-
-        final b = _scanNumber(s, p);
-        if (b == null) continue;
-        return (a.text, b.text);
-      }
-    }
-    return null;
-  }
-
-  // ── 3) @<lat>,<lng> ──
+  // ── 2) @<lat>,<lng> ──
   static (String, String)? _matchAtSign(String s) {
     var from = 0;
     while (true) {
@@ -143,7 +177,7 @@ class LocationUrlHelper {
     }
   }
 
-  // ── 4) place/<lat>,\+?<lng> ──
+  // ── 3) place/<lat>,\+?<lng> ──
   static (String, String)? _matchPlacePath(String s) {
     var from = 0;
     while (true) {
@@ -160,7 +194,7 @@ class LocationUrlHelper {
     }
   }
 
-  // ── 5) ^\s*<lat>\s*[,;]\s*<lng>\s*$ ──
+  // ── 4) ^\s*<lat>\s*[,;]\s*<lng>\s*$ ──
   static (String, String)? _matchPlainPair(String s) {
     var p = 0;
     while (p < s.length && _isSpace(s.codeUnitAt(p))) {
@@ -192,9 +226,72 @@ class LocationUrlHelper {
     return (a.text, b.text);
   }
 
-  // ── أدوات الماسح النصي ──
+  // ═══════════════════════════════════════════════════════════════
+  // 4. EXTERNAL ACTIONS & LINGUISTIC NORMALIZATION
+  // ═══════════════════════════════════════════════════════════════
 
-  /// يقرأ رقماً بالصيغة: -?\d+(\.\d+)? ابتداءً من [start].
+  /// يفتح الرابط بذكاء مع التراجع الآمن (Fallback) في حال فشل التطبيق.
+  static Future<bool> openSmart(String? url) async {
+    if (url == null || url.trim().isEmpty) return false;
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) return false;
+
+    try {
+      // محاولة فتح التطبيق الخارجي (Deep Link)
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+
+      // ✅ إذا فشل (مثلاً المستخدم ليس لديه تطبيق خرائط)، نحول الرابط لنسخة الويب بدون RegExp
+      if (url.startsWith('geo:')) {
+        final webFallback =
+            'https://www.google.com/maps/search/?api=1&query=${url.substring(4)}';
+        return await launchUrl(Uri.parse(webFallback),
+            mode: LaunchMode.inAppBrowserView);
+      } else if (url.startsWith('maps:')) {
+        final webFallback =
+            'https://www.google.com/maps/search/?api=1&query=${url.substring(5)}';
+        return await launchUrl(Uri.parse(webFallback),
+            mode: LaunchMode.inAppBrowserView);
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('LocationUrlHelper.openSmart error: $e');
+      return false;
+    }
+  }
+
+  /// إجراء اتصال هاتفي مع دعم الأرقام العربية.
+  static Future<bool> makeCall(String? phone) async {
+    if (phone == null) return false;
+    final cleaned = _normalizeDigits(phone);
+    if (cleaned.isEmpty) return false;
+    return openSmart('tel:$cleaned');
+  }
+
+  /// فتح واتساب مع حقن كود الدولة (مصر: 20).
+  static Future<bool> openWhatsApp(
+    String? phone, {
+    String defaultCountryCode = '20',
+  }) async {
+    if (phone == null) return false;
+    var cleaned = _normalizeDigits(phone);
+    if (cleaned.isEmpty) return false;
+
+    if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('0')) {
+      cleaned = '$defaultCountryCode${cleaned.substring(1)}';
+    }
+
+    return openSmart('https://wa.me/$cleaned');
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 5. LOW-LEVEL HELPERS (أدوات المعالجة العميقة)
+  // ═══════════════════════════════════════════════════════════════
+
   static ({String text, int end})? _scanNumber(String s, int start) {
     var p = start;
     if (p < s.length && s.codeUnitAt(p) == 45) p++; // '-'
@@ -216,22 +313,10 @@ class LocationUrlHelper {
     return (text: s.substring(start, p), end: p);
   }
 
-  /// يطابق [lowerKey] (بحروف صغيرة) عند [pos] دون اعتبار حالة الأحرف اللاتينية.
-  static bool _matchesIgnoreCase(String s, int pos, String lowerKey) {
-    if (pos < 0 || pos + lowerKey.length > s.length) return false;
-    for (var k = 0; k < lowerKey.length; k++) {
-      var c = s.codeUnitAt(pos + k);
-      if (c >= 65 && c <= 90) c += 32; // A-Z → a-z
-      if (c != lowerKey.codeUnitAt(k)) return false;
-    }
-    return true;
-  }
-
   static bool _isDigit(int c) => c >= 48 && c <= 57;
 
-  /// مكافئ \s في Dart: مسافات ASCII وفراغات يونيكود المعتادة.
   static bool _isSpace(int c) {
-    return (c >= 9 && c <= 13) || // \t \n \v \f \r
+    return (c >= 9 && c <= 13) ||
         c == 32 ||
         c == 0xA0 ||
         c == 0x1680 ||
@@ -244,61 +329,48 @@ class LocationUrlHelper {
         c == 0xFEFF;
   }
 
-  /// يُبقي الأرقام 0-9 فقط (مكافئ replaceAll([^\d], '')).
-  static String _digitsOnly(String s) {
+  /// التطبيع اللغوي: تحويل الأرقام العربية/الفارسية لإنجليزية وإزالة الرموز.
+  static String _normalizeDigits(String s) {
     final buf = StringBuffer();
-    for (final c in s.codeUnits) {
-      if (_isDigit(c)) buf.writeCharCode(c);
+    for (final c in s.runes) {
+      if (c >= 48 && c <= 57) {
+        buf.writeCharCode(c); // 0-9
+      } else if (c >= 0x0660 && c <= 0x0669) {
+        buf.writeCharCode(c - 0x0660 + 48); // ٠-٩
+      } else if (c >= 0x06F0 && c <= 0x06F9) {
+        buf.writeCharCode(c - 0x06F0 + 48); // ۰-۹
+      } else if (c == 43) {
+        buf.writeCharCode(c); // '+'
+      }
     }
     return buf.toString();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // External Actions (Graceful Degradation — بدون Crash)
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<bool> open(String? url) async {
-    if (url == null || url.trim().isEmpty) return false;
-    debugPrint(
-      'LocationUrlHelper.open: "$url" — url_launcher not available in FlutterLab',
-    );
-    return false;
-  }
-
-  static Future<bool> call(String? phone) async {
-    if (phone == null || phone.trim().isEmpty) return false;
-
-    final trimmed = phone.trim();
-    final digits = _digitsOnly(trimmed);
-    if (digits.isEmpty) return false;
-
-    final cleaned = trimmed.startsWith('+') ? '+$digits' : digits;
-    return open('tel:$cleaned');
-  }
-
-  static Future<bool> openWhatsApp(
-    String? phone, {
-    String? defaultCountryCode,
-  }) async {
-    if (phone == null || phone.trim().isEmpty) return false;
-
-    var cleaned = _digitsOnly(phone);
-    if (cleaned.isEmpty) return false;
-
-    if (cleaned.startsWith('00')) {
-      cleaned = cleaned.substring(2);
-    } else if (defaultCountryCode != null && cleaned.startsWith('0')) {
-      cleaned = '$defaultCountryCode${cleaned.substring(1)}';
-    }
-
-    return open('https://wa.me/$cleaned');
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Validation
-  // ═══════════════════════════════════════════════════════════════
-
   static bool _isValidCoordinate(double lat, double lng) {
-    return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    return lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180 &&
+        lat != 0 &&
+        lng != 0;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 6. BACKWARD COMPATIBILITY (Aliases for older code)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// اسم قديم للتوافق مع add_place_screen و place_detail_screen
+  static String? mapUrl({double? lat, double? lng, GeoPoint? location}) {
+    return getSmartMapUrl(lat: lat, lng: lng, location: location);
+  }
+
+  /// اسم قديم للتوافق مع add_place_screen و place_detail_screen
+  static Future<bool> open(String? url) {
+    return openSmart(url);
+  }
+
+  /// اسم قديم للتوافق مع place_detail_screen
+  static String? directionsUrl({double? lat, double? lng, GeoPoint? location}) {
+    return getSmartDirectionsUrl(lat: lat, lng: lng, location: location);
   }
 }

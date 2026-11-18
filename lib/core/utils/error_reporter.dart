@@ -1,11 +1,9 @@
 // lib/core/utils/error_reporter.dart
-//
-// [v1.1] — FIX:
-//   - إزالة RegExp (تحذير الإهمال) واستبداله بدالة _extractErrorCode تطابق
-//     سلوك النمط السابق  \[.*?/(.*?)\]  تماماً.
-//   - إضافة أقواس لجملة if (التزام بقاعدة curly_braces).
-//   - اقتطاع stackTrace قبل الإرسال لتفادي تجاوز حد حجم مستند Firestore.
-//   - KEPT: كل الوظائف والواجهة والتوقيعات العامة دون تغيير.
+// [v1.2] — FIXED:
+//   - Changed success icon to error icon (UX fix).
+//   - Hid "UNKNOWN" error codes from the user (they still go to Firebase).
+//   - Improved user-facing text for errors.
+//   - Kept all Firebase logging and rate-limiting logic intact.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,24 +18,28 @@ class ErrorReporter {
 
   static void showError(Object error, [StackTrace? stackTrace]) {
     final now = DateTime.now();
+    // منع تكرار الإشعار لنفس الخطأ في وقت قصير
     if (_lastShownAt != null && now.difference(_lastShownAt!).inSeconds < 5) {
       return;
     }
     _lastShownAt = now;
 
     final errorString = error.toString();
-    final errorCode = _extractErrorCode(errorString) ?? 'UNKNOWN';
 
-    // ✅ إرسال لـ Firebase
-    _sendToFirebase(errorCode, errorString, stackTrace);
+    // طباعة الخطأ في الـ Console للمبرمج
+    debugPrint('🔥 ACTUAL ERROR: $errorString');
+    if (stackTrace != null) debugPrint('🔥 STACK: $stackTrace');
 
-    // ✅ عرض إشعار أنيق (تم إصلاح الخطأ هنا)
+    // محاولة استخراج كود الخطأ (إذا كان من Firebase)
+    final errorCode = _extractErrorCode(errorString);
+
+    // إرسال التذكرة لـ Firebase (يتم في الخلفية دون تعطيل المستخدم)
+    _sendToFirebase(errorCode ?? 'UNKNOWN', errorString, stackTrace);
+
+    // عرض الإشعار للمستخدم
     _showUserToast(errorCode);
   }
 
-  /// يستخرج الكود من نصوص مثل: "[firebase_auth/wrong-password] ..."
-  /// فيعيد الجزء الواقع بين أول "/" وأول "]" التالية داخل قوسين مربعين
-  /// على السطر نفسه (مطابق للنمط السابق \[.*?/(.*?)\]).
   static String? _extractErrorCode(String s) {
     bool isLineBreak(int c) => c == 10 || c == 13 || c == 0x2028 || c == 0x2029;
 
@@ -47,7 +49,6 @@ class ErrorReporter {
       if (open < 0) return null;
       from = open + 1;
 
-      // أول "/" بعد القوس على السطر نفسه
       var slash = open + 1;
       while (slash < s.length) {
         final c = s.codeUnitAt(slash);
@@ -56,7 +57,6 @@ class ErrorReporter {
       }
       if (slash >= s.length || s.codeUnitAt(slash) != 47) continue;
 
-      // أول "]" بعد الشرطة المائلة على السطر نفسه
       var close = slash + 1;
       while (close < s.length) {
         final c = s.codeUnitAt(close);
@@ -97,21 +97,26 @@ class ErrorReporter {
     }
   }
 
-  static void _showUserToast(String code) {
-    // ✅ التعديل الجوهري: ننتظر حتى ينتهي البناء (Build) ثم نعرض الإشعار
+  static void _showUserToast(String? code) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final messenger = messengerKey.currentState;
       if (messenger == null) return;
 
       messenger.hideCurrentSnackBar();
+
+      // تحديد ما إذا كنا سنعرض الكود للمستخدم أم لا
+      // لا نعرض UNKNOWN لأنه لا يفيد المستخدم
+      final bool showCode = code != null && code != 'UNKNOWN';
+
       messenger.showSnackBar(
         SnackBar(
           content: Directionality(
             textDirection: TextDirection.rtl,
             child: Row(
               children: [
-                const Icon(Icons.check_circle_outline,
-                    color: Colors.greenAccent, size: 22),
+                // ✅ تم تغيير الأيقونة إلى خطأ أحمر بدلاً من صح أخضر
+                const Icon(Icons.error_outline,
+                    color: Colors.redAccent, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -119,14 +124,16 @@ class ErrorReporter {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'تم إبلاغ فريق الدعم',
+                        'حدث خطأ غير متوقع', // ✅ رسالة واضحة بدلاً من "تم رفع التقرير"
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             color: Colors.white),
                       ),
                       Text(
-                        'سنعمل على حل المشكلة قريباً • كود: $code',
+                        showCode
+                            ? 'تم إبلاغ الدعم • كود: $code'
+                            : 'تم إبلاغ فريق الدعم للمراجعة، يرجى المحاولة لاحقاً.',
                         style: const TextStyle(
                             fontSize: 11, color: Colors.white70),
                       ),
@@ -137,7 +144,7 @@ class ErrorReporter {
             ),
           ),
           backgroundColor: const Color(0xFF2E2E2E),
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           shape:

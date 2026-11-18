@@ -1,9 +1,13 @@
 // lib/core/location/governorate_picker_sheet.dart
 //
+// [v1.2.2 — 2026-11-15] — LINTER FIX: Added curly braces to `if` statement in `_displayName`.
+// [v1.2.1 — 2026-11-05] — FIX: Replaced deprecated `withOpacity` with `withValues(alpha: ...)`.
+// [v1.2.0 — 2026-11-05] — POLISH: fallback to controller.physicalPlaceName,
+//                         conditional divider, useSafeArea, selectedTileColor,
+//                         const optimizations, bottom spacing.
 // [v1.1 — 2026-10-19] — Wave 5.5b: physicalPlaceName support
 //   - NEW: show() يقبل physicalPlaceName اختياري (اسم GPS الدقيق)
 //   - FIX: _PhysicalOption يعرض اسم GPS بدل اسم المحافظة
-//          مثال: "الشرق، بورسعيد — من GPS" بدل "بورسعيد — من GPS"
 //   - FIX: إزالة physical! (استبدال بـ null check)
 //   - FIX: const Chip
 //   - KEPT: Future<void> — توافق 100% مع welcome_header v2.0.7
@@ -24,8 +28,9 @@ class GovernoratePickerSheet extends StatelessWidget {
 
   final BrowsingLocationController controller;
 
-  /// اسم المكان الدقيق من GPS (مثل "الشرق، بورسعيد")
-  /// إن لم يُمرَّر، يُستخدم اسم المحافظة من `physical.nameAr`
+  /// اسم المكان الدقيق من GPS (مثل "الشرق، بورسعيد").
+  /// إن لم يُمرَّر، يستخدم `controller.physicalPlaceName` تلقائياً،
+  /// وإلا اسم المحافظة من `physical.nameAr`.
   final String? physicalPlaceName;
 
   /// يعرض الـ BottomSheet مع BrowsingLocationController الممرَّر.
@@ -39,6 +44,7 @@ class GovernoratePickerSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true, // ✅ حماية من النوتش على الأجهزة الحديثة
       builder: (_) => GovernoratePickerSheet(
         controller: controller,
         physicalPlaceName: physicalPlaceName,
@@ -51,7 +57,14 @@ class GovernoratePickerSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final browsing = controller.browsing;
     final physical = controller.physical;
-    final hasPhysical = controller.hasPhysicalLocation;
+    final hasPhysical = controller.hasPhysicalLocation && physical != null;
+
+    // 🔗 سلسلة Fallback ذكية لاسم المكان:
+    // 1) Parameter الممرر  2) Controller.physicalPlaceName  3) اسم المحافظة
+    final paramName = physicalPlaceName?.trim();
+    final effectivePlaceName = (paramName != null && paramName.isNotEmpty)
+        ? paramName
+        : controller.physicalPlaceName;
 
     return SafeArea(
       child: ConstrainedBox(
@@ -83,12 +96,12 @@ class GovernoratePickerSheet extends StatelessWidget {
             ),
 
             // ─── "استخدام موقعي الحالي" ───
-            if (hasPhysical && physical != null)
+            if (hasPhysical)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: _PhysicalOption(
                   physical: physical,
-                  physicalPlaceName: physicalPlaceName,
+                  physicalPlaceName: effectivePlaceName,
                   isActive: controller.isUsingPhysical,
                   onTap: () {
                     controller.resetToPhysical();
@@ -97,7 +110,11 @@ class GovernoratePickerSheet extends StatelessWidget {
                 ),
               ),
 
-            const Divider(height: 24),
+            // ─── فاصل شرطي (يظهر فقط عند وجود خيار GPS) ───
+            if (hasPhysical)
+              const Divider(height: 24)
+            else
+              const SizedBox(height: 8),
 
             // ─── نص إرشادي ───
             Padding(
@@ -145,6 +162,10 @@ class GovernoratePickerSheet extends StatelessWidget {
                           )
                         : null,
                     selected: isSelected,
+                    // ✅ تمييز لوني بسيط للمحافظة المختارة لتحسين الوضوح البصري
+                    // تم إصلاح التحذير باستخدام withValues بدلاً من withOpacity
+                    selectedTileColor: theme.colorScheme.primaryContainer
+                        .withValues(alpha: 0.3),
                     onTap: () {
                       controller.setBrowsingGovernorate(gov.id);
                       Navigator.of(context).pop();
@@ -153,6 +174,9 @@ class GovernoratePickerSheet extends StatelessWidget {
                 },
               ),
             ),
+
+            // ─── مسافة سفلية صغيرة ───
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -170,14 +194,16 @@ class _PhysicalOption extends StatelessWidget {
 
   final EgyptGovernorate physical;
 
-  /// اسم المكان الدقيق من GPS (اختياري)
+  /// اسم المكان الدقيق من GPS (اختياري).
   final String? physicalPlaceName;
   final bool isActive;
   final VoidCallback onTap;
 
   String get _displayName {
     final name = physicalPlaceName?.trim();
-    if (name != null && name.isNotEmpty) return name;
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
     return physical.nameAr;
   }
 

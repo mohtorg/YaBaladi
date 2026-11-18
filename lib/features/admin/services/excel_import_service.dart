@@ -1,13 +1,24 @@
 // lib/features/admin/services/excel_import_service.dart
-import 'dart:convert';
+// [v3.3.0 — 2026-11-08] — FIXED: Default priceLevel to 1 to prevent UI Dropdown crashes.
+
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:csv/csv.dart'; // ✅ مكتبة csv
+import 'package:excel/excel.dart';
+import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart';
+
+// ✅ كلاس جديد لإرجاع نتيجة الفرز بالتفصيل
+class ParseResult {
+  final List<Map<String, dynamic>> validPlaces;
+  final List<String> errors;
+  ParseResult({required this.validPlaces, required this.errors});
+}
 
 class ExcelImportResult {
   final int successCount;
   final int failCount;
   final List<String> errors;
+
   const ExcelImportResult({
     required this.successCount,
     required this.failCount,
@@ -18,67 +29,199 @@ class ExcelImportResult {
 class ExcelImportService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// قراءة ملف CSV وإرجاع قائمة صفوف
-  Future<List<Map<String, dynamic>>> parseCsv(Uint8List bytes) async {
-    // فك ترميز UTF-8 (يدعم العربية)
-    final content = utf8.decode(bytes, allowMalformed: true);
-    final csvData = const CsvToListConverter(
-      fieldDelimiter: ',',
-      eol: '\n',
-    ).convert(content);
+  Future<void> generateAndDownloadTemplate() async {
+    final excel = Excel.createExcel();
+    final Sheet sheetObject = excel['معالم بورسعيد'];
+    excel.setDefaultSheet('معالم بورسعيد');
 
-    if (csvData.isEmpty) return [];
+    final List<String> headers = [
+      'name',
+      'name_en',
+      'description',
+      'categoryId',
+      'governorate',
+      'geoZoneName',
+      'address',
+      'map_url',
+      'longitude',
+      'latitude',
+      'phone',
+      'website',
+      'email',
+      'facebook',
+      'priceLevel',
+      'hasWifi',
+      'hasParking',
+      'hasRestroom',
+      'hasAccessibility',
+      'isFamilyFriendly',
+      'hasShade',
+      'hasDelivery',
+      'hasReservation',
+      'tags',
+      'is_active'
+    ];
 
-    final List<Map<String, dynamic>> rows = [];
+    for (int i = 0; i < headers.length; i++) {
+      sheetObject
+          .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
+          .value = TextCellValue(headers[i]);
+    }
 
-    // تخطي الصف الأول (العناوين)
-    for (int i = 1; i < csvData.length; i++) {
-      final row = csvData[i];
+    // ✅ تم تغيير السعر إلى 1 في المثال
+    final List<CellValue?> exampleRow = [
+      TextCellValue('فنار بورسعيد القديم'),
+      TextCellValue('Port Said Lighthouse'),
+      TextCellValue('منارة مثمنة...'),
+      TextCellValue('landmarks'),
+      TextCellValue('بورسعيد'),
+      TextCellValue('حي الشرق'),
+      TextCellValue('شارع فلسطين'),
+      TextCellValue('https://maps.google.com/?q=31.263889,32.311667'),
+      DoubleCellValue(32.311667),
+      DoubleCellValue(31.263889),
+      TextCellValue('01000000000'),
+      TextCellValue('https://example.com'),
+      TextCellValue('info@example.com'),
+      TextCellValue('https://facebook.com/example'),
+      IntCellValue(1), // ✅ السعر 1
+      BoolCellValue(false),
+      BoolCellValue(false),
+      BoolCellValue(false),
+      BoolCellValue(false),
+      BoolCellValue(true),
+      BoolCellValue(false),
+      BoolCellValue(false),
+      BoolCellValue(false),
+      TextCellValue('تاريخي, فنار'),
+      BoolCellValue(true)
+    ];
+
+    for (int i = 0; i < exampleRow.length; i++) {
+      sheetObject
+          .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1))
+          .value = exampleRow[i];
+    }
+
+    final List<int>? fileBytes = excel.save();
+    if (fileBytes != null) {
+      await FileSaver.instance.saveFile(
+        name: 'yabaladi_places_template',
+        bytes: Uint8List.fromList(fileBytes),
+        ext: 'xlsx',
+        mimeType: MimeType.microsoftExcel,
+      );
+    }
+  }
+
+  Future<ParseResult> parseExcel(Uint8List bytes) async {
+    final excel = Excel.decodeBytes(bytes);
+    final List<Map<String, dynamic>> validPlaces = [];
+    final List<String> errors = [];
+
+    if (excel.tables.isEmpty) {
+      errors.add('الملف فارغ أو غير صالح.');
+      return ParseResult(validPlaces: validPlaces, errors: errors);
+    }
+
+    final table = excel.tables[excel.tables.keys.first];
+    if (table == null || table.rows.isEmpty) {
+      errors.add('الورقة الأولى فارغة.');
+      return ParseResult(validPlaces: validPlaces, errors: errors);
+    }
+
+    final rows = table.rows;
+    final headers = rows[0]
+        .map((cell) => cell?.value?.toString().trim().toLowerCase() ?? '')
+        .toList();
+    int getIndex(String name) => headers.indexOf(name.toLowerCase());
+
+    if (getIndex('name') == -1) {
+      errors.add('العمود "name" (اسم المكان) غير موجود في الملف.');
+      return ParseResult(validPlaces: validPlaces, errors: errors);
+    }
+
+    for (int i = 1; i < rows.length; i++) {
+      final row = rows[i];
       if (row.isEmpty) continue;
 
-      String _cell(int idx) =>
-          row.length > idx ? row[idx]?.toString().trim() ?? '' : '';
-      bool _bool(int idx) {
-        final v = _cell(idx).toLowerCase();
+      String getCell(String name) {
+        final int idx = getIndex(name);
+        if (idx == -1 || row.length <= idx) return '';
+        return row[idx]?.value?.toString().trim() ?? '';
+      }
+
+      bool getBool(String name) {
+        final v = getCell(name).toLowerCase();
         return v == 'true' || v == '1' || v == 'نعم';
       }
 
-      double? _double(int idx) => double.tryParse(_cell(idx));
+      double? getDouble(String name) {
+        final val = getCell(name);
+        if (val.isEmpty) return null;
+        return double.tryParse(val.replaceAll(',', '.'));
+      }
 
-      final nameAr = _cell(0);
-      if (nameAr.isEmpty) continue;
+      // ✅ التعديل هنا: القيمة الافتراضية 1، وإذا كانت 0 أو أقل نرجع 1
+      int getInt(String name, {int defaultValue = 1}) {
+        final val = getCell(name);
+        if (val.isEmpty) return defaultValue;
+        final parsed = int.tryParse(val);
+        if (parsed == null || parsed < 1) return defaultValue;
+        return parsed;
+      }
 
-      rows.add({
-        'nameAr': nameAr,
-        'nameEn': _cell(1),
-        'categoryId': _cell(2).isEmpty ? 'other' : _cell(2),
-        'governorate': _cell(3),
-        'city': _cell(4),
-        'address': _cell(5),
-        'latitude': _double(6),
-        'longitude': _double(7),
-        'phone': _cell(8),
-        'website': _cell(9),
-        'description': _cell(10),
-        'tags': _cell(11)
+      final name = getCell('name');
+      final lat = getDouble('latitude');
+      final lng = getDouble('longitude');
+
+      if (name.isEmpty) {
+        errors.add('السطر ${i + 1}: اسم المكان مفقود.');
+        continue;
+      }
+      if (lat == null || lng == null || lat == 0.0 || lng == 0.0) {
+        errors.add(
+            '"$name" (السطر ${i + 1}): إحداثيات خط الطول أو العرض مفقودة.');
+        continue;
+      }
+
+      validPlaces.add({
+        'name': name,
+        'name_en': getCell('name_en'),
+        'description': getCell('description'),
+        'category': getCell('category'),
+        'categoryId':
+            getCell('categoryid').isEmpty ? 'other' : getCell('categoryid'),
+        'governorate': getCell('governorate'),
+        'geoZoneName': getCell('geozonename'),
+        'address': getCell('address'),
+        'map_url': getCell('map_url'),
+        'phone': getCell('phone'),
+        'website': getCell('website'),
+        'email': getCell('email'),
+        'facebook': getCell('facebook'),
+        'priceLevel': getInt('pricelevel'), // ✅ سيتم قراءتها بأمان
+        'hasWifi': getBool('haswifi'),
+        'hasParking': getBool('hasparking'),
+        'hasRestroom': getBool('hasrestroom'),
+        'hasAccessibility': getBool('hasaccessibility'),
+        'isFamilyFriendly': getBool('isfamilyfriendly'),
+        'hasShade': getBool('hasshade'),
+        'hasDelivery': getBool('hasdelivery'),
+        'hasReservation': getBool('hasreservation'),
+        'tags': getCell('tags')
             .split(',')
             .map((e) => e.trim())
             .where((e) => e.isNotEmpty)
             .toList(),
-        'hasWifi': _bool(12),
-        'hasParking': _bool(13),
-        'hasRestroom': _bool(14),
-        'hasAccessibility': _bool(15),
-        'isFamilyFriendly': _bool(16),
-        'isHalal': _bool(17),
-        'hasDelivery': _bool(18),
-        'hasReservation': _bool(19),
-        'isApproved': _bool(20),
-        'isActive': _bool(21),
-        'addedBy': _cell(22).isEmpty ? 'admin' : _cell(22),
+        'latitude': lat,
+        'longitude': lng,
+        'is_active': getBool('is_active'),
+        'isApproved': true,
+        'addedBy': 'admin',
       });
     }
-    return rows;
+    return ParseResult(validPlaces: validPlaces, errors: errors);
   }
 
   Future<ExcelImportResult> uploadToFirestore(
@@ -96,39 +239,47 @@ class ExcelImportService {
       final chunk = rows.sublist(start, end);
       final batch = _db.batch();
 
+      int chunkSuccess = 0;
+
       for (final row in chunk) {
         try {
-          final lat = row['latitude'] as double?;
-          final lng = row['longitude'] as double?;
-          if (lat == null || lng == null) {
-            errors.add('${row['nameAr']}: إحداثيات مفقودة');
-            fail++;
-            continue;
-          }
+          final lat = row['latitude'] as double? ?? 0.0;
+          final lng = row['longitude'] as double? ?? 0.0;
 
           final docRef = _db.collection('places').doc();
+
           final docData = Map<String, dynamic>.from(row)
             ..remove('latitude')
             ..remove('longitude')
             ..['location'] = GeoPoint(lat, lng)
+            ..['latitude'] = lat
+            ..['longitude'] = lng
             ..['geohash'] = _encodeGeohash(lat, lng)
             ..['averageRating'] = 0.0
             ..['reviewCount'] = 0
             ..['imageUrls'] = <String>[]
-            ..['createdAt'] = FieldValue.serverTimestamp()
+            ..['created_at'] = FieldValue.serverTimestamp()
             ..['updatedAt'] = FieldValue.serverTimestamp();
 
           batch.set(docRef, docData);
-          success++;
+          chunkSuccess++;
         } catch (e) {
-          errors.add('${row['nameAr']}: $e');
+          errors.add('${row['name']}: $e');
           fail++;
         }
       }
-      await batch.commit();
+
+      if (chunkSuccess > 0) {
+        try {
+          await batch.commit();
+          success += chunkSuccess;
+        } catch (e) {
+          fail += chunkSuccess;
+          errors.add('فشل حفظ الدفعة: $e');
+        }
+      }
       onProgress?.call(end, rows.length);
     }
-
     return ExcelImportResult(
         successCount: success, failCount: fail, errors: errors);
   }

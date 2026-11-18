@@ -116,7 +116,6 @@ class NotificationsController extends ChangeNotifier {
   Future<void> markAsRead(String notificationId) async {
     if (_userId == null) return;
 
-    // البحث عن الإشعار لمعرفة نوعه
     AppNotification? notif;
     try {
       notif = _rawNotifications.firstWhere((n) => n.id == notificationId);

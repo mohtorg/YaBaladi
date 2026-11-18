@@ -1,153 +1,143 @@
 // lib/features/filters/controllers/filters_controller.dart
-//
-// [Wave 11 — Filters System] — 2026-10-25
-// [v11.1 — 2026-10-25] — FIX: add load() + dispose() for main.dart wiring
-//   - NEW: load() subscribes to Firestore stream + auto-calls bindStream
-//   - NEW: dispose() cancels subscription (prevents memory leak)
-//   - KEPT: full existing API (bindStream, visibleFor, selection, CRUD)
+// [v2.2.0 — 2026-11-12] — RESTORED LEGACY FIELDS & METHODS:
+//   - Re-added `selection`, `currentRole`, `visibleFor`, `replaceSelection`, `clearSelection`.
+//   - Kept category-aware helpers (`applicableFiltersFor`, etc.) and `load()`.
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/filter_definition.dart';
-import '../../../repositories/filters_repository.dart';
 
 class FiltersController extends ChangeNotifier {
-  final FiltersRepository _repo;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  FiltersController({FiltersRepository? repository})
-      : _repo = repository ?? FiltersRepository();
-
-  List<FilterDefinition> _all = const [];
-  List<FilterDefinition> _active = const [];
+  List<FilterDefinition> _all = [];
   bool _loading = true;
   String? _error;
+  StreamSubscription<QuerySnapshot>? _subscription;
 
+  // ─── State (Legacy - for UI) ───
   Map<String, FilterSelection> _selection = {};
   String _currentRole = 'user';
 
-  StreamSubscription<List<FilterDefinition>>? _subscription;
-
-  // ─── Getters ───
+  // ─── Getters (Core) ───
   List<FilterDefinition> get all => _all;
-  List<FilterDefinition> get active => _active;
   bool get loading => _loading;
   String? get error => _error;
+  Map<String, FilterSelection> get selection => _selection;
   String get currentRole => _currentRole;
-  Map<String, FilterSelection> get selection => Map.unmodifiable(_selection);
-  int get activeCount => _selection.values.where((s) => s.isNotEmpty).length;
 
-  // ─── Stream ───
-  Stream<List<FilterDefinition>> get stream => _repo.watchAll();
-
-  /// [v11.1] Subscribe to Firestore stream — called from main.dart:
-  ///   ChangeNotifierProvider(create: (_) => FiltersController()..load())
-  void load() {
-    _subscription?.cancel();
-    _loading = true;
-    notifyListeners();
-
-    _subscription = _repo.watchAll().listen(
-      (filters) => bindStream(filters),
-      onError: (Object e) {
-        _error = e.toString();
-        _loading = false;
-        notifyListeners();
-      },
-    );
+  // ─── Getters (Category-Aware) ───
+  List<FilterDefinition> get generalFilters {
+    return _all.where((f) => f.categoryId == null).toList();
   }
 
-  void bindStream(List<FilterDefinition> filters) {
-    _all = filters;
-    _active = filters.where((f) => f.isActive).toList();
-    _loading = false;
-    _error = null;
-    notifyListeners();
+  List<FilterDefinition> filtersForCategory(String categoryId) {
+    return _all.where((f) => f.categoryId == categoryId).toList();
   }
 
-  void setRole(String role) {
-    if (_currentRole == role) return;
-    _currentRole = role;
-    notifyListeners();
+  List<FilterDefinition> applicableFiltersFor(String categoryId) {
+    return _all
+        .where((f) => f.categoryId == null || f.categoryId == categoryId)
+        .toList();
   }
 
-  // ─── Visibility (RBAC) ───
+  // ─── Getters (Role-Aware) ───
   List<FilterDefinition> visibleFor(String role) {
-    return _active.where((f) {
-      if (f.rolesAllowed.isEmpty) return true;
-      return f.rolesAllowed.contains(role);
-    }).toList();
+    return _all
+        .where((f) => f.isActive && f.rolesAllowed.contains(role))
+        .toList();
   }
 
-  // ─── Selection ───
-  FilterSelection selectionFor(String filterId) =>
-      _selection[filterId] ?? FilterSelection.empty;
-
-  void toggle(String filterId, String value) {
-    final current = _selection[filterId] ?? FilterSelection.empty;
-    final next = Set<String>.from(current.values);
-    if (next.contains(value)) {
-      next.remove(value);
-    } else {
-      next.add(value);
+  // ─── Mutators ───
+  void setRole(String role) {
+    if (_currentRole != role) {
+      _currentRole = role;
+      notifyListeners();
     }
-    _selection = {..._selection, filterId: FilterSelection(next)};
+  }
+
+  void replaceSelection(Map<String, FilterSelection> newSelection) {
+    _selection = Map.from(newSelection);
     notifyListeners();
   }
 
-  void setSingle(String filterId, String? value) {
-    if (value == null) {
-      _selection.remove(filterId);
-    } else {
-      _selection = {
-        ..._selection,
-        filterId: FilterSelection({value})
-      };
-    }
-    notifyListeners();
-  }
-
-  void clearFilter(String filterId) {
-    _selection.remove(filterId);
-    notifyListeners();
-  }
-
-  void clearAll() {
+  void clearSelection() {
     _selection = {};
     notifyListeners();
   }
 
-  void replaceSelection(Map<String, FilterSelection> next) {
-    _selection = Map.from(next);
-    notifyListeners();
+  // ─── Lifecycle ───
+  FiltersController() {
+    _init();
   }
 
-  Map<String, FilterSelection> toPlaceFilters() => Map.from(_selection);
-
-  // ─── CRUD (Admin) ───
-  Future<void> create(FilterDefinition filter) async {
-    await _repo.create(filter.id, filter);
-    notifyListeners();
+  void load() {
+    _init();
   }
 
-  Future<void> update(String id, FilterDefinition filter) async {
-    await _repo.update(id, filter.toMap());
+  void _init() {
+    _subscription?.cancel();
+    _loading = true;
+    _error = null;
     notifyListeners();
-  }
 
-  Future<void> toggleActive(String id, bool isActive) async {
-    await _repo.update(id, {'isActive': isActive});
-    notifyListeners();
-  }
-
-  Future<void> delete(String id) async {
-    await _repo.delete(id);
-    notifyListeners();
+    _subscription =
+        _firestore.collection('filters').orderBy('order').snapshots().listen(
+      (snapshot) {
+        _all = snapshot.docs
+            .map((doc) => FilterDefinition.fromFirestore(doc))
+            .toList();
+        _loading = false;
+        _error = null;
+        notifyListeners();
+      },
+      onError: (e) {
+        _loading = false;
+        _error = e.toString();
+        notifyListeners();
+      },
+    );
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
     super.dispose();
+  }
+
+  // ─── CRUD Operations ───
+  Future<void> create(FilterDefinition filter) async {
+    try {
+      await _firestore.collection('filters').doc(filter.id).set(filter.toMap());
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> update(String id, FilterDefinition filter) async {
+    try {
+      await _firestore.collection('filters').doc(id).update(filter.toMap());
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> delete(String id) async {
+    try {
+      await _firestore.collection('filters').doc(id).delete();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> toggleActive(String id, bool isActive) async {
+    try {
+      await _firestore.collection('filters').doc(id).update({
+        'isActive': isActive,
+      });
+    } catch (e) {
+      rethrow;
+    }
   }
 }

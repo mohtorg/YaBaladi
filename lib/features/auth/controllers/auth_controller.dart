@@ -1,36 +1,21 @@
 // lib/features/auth/controllers/auth_controller.dart
-//
-// [v4.7 — 2026-10-29] — FIX (مراجعة وتصويب، بدون تغيير الواجهة العامة):
-//   - الدور: استعمال roleFromCode بدل UserRole.values.firstWhere؛ كان 'user' المخزَّن في
-//     Firestore لا يطابق أي اسم في التعداد (member) فيتحول كل مستخدم إلى visitor.
-//   - رسائل الأخطاء: تحويل رموز FirebaseAuthException إلى رسائل عربية مناسبة
-//     (لم تعد كل أخطاء Google تعرض «تأكد من بصمة التطبيق»).
-//   - إلغاء المستخدم لنافذة Google (popup-closed-by-user وغيرها) يُعاد كـ AuthResult.cancelled
-//     برسالة محايدة، وبقي الحقل error غير null حتى لا ينهار أي مستدعٍ يقرؤه.
-//   - _listenToMerchantPlace: لم يعد يُعاد الاشتراك عند كل تحديث لمستند المستخدم + معالجة الأخطاء.
-//   - deleteAccount: إعادة مصادقة مستخدم Google عند الحاجة، وحذف مستند users/{uid}، ورسائل واضحة.
-//   - قص (trim) البريد الإلكتروني في تسجيل الدخول والتسجيل واستعادة كلمة المرور.
-//   - isMerchant/isAdmin/isModerator: مقارنة بالتعداد بدل مقارنة النصوص.
-// [v4.6 — 2026-10-29] — LINT FIX: remove redundant material.dart import.
-//   foundation.dart already exports ChangeNotifier, debugPrint, kIsWeb.
-// [v4.5 — 2026-10-28] — FIX: Remove google_sign_in package, use Firebase signInWithProvider
+// [v5.2.3 — 2026-11-15] — LINTER FIX: Added curly braces to all `if` statements.
+// [v5.2.2 — 2026-11-15] — FIX: Guarantee Firestore doc deletion before Auth deletion.
+// [v5.2.1 — 2026-11-15] — FIX: Handle Google re-authentication for account deletion.
+// [v5.2.0 — 2026-11-15] — AUTO-CREATE USER DOC
 
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart'; // ChangeNotifier + debugPrint + kIsWeb
+import 'package:flutter/foundation.dart';
 
 import '../../../core/auth/role.dart';
 
 enum AuthStatus { loading, authenticated, unauthenticated }
 
-// ═══════════════════════════════════════════════════════════════
-// Error messages (Arabic)
-// ═══════════════════════════════════════════════════════════════
-
 const String _networkMessage = 'لا يوجد اتصال بالإنترنت أو حدث خطأ غير متوقع.';
+const String _bannedMessage = 'عذراً، هذا الحساب محظور. يرجى التواصل مع الدعم.';
 
-/// رموز تعني أن المستخدم أغلق نافذة تسجيل الدخول أو ألغاها.
 const Set<String> _cancelCodes = {
   'popup-closed-by-user',
   'cancelled-popup-request',
@@ -39,7 +24,6 @@ const Set<String> _cancelCodes = {
   'web-context-cancelled',
 };
 
-/// رسائل عامة لأخطاء المصادقة (بريد/كلمة مرور وغيرها).
 String _authErrorMessage(FirebaseAuthException e) {
   switch (e.code) {
     case 'invalid-email':
@@ -68,31 +52,28 @@ String _authErrorMessage(FirebaseAuthException e) {
   }
 }
 
-/// رسائل خاصة بتسجيل الدخول عبر Google.
 String _googleErrorMessage(FirebaseAuthException e) {
   switch (e.code) {
     case 'network-request-failed':
-      return 'لا يوجد اتصال بالإنترنت. تحقق من الشبكة وأعد المحاولة.';
+      return 'لا يوجد اتصال بالإنترنت.';
     case 'popup-blocked':
-      return 'المتصفح منع نافذة تسجيل الدخول. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.';
+      return 'المتصفح منع نافذة تسجيل الدخول.';
     case 'unauthorized-domain':
-      return 'هذا النطاق غير مصرَّح به في Firebase (Authentication ← Authorized domains).';
+      return 'هذا النطاق غير مصرَّح به في Firebase.';
     case 'operation-not-allowed':
-      return 'تسجيل الدخول بـ Google غير مفعّل في Firebase (Authentication ← Sign-in method).';
+      return 'تسجيل الدخول بـ Google غير مفعّل في Firebase.';
     case 'account-exists-with-different-credential':
-      return 'هذا البريد مسجَّل بطريقة أخرى. سجّل الدخول بالطريقة الأصلية، '
-          'ثم اربط Google من الإعدادات.';
+      return 'هذا البريد مسجَّل بطريقة أخرى.';
     case 'user-disabled':
-      return 'هذا الحساب موقوف. تواصل مع الدعم.';
+      return 'هذا الحساب موقوف.';
     case 'too-many-requests':
-      return 'محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.';
+      return 'محاولات كثيرة. انتظر قليلاً.';
     case 'invalid-app-info':
     case 'developer-error':
     case 'app-not-authorized':
     case 'invalid-api-key':
     case 'internal-error':
-      return 'تعذر تسجيل الدخول بـ Google (كود: ${e.code}).\n'
-          'تأكد من بصمة التطبيق (SHA-1 / SHA-256) وملف google-services.json في Firebase.';
+      return 'تعذر تسجيل الدخول بـ Google (كود: ${e.code}).';
     default:
       return 'تعذر تسجيل الدخول بـ Google (كود: ${e.code}).';
   }
@@ -109,18 +90,14 @@ class AuthController extends ChangeNotifier {
   bool _isGuest = false;
   bool _isDisposed = false;
   bool _isLoading = false;
-
   bool _isRoleReady = false;
-  bool get isRoleReady => _isRoleReady;
 
+  bool get isRoleReady => _isRoleReady;
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _placeSubscription;
-
-  /// الـ uid الذي يُستمع حالياً لمكانه (لتفادي إعادة الاشتراك بلا داعٍ).
   String? _placeListenUid;
 
-  // ─── Getters ───
   AuthStatus get status => _status;
   User? get user => _user;
   UserRole get role => _role;
@@ -134,7 +111,12 @@ class AuthController extends ChangeNotifier {
   bool get hasPlace => _placeId != null;
   String? get placeId => _placeId;
   String get uid => _user?.uid ?? '';
-  String get displayName => _user?.displayName ?? 'مستخدم';
+
+  String get displayName {
+    final dn = _user?.displayName;
+    return (dn == null || dn.isEmpty) ? 'مستخدم' : dn;
+  }
+
   String? get photoUrl => _user?.photoURL;
 
   bool get hasPasswordProvider =>
@@ -147,27 +129,63 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    _authSubscription = _auth.authStateChanges().listen((User? user) {
-      if (user == null) {
-        _setUnauthenticated();
-      } else {
-        _user = user;
-        _status = AuthStatus.authenticated;
-        _isGuest = false;
-        _isRoleReady = false;
-        _listenToUserRole(user.uid);
-        _safeNotify();
+    _authSubscription = _auth.authStateChanges().listen(
+      (User? user) async {
+        if (user == null) {
+          await Future.delayed(const Duration(milliseconds: 2500));
+          if (_isDisposed) {
+            return;
+          }
+          if (_auth.currentUser == null) {
+            _setUnauthenticated();
+          }
+        } else {
+          _user = user;
+          await _ensureUserDocExists(user);
+          _status = AuthStatus.authenticated;
+          _isGuest = false;
+          _isRoleReady = false;
+          _listenToUserRole(user.uid);
+          _safeNotify();
+        }
+      },
+      onError: (Object e) => debugPrint('AuthController auth stream error: $e'),
+    );
+  }
+
+  Future<void> _ensureUserDocExists(User user) async {
+    try {
+      final docRef = _db.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+      if (!doc.exists) {
+        await docRef.set({
+          'uid': user.uid,
+          'email': user.email,
+          'name': user.displayName ?? 'مستخدم',
+          'role': 'user',
+          'isBanned': false,
+          'publishedRatingsCount': 0,
+          'trustScore': 0.0,
+          'hasConfirmedReports': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
-    });
+    } catch (e) {
+      debugPrint('AuthController _ensureUserDocExists error: $e');
+    }
   }
 
   void _listenToUserRole(String uid) {
     _userSubscription?.cancel();
     _userSubscription =
-        _db.collection('users').doc(uid).snapshots().listen((doc) {
+        _db.collection('users').doc(uid).snapshots().listen((doc) async {
       if (doc.exists) {
         final data = doc.data() ?? {};
-        // roleFromCode يقبل 'user' كمرادف لـ member، ويعيد member لأي قيمة غير معروفة.
+        if (data['isBanned'] == true) {
+          await _auth.signOut();
+          _setUnauthenticated();
+          return;
+        }
         final newRole = roleFromCode(data['role'] as String?);
         if (_role != newRole) {
           _role = newRole;
@@ -181,13 +199,19 @@ class AuthController extends ChangeNotifier {
         _role = UserRole.values.first;
         _stopMerchantPlaceListener();
       }
-      _isRoleReady = true;
-      _safeNotify();
-    }, onError: (Object e) {
+      await Future.delayed(const Duration(milliseconds: 2500));
+      if (_user?.uid == uid) {
+        _isRoleReady = true;
+        _safeNotify();
+      }
+    }, onError: (Object e) async {
       debugPrint('AuthController role stream error: $e');
       _role = UserRole.values.first;
-      _isRoleReady = true;
-      _safeNotify();
+      await Future.delayed(const Duration(milliseconds: 2500));
+      if (_user?.uid == uid) {
+        _isRoleReady = true;
+        _safeNotify();
+      }
     });
   }
 
@@ -199,9 +223,9 @@ class AuthController extends ChangeNotifier {
   }
 
   void _listenToMerchantPlace(String uid) {
-    // اشتراك قائم لنفس المستخدم: لا حاجة لإعادته عند كل تحديث لمستند المستخدم.
-    if (_placeSubscription != null && _placeListenUid == uid) return;
-
+    if (_placeSubscription != null && _placeListenUid == uid) {
+      return;
+    }
     _placeSubscription?.cancel();
     _placeListenUid = uid;
     _placeSubscription = _db
@@ -222,15 +246,19 @@ class AuthController extends ChangeNotifier {
           _safeNotify();
         }
       }
-    }, onError: (Object e) {
-      debugPrint('AuthController place stream error: $e');
-    });
+    },
+            onError: (Object e) =>
+                debugPrint('AuthController place stream error: $e'));
   }
 
   void continueAsGuest() {
+    _userSubscription?.cancel();
+    _userSubscription = null;
+    _stopMerchantPlaceListener();
     _status = AuthStatus.unauthenticated;
     _isGuest = true;
     _user = null;
+    _role = UserRole.values.first;
     _isRoleReady = true;
     _safeNotify();
   }
@@ -240,8 +268,16 @@ class AuthController extends ChangeNotifier {
     _isLoading = true;
     _safeNotify();
     try {
-      await _auth.signInWithEmailAndPassword(
+      final cred = await _auth.signInWithEmailAndPassword(
           email: email.trim(), password: password);
+      if (cred.user != null) {
+        await _ensureUserDocExists(cred.user!);
+        final doc = await _db.collection('users').doc(cred.user!.uid).get();
+        if (doc.exists && doc.data()?['isBanned'] == true) {
+          await _auth.signOut();
+          return AuthResult.failure(_bannedMessage);
+        }
+      }
       _isGuest = false;
       return AuthResult.success();
     } on FirebaseAuthException catch (e) {
@@ -261,20 +297,37 @@ class AuthController extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _safeNotify();
+    UserCredential? cred;
     try {
       final cleanEmail = email.trim();
-      final cred = await _auth.createUserWithEmailAndPassword(
+      cred = await _auth.createUserWithEmailAndPassword(
           email: cleanEmail, password: password);
-      await cred.user?.updateDisplayName(displayName);
-      if (cred.user != null) {
-        await _db.collection('users').doc(cred.user!.uid).set({
-          'uid': cred.user!.uid,
-          'email': cleanEmail,
-          'name': displayName,
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      try {
+        await cred.user?.updateDisplayName(displayName);
+        if (cred.user != null) {
+          await _db.collection('users').doc(cred.user!.uid).set({
+            'uid': cred.user!.uid,
+            'email': cleanEmail,
+            'name': displayName,
+            'role': 'user',
+            'isBanned': false,
+            'publishedRatingsCount': 0,
+            'trustScore': 0.0,
+            'hasConfirmedReports': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        debugPrint('❌ Firestore write failed, rolling back: $e');
+        try {
+          await cred.user?.delete();
+        } catch (rollbackErr) {
+          debugPrint('⚠️ Rollback failed: $rollbackErr');
+        }
+        return AuthResult.failure(
+            'تعذر إنشاء مستند المستخدم. تحقق من الاتصال وأعد المحاولة.');
       }
+      _isGuest = false;
       return AuthResult.success();
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_authErrorMessage(e));
@@ -302,35 +355,43 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ✅ الطريقة الأصلية لـ Firebase (بدون google_sign_in package)
   Future<AuthResult> signInWithGoogle() async {
     _isLoading = true;
     _safeNotify();
     try {
       final GoogleAuthProvider googleProvider = GoogleAuthProvider();
       googleProvider.setCustomParameters({'prompt': 'select_account'});
-
       final UserCredential userCredential;
       if (kIsWeb) {
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
         userCredential = await _auth.signInWithProvider(googleProvider);
       }
-
       final user = userCredential.user;
       _isGuest = false;
-
       if (user != null) {
-        final docRef = _db.collection('users').doc(user.uid);
-        final doc = await docRef.get();
-        if (!doc.exists) {
-          await docRef.set({
-            'uid': user.uid,
-            'email': user.email,
-            'name': user.displayName ?? 'مستخدم',
-            'role': 'user',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+        try {
+          final docRef = _db.collection('users').doc(user.uid);
+          final doc = await docRef.get();
+          if (doc.exists && doc.data()?['isBanned'] == true) {
+            await _auth.signOut();
+            return AuthResult.failure(_bannedMessage);
+          }
+          if (!doc.exists) {
+            await docRef.set({
+              'uid': user.uid,
+              'email': user.email,
+              'name': user.displayName ?? 'مستخدم',
+              'role': 'user',
+              'isBanned': false,
+              'publishedRatingsCount': 0,
+              'trustScore': 0.0,
+              'hasConfirmedReports': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (e) {
+          debugPrint('⚠️ Firestore user doc sync failed (continuing): $e');
         }
       }
       return AuthResult.success();
@@ -338,12 +399,8 @@ class AuthController extends ChangeNotifier {
       debugPrint(
           'FirebaseAuthException in Google Sign In: ${e.code} - ${e.message}');
       if (_cancelCodes.contains(e.code)) {
-        // نافذة Google أُغلقت قبل الاكتمال (من المستخدم، أو لعدم وجود اتصال،
-        // أو لأن المتصفح منعها): ليست خطأ في إعدادات التطبيق.
         return AuthResult.cancelled(
-          'لم يكتمل تسجيل الدخول. تأكد من الاتصال بالإنترنت ومن السماح '
-          'بالنوافذ المنبثقة، ثم أعد المحاولة.',
-        );
+            'لم يكتمل تسجيل الدخول. تأكد من الاتصال بالإنترنت.');
       }
       return AuthResult.failure(_googleErrorMessage(e));
     } catch (e) {
@@ -366,17 +423,24 @@ class AuthController extends ChangeNotifier {
       return AuthResult.failure('لا يوجد مستخدم مسجل الدخول.');
     }
 
+    _isLoading = true;
+    _safeNotify();
+
     try {
       final email = user.email;
       final hasGoogle =
           user.providerData.any((p) => p.providerId == 'google.com');
+      final hasPassword =
+          user.providerData.any((p) => p.providerId == 'password');
 
-      if (password != null && email != null) {
+      if (hasPassword &&
+          password != null &&
+          password.isNotEmpty &&
+          email != null) {
         final cred =
             EmailAuthProvider.credential(email: email, password: password);
         await user.reauthenticateWithCredential(cred);
       } else if (hasGoogle) {
-        // مستخدم Google: نعيد المصادقة إلا إذا كان دخوله حديثاً جداً.
         final last = user.metadata.lastSignInTime;
         final recent =
             last != null && DateTime.now().difference(last).inMinutes < 4;
@@ -391,11 +455,14 @@ class AuthController extends ChangeNotifier {
         }
       }
 
-      // حذف مستند المستخدم قبل حذف حساب Auth (القواعد تتطلب أن يكون المستخدم مسجلاً).
       try {
         await _db.collection('users').doc(user.uid).delete();
+        debugPrint('✅ User Firestore document deleted successfully.');
       } catch (e) {
-        debugPrint('AuthController: users doc delete failed (continuing): $e');
+        debugPrint('❌ Failed to delete Firestore document: $e');
+        return AuthResult.failure(
+          'تعذر حذف بيانات المستخدم من قاعدة البيانات. يرجى المحاولة مرة أخرى أو التواصل مع الدعم.',
+        );
       }
 
       await user.delete();
@@ -405,10 +472,17 @@ class AuthController extends ChangeNotifier {
       if (_cancelCodes.contains(e.code)) {
         return AuthResult.cancelled('أُلغيت عملية التحقق. لم يُحذف الحساب.');
       }
+      if (e.code == 'requires-recent-login') {
+        return AuthResult.failure(
+            'انتهت الجلسة. يرجى إعادة تسجيل الدخول والمحاولة مجدداً.');
+      }
       return AuthResult.failure(_authErrorMessage(e));
     } catch (e) {
       debugPrint('AuthController deleteAccount error: $e');
       return AuthResult.failure('تعذر حذف الحساب. أعد المحاولة.');
+    } finally {
+      _isLoading = false;
+      _safeNotify();
     }
   }
 
@@ -417,13 +491,15 @@ class AuthController extends ChangeNotifier {
     _stopMerchantPlaceListener();
     _user = null;
     _status = AuthStatus.unauthenticated;
-    _isGuest = false;
+    _role = UserRole.values.first;
     _isRoleReady = true;
     _safeNotify();
   }
 
   void _safeNotify() {
-    if (!_isDisposed) notifyListeners();
+    if (!_isDisposed) {
+      notifyListeners();
+    }
   }
 
   @override
@@ -444,10 +520,10 @@ class AuthResult {
   AuthResult._({required this.isSuccess, this.isCancelled = false, this.error});
 
   factory AuthResult.success() => AuthResult._(isSuccess: true);
+
   factory AuthResult.failure(String error) =>
       AuthResult._(isSuccess: false, error: error);
 
-  /// إلغاء من المستخدم؛ [message] رسالة محايدة تُعرض إن لم يعالج المستدعي الإلغاء.
   factory AuthResult.cancelled([String? message]) => AuthResult._(
         isSuccess: false,
         isCancelled: true,

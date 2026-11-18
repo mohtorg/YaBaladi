@@ -1,3 +1,4 @@
+// lib/features/notifications/models/notification_model.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -9,7 +10,29 @@ enum NotificationType {
   merchantRejected,
   newOffer,
   newReview,
-  systemAnnouncement,
+  systemAnnouncement;
+
+  // ✅ إضافة: دالة لترجمة اسم الإشعار إلى العربية الفصحى
+  String get arabicLabel {
+    switch (this) {
+      case NotificationType.placeBlocked:
+        return 'حظر نشاط تجاري';
+      case NotificationType.placeUnblocked:
+        return 'فك حظر نشاط';
+      case NotificationType.supportReply:
+        return 'رد من الدعم الفني';
+      case NotificationType.merchantApproved:
+        return 'الموافقة على طلب تاجر';
+      case NotificationType.merchantRejected:
+        return 'رفض طلب تاجر';
+      case NotificationType.newOffer:
+        return 'عرض أو خصم جديد';
+      case NotificationType.newReview:
+        return 'تقييم جديد';
+      case NotificationType.systemAnnouncement:
+        return 'إعلان عام للنظام';
+    }
+  }
 }
 
 class AppNotification {
@@ -49,7 +72,6 @@ class AppNotification {
     );
   }
 
-  /// ✅ جديد: لإنشاء نسخة معدلة (لأغراض حالة القراءة الشخصية)
   AppNotification copyWith({bool? isRead}) => AppNotification(
         id: id,
         userId: userId,

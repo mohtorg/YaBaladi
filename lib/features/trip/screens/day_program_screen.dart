@@ -1,7 +1,11 @@
 // lib/features/trip/screens/day_program_screen.dart
 //
-// [v2.0 — 2026-10-18] — Wave 3.3: Progress Persistence
-//   NOTE: لا يستخدم url_launcher (خلافاً لـ active_stop_screen)
+// [v3.0 - DARK THEME CONSISTENCY]
+//   - UPDATED: Dark theme (#0F172A) matching Planner/Overview/ActiveStop.
+//   - UPDATED: Glassmorphism timeline cards with subtle borders.
+//   - UPDATED: Animated progress bar and visited state transitions.
+//   - FIXED: Timeline connector now visible on dark background.
+//   - KEPT: All progress tracking, reset logic, and stop navigation.
 
 import 'package:flutter/material.dart';
 
@@ -61,15 +65,20 @@ class _DayProgramScreenState extends State<DayProgramScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('إعادة تعيين؟'),
-        content: const Text('سيتم مسح علامات الزيارة. متابعة؟'),
+        backgroundColor: const Color(0xFF1E293B),
+        title:
+            const Text('إعادة تعيين؟', style: TextStyle(color: Colors.white)),
+        content: const Text('سيتم مسح علامات الزيارة. متابعة؟',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
             child: const Text('إعادة تعيين'),
           ),
         ],
@@ -100,110 +109,162 @@ class _DayProgramScreenState extends State<DayProgramScreen> {
   Widget build(BuildContext context) {
     if (!_loaded) {
       return Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
           title: Text(
             'برنامج اليوم ${widget.dayIndex + 1}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
         ),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(
+            child: CircularProgressIndicator(color: Color(0xFF0EA5E9))),
       );
     }
 
-    final theme = Theme.of(context);
     final stops = widget.dayStops;
     final progressValue = stops.isEmpty ? 0.0 : _visitedCount / stops.length;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           'برنامج اليوم ${widget.dayIndex + 1}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.restart_alt),
+            icon: const Icon(Icons.restart_alt, color: Colors.white70),
             tooltip: 'إعادة تعيين التقدم',
             onPressed: _visitedPlaceIds.isEmpty ? null : _resetProgress,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          LinearProgressIndicator(
-            value: progressValue,
-            minHeight: 6,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  _allVisited ? Icons.celebration : Icons.timeline,
-                  color: _allVisited ? Colors.green : theme.colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _allVisited
-                        ? '🎉 أكملت كل محطات اليوم!'
-                        : 'أنجزت $_visitedCount من ${stops.length} محطات',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: _allVisited ? Colors.green : null,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ─── Progress Bar ───
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _allVisited
+                              ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                              : const Color(0xFF0EA5E9).withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _allVisited ? Icons.emoji_events : Icons.timeline,
+                          color: _allVisited
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF0EA5E9),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _allVisited
+                              ? 'أكملت كل محطات اليوم!'
+                              : 'أنجزت $_visitedCount من ${stops.length} محطات',
+                          style: TextStyle(
+                            color: _allVisited
+                                ? const Color(0xFF10B981)
+                                : Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _allVisited
+                              ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$_visitedCount / ${stops.length}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _allVisited
+                                ? const Color(0xFF10B981)
+                                : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: progressValue),
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          minHeight: 8,
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _allVisited
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF0EA5E9),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _allVisited
-                        ? Colors.green.withValues(alpha: 0.15)
-                        : theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$_visitedCount / ${stops.length}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _allVisited
-                          ? Colors.green
-                          : theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: stops.length,
-              itemBuilder: (context, index) {
-                final stop = stops[index];
-                final isVisited = _visitedPlaceIds.contains(stop.placeId);
-                return _TimelineStopCard(
-                  stop: stop,
-                  index: index,
-                  isLast: index == stops.length - 1,
-                  isVisited: isVisited,
-                  onGo: () => _openStop(stop),
-                );
-              },
+
+            // ─── Stops List ───
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                itemCount: stops.length,
+                itemBuilder: (context, index) {
+                  final stop = stops[index];
+                  final isVisited = _visitedPlaceIds.contains(stop.placeId);
+                  return _TimelineStopCard(
+                    stop: stop,
+                    index: index,
+                    isLast: index == stops.length - 1,
+                    isVisited: isVisited,
+                    onGo: () => _openStop(stop),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// TIMELINE STOP CARD
+// ═══════════════════════════════════════════════════════════════
 
 class _TimelineStopCard extends StatelessWidget {
   const _TimelineStopCard({
@@ -222,22 +283,34 @@ class _TimelineStopCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ─── Timeline Column ───
           SizedBox(
             width: 40,
             child: Column(
               children: [
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: isVisited ? Colors.green : theme.colorScheme.primary,
+                    color: isVisited
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF0EA5E9),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isVisited
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF0EA5E9))
+                            .withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Center(
                     child: isVisited
@@ -254,93 +327,131 @@ class _TimelineStopCard extends StatelessWidget {
                 ),
                 if (!isLast)
                   Expanded(
-                    child: Container(width: 2, color: theme.dividerColor),
+                    child: Container(
+                      width: 2,
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
                   ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
+
+          // ─── Card Content ───
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 24),
-              child: Card(
-                elevation: isVisited ? 0 : 2,
-                color: isVisited
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stop.placeNameAr,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          decoration:
-                              isVisited ? TextDecoration.lineThrough : null,
-                          color: isVisited
-                              ? theme.colorScheme.onSurfaceVariant
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.schedule,
-                              size: 20, color: Colors.blue),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${stop.plannedDurationMin ?? 60} دقيقة',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (!isVisited)
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: onGo,
-                            icon: const Icon(Icons.navigation, size: 24),
-                            label: const Text(
-                              'اذهب إلى هنا',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: theme.colorScheme.primary,
-                            ),
-                          ),
-                        )
-                      else
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle,
-                                  color: Colors.green, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'تمت الزيارة بنجاح',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isVisited
+                      ? Colors.white.withValues(alpha: 0.03)
+                      : Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isVisited
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.15),
                   ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      stop.placeNameAr,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        decoration:
+                            isVisited ? TextDecoration.lineThrough : null,
+                        color: isVisited ? Colors.white54 : Colors.white,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          size: 16,
+                          color: isVisited
+                              ? Colors.white38
+                              : const Color(0xFF0EA5E9),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${stop.plannedDurationMin ?? 60} دقيقة',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isVisited ? Colors.white38 : Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(
+                          Icons.star,
+                          size: 16,
+                          color: Colors.amber
+                              .withValues(alpha: isVisited ? 0.3 : 1),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          stop.rating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isVisited ? Colors.white38 : Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (!isVisited)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: onGo,
+                          icon: const Icon(Icons.navigation, size: 20),
+                          label: const Text('اذهب إلى هنا',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            backgroundColor: const Color(0xFF0EA5E9),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle,
+                                color: Color(0xFF10B981), size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'تمت الزيارة بنجاح',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),

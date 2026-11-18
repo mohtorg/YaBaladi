@@ -1,6 +1,9 @@
 // lib/core/router/app_router.dart
 //
-// [v6.3 — 2026-10-28] — ADD: /notifications route + redirect logic
+// [v6.9.2 — 2026-11-05] — ADDED: Admin bulk import route.
+// [v6.9.1 — 2026-11-05] — HOTFIX: Fixed UserRole.code error by using native .name property.
+// [v6.9 — 2026-11-05] — FIX: Un-trapped Admin (can now browse public app),
+//                        Improved merchant route protection.
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -20,32 +23,37 @@ import '../../features/auth/screens/register_screen.dart';
 import '../../features/admin/screens/admin_dashboard_screen.dart';
 import '../../features/support/controllers/support_tickets_controller.dart';
 import '../../features/support/screens/admin_support_screen.dart';
+// ✅ إضافة استيراد شاشة استيراد الإكسل
+import '../../screens/admin/bulk_import_screen.dart';
 
 // ─── Merchant Routes ───
 import '../../features/merchant/controllers/merchant_application_controller.dart';
 import '../../features/merchant/merchant_shell.dart';
 import '../../features/merchant/screens/merchant_application_screen.dart';
 
+// ─── Legal & About Routes ───
+import '../../features/legal/screens/legal_page_screen.dart';
+import '../../features/about/screens/about_screen.dart';
+
 // ─── User Routes ───
 import '../../features/favorites/favorites_screen.dart';
-import '../../features/notifications/screens/notifications_screen.dart'; // ✅ استيراد جديد
+import '../../features/notifications/screens/notifications_screen.dart';
+import '../../features/places/screens/all_offers_screen.dart';
 import '../../features/places/screens/place_details_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reviews/screens/my_reviews_screen.dart';
 import '../../features/search/screens/explore_screen.dart';
 import '../../features/search/screens/all_categories_screen.dart';
 import '../../features/trip/screens/trip_detailed_screen.dart';
-import '../../features/trip/screens/trip_details_screen.dart';
 import '../../features/trip/screens/trip_place_picker_screen.dart';
 import '../../features/trip/screens/trip_plans_screen.dart';
 import '../../features/trip/screens/trip_bag_screen.dart';
-import '../../features/trip/screens/wizard/wizard_container_screen.dart';
+import '../../features/trip/screens/trip_planner_screen.dart';
 import '../../models/trip_plan.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/main_shell.dart';
 import '../../screens/settings_screen.dart';
 
-// ✅ دالة آمنة للتحقق من المسار
 String? _safeFrom(String? from) {
   if (from == null || from.isEmpty) return null;
   if (!from.startsWith('/') || from.startsWith('//')) return null;
@@ -69,18 +77,20 @@ GoRouter createAppRouter(AuthController auth) {
     refreshListenable: auth,
     redirect: (context, state) {
       final status = auth.status;
-      final roleName = auth.role.toString().split('.').last;
+
+      // ✅ الحل: استخدام الخاصية المدمجة .name للـ Enum (لا تحتاج لاستيراد extension)
+      final roleCode = auth.role.name;
+
       final location = state.uri.path;
       final isRoleReady = auth.isRoleReady;
       final isSplash = location == '/splash';
 
-      // 1. إذا لم ينته التحميل أو الدور لم يجهز → ابقَ على splash
+      // 1. حالة التحميل: اذهب للسبلاش
       if (status == AuthStatus.loading || !isRoleReady) {
         if (!isSplash) return '/splash';
         return null;
       }
 
-      // 2. الدور جاهز الآن → وجّه حسب الحالة
       final isAuthPage = location == '/login' ||
           location == '/register' ||
           location == '/forgot-password';
@@ -88,11 +98,11 @@ GoRouter createAppRouter(AuthController auth) {
       final isMerchantApplyRoute = location == '/merchant/apply';
       final isMerchantDashboardRoute =
           location.startsWith('/merchant') && !isMerchantApplyRoute;
-      final isNotificationsRoute = location == '/notifications'; // ✅ جديد
+      final isNotificationsRoute = location == '/notifications';
 
-      final isStaff = roleName == 'admin' || roleName == 'moderator';
+      final isStaff = roleCode == 'admin' || roleCode == 'moderator';
 
-      // ─── غير مسجل ───
+      // 2. غير مسجل الدخول: يمنع الوصول للمسارات المحمية
       if (status == AuthStatus.unauthenticated) {
         if (isSplash) return '/login';
         if (isAdminRoute ||
@@ -104,29 +114,31 @@ GoRouter createAppRouter(AuthController auth) {
         return null;
       }
 
-      // ─── مسجل ───
+      // 3. مسجل الدخول
       if (status == AuthStatus.authenticated) {
+        // التوجيه الأولي بعد السبلاش
         if (isSplash) {
           if (isStaff) return '/admin';
-          if (roleName == 'merchant') return '/merchant/dashboard';
+          if (roleCode == 'merchant') return '/merchant/dashboard';
           return '/home';
         }
 
-        if (isStaff) {
-          if (!isAdminRoute && !isNotificationsRoute) return '/admin';
-          return null;
+        // ✅ حماية مسارات الأدمن: فقط الـ Staff يمكنهم الدخول
+        if (isAdminRoute && !isStaff) {
+          return '/home';
         }
 
-        if (isAdminRoute) return '/home';
+        // حماية مسارات التاجر: فقط التاجر يمكنه الدخول (ما لم يكن أدمن)
+        if (isMerchantDashboardRoute && roleCode != 'merchant' && !isStaff) {
+          return '/home';
+        }
 
-        if (isMerchantApplyRoute && roleName == 'merchant') {
+        // إذا كان تاجراً وحاول الدخول لصفحة تقديم الطلب مجدداً
+        if (isMerchantApplyRoute && roleCode == 'merchant') {
           return '/merchant/dashboard';
         }
 
-        if (isMerchantDashboardRoute && roleName != 'merchant') {
-          return '/home';
-        }
-
+        // إذا كان مسجلاً بالفعل وحاول الدخول لصفحات الدخول/التسجيل
         if (isAuthPage) {
           return _safeFrom(state.uri.queryParameters['from']) ?? '/home';
         }
@@ -171,6 +183,25 @@ GoRouter createAppRouter(AuthController auth) {
         ),
       ),
 
+      // ─── Legal & About (Public) ───
+      GoRoute(
+        path: '/legal/privacy',
+        name: 'privacyPolicy',
+        builder: (context, state) =>
+            const LegalPageScreen(type: LegalType.privacy),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        name: 'termsOfUse',
+        builder: (context, state) =>
+            const LegalPageScreen(type: LegalType.terms),
+      ),
+      GoRoute(
+        path: '/about',
+        name: 'about',
+        builder: (context, state) => const AboutScreen(),
+      ),
+
       // ═══════════════════════════════════════════════════════════
       // 2. Admin Routes
       // ═══════════════════════════════════════════════════════════
@@ -187,6 +218,12 @@ GoRouter createAppRouter(AuthController auth) {
           child: const AdminSupportScreen(),
         ),
       ),
+      // ✅ إضافة مسار شاشة استيراد الإكسل
+      GoRoute(
+        path: '/admin/bulk-import',
+        name: 'adminBulkImport',
+        builder: (context, state) => const BulkImportScreen(),
+      ),
 
       // ═══════════════════════════════════════════════════════════
       // 3. Merchant Shell
@@ -201,19 +238,32 @@ GoRouter createAppRouter(AuthController auth) {
       // 4. Standalone Routes
       // ═══════════════════════════════════════════════════════════
       GoRoute(
-        path: '/notifications', // ✅ جديد: شاشة الإشعارات
+        path: '/notifications',
         name: 'notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/offers',
+        name: 'allOffers',
+        builder: (context, state) => const AllOffersScreen(),
       ),
       GoRoute(
         path: '/trips',
         name: 'tripsHistory',
         builder: (context, state) => const TripPlansScreen(),
       ),
+      // ✅ Planner: TripPlannerScreen
       GoRoute(
         path: '/trips/planner',
         name: 'tripPlanner',
-        builder: (context, state) => const WizardContainerScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          List<Map<String, dynamic>>? initialPlaces;
+          if (extra is List) {
+            initialPlaces = extra.whereType<Map<String, dynamic>>().toList();
+          }
+          return TripPlannerScreen(initialPlaces: initialPlaces);
+        },
         routes: [
           GoRoute(
             path: 'picker',
@@ -269,7 +319,7 @@ GoRouter createAppRouter(AuthController auth) {
         name: 'tripDetails',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return TripDetailsScreen(tripId: id);
+          return TripDetailedScreen(tripId: id);
         },
       ),
       GoRoute(
@@ -383,7 +433,9 @@ GoRouter createAppRouter(AuthController auth) {
             Text('الصفحة غير موجودة: ${state.uri}'),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => context.go('/home'),
+              onPressed: () {
+                context.go('/home');
+              },
               child: const Text('الرئيسية'),
             ),
           ],

@@ -15,39 +15,72 @@ class YaBaladiBackNavigation extends StatelessWidget {
     this.onConfirmDiscard,
   });
 
+  /// الشاشة الفرعية التي سيتم تغليفها
   final Widget child;
+
+  /// هل هذه الشاشة هي الشاشة الرئيسية (الجذر)؟
   final bool isRoot;
+
+  /// هل هناك تغييرات غير محفوظة في الشاشة الحالية؟
   final bool hasUnsavedChanges;
+
+  /// دالة تُستدعى لسؤال المستخدم عند محاولة الخروج مع وجود تغييرات
   final Future<bool> Function()? onConfirmDiscard;
 
-  Future<bool> _confirmDiscard() async {
-    final callback = onConfirmDiscard;
-    if (callback == null) {
-      return false;
+  Future<bool> _confirmDiscard(BuildContext context) async {
+    // إذا تم توفير دالة مخصصة، نستخدمها
+    if (onConfirmDiscard != null) {
+      return onConfirmDiscard!();
     }
-    return callback();
+
+    // إذا لم يتم توفير دالة، نعرض حواراً افتراضياً لحماية البيانات
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تغييرات غير محفوظة'),
+        content: const Text('هل تريد تجاهل التغييرات والعودة؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('تجاهل'),
+          ),
+        ],
+      ),
+    );
+
+    // إذا أغلق المستخدم الحوار دون اختيار، نعتبر ذلك رفضاً للخروج
+    return result ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope<bool>(
+      // يمكن الرجوع إذا لم تكن الشاشة جذراً ولا توجد تغييرات غير محفوظة
       canPop: !isRoot && !hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, result) async {
+        // إذا تم الرجوع بالفعل، أو كنا في الشاشة الجذر، أو لا توجد تغييرات، لا تفعل شيئاً
         if (didPop || isRoot || !hasUnsavedChanges) {
           return;
         }
 
-        // ✅ نحفظ الـ NavigatorState قبل أي await
+        // ✅ نحفظ الـ NavigatorState قبل أي await لتجنب مشاكل السياق
         final navigator = Navigator.of(context);
 
-        final shouldDiscard = await _confirmDiscard();
+        // سؤال المستخدم لتأكيد الخروج (أو عرض الحوار الافتراضي)
+        final shouldDiscard = await _confirmDiscard(context);
 
-        // ✅ فحص mounted بعد الـ await
+        // ✅ فحص mounted بعد الـ await لضمان أن الشاشة لا تزال موجودة
         // ignore: use_build_context_synchronously
         if (!context.mounted) return;
-        if (!shouldDiscard) return;
+
+        // إذا رفض المستخدم الخروج، نوقف العملية
         if (!shouldDiscard) return;
 
+        // إذا وافق المستخدم، ننفذ الرجوع
         navigator.pop(result);
       },
       child: child,

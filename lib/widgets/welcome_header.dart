@@ -1,9 +1,8 @@
 // lib/widgets/welcome_header.dart
-//
-// [v3.0 — 2026-10-19] — Wave 5.5c: Location on Demand (ADR-6)
-//   - NO auto-fetch in initState
-//   - Reads cache via LocationCacheService
-//   - Opens LocationSourceSheet on tap
+// [v3.6 — 2026-11-17] — SINGLE-LETTER AVATAR: _initials now returns only the
+//   first character of the user's name (e.g., "م" instead of "م ح").
+//   Design/UI/animations 100% unchanged.
+// [v3.5 — 2026-11-17] — CENTRAL FORMATTER
 
 import 'dart:async';
 
@@ -12,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../core/location/browsing_location_controller.dart';
 import '../core/location/location_source_sheet.dart';
+import '../core/utils/address_formatter.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../services/location_cache_service.dart';
 import '../services/location_service.dart';
@@ -60,7 +60,6 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
     );
 
-    // ⭐ [v3.0] يقرأ cache فقط
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_loadCachedLocation());
@@ -73,6 +72,14 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     super.dispose();
   }
 
+  // ✅ v3.5: استخدام المنسق المركزي
+  String _buildDisplayName(LocationData loc) {
+    return AddressFormatter.medium(
+      district: loc.neighborhood,
+      governorate: loc.governorate,
+    );
+  }
+
   Future<void> _loadCachedLocation() async {
     if (!mounted) return;
     final browsingCtrl = context.read<BrowsingLocationController>();
@@ -82,15 +89,17 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
       if (!mounted) return;
 
       if (cached != null) {
+        final displayName = _buildDisplayName(cached);
+
         setState(() {
-          _gpsPlaceName = cached.nameAr;
+          _gpsPlaceName = displayName;
           _lastLocation = cached;
           _state = _LocState.loaded;
         });
         browsingCtrl.setPhysicalLocation(
           cached.latitude,
           cached.longitude,
-          placeName: cached.nameAr,
+          placeName: displayName,
         );
       } else {
         setState(() => _state = _LocState.idle);
@@ -116,23 +125,15 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     if (loc != null) {
       await LocationCacheService.save(loc);
       if (!mounted) return;
+
+      final displayName = _buildDisplayName(loc);
+
       setState(() {
-        _gpsPlaceName = loc.nameAr;
+        _gpsPlaceName = displayName;
         _lastLocation = loc;
         _state = _LocState.loaded;
       });
       unawaited(_waveController.forward());
-    }
-  }
-
-  String get _buttonLabel {
-    switch (_state) {
-      case _LocState.idle:
-        return 'اختر موقعك';
-      case _LocState.loading:
-        return 'جارٍ التحديد…';
-      case _LocState.loaded:
-        return context.read<BrowsingLocationController>().browsingShortLabel;
     }
   }
 
@@ -149,6 +150,19 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     final auth = context.watch<AuthController>();
     final browsingCtrl = context.watch<BrowsingLocationController>();
     final isGuest = auth.isGuest;
+
+    final String buttonLabel;
+    switch (_state) {
+      case _LocState.idle:
+        buttonLabel = 'اختر موقعك';
+        break;
+      case _LocState.loading:
+        buttonLabel = 'جارٍ التحديد…';
+        break;
+      case _LocState.loaded:
+        buttonLabel = browsingCtrl.browsingShortLabel;
+        break;
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -202,7 +216,7 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
                     ),
                     const SizedBox(height: 4),
                     _GovernorateButton(
-                      label: _buttonLabel,
+                      label: buttonLabel,
                       isLoading: _state == _LocState.loading,
                       isIdle: _state == _LocState.idle,
                       onTap: () => _openLocationSourceSheet(browsingCtrl),
@@ -268,10 +282,6 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
 }
 
 enum _LocState { idle, loaded, loading }
-
-// ═══════════════════════════════════════════════════════════════
-// GOVERNORATE BUTTON
-// ═══════════════════════════════════════════════════════════════
 
 class _GovernorateButton extends StatelessWidget {
   const _GovernorateButton({
@@ -435,14 +445,9 @@ class _SmartAvatar extends StatelessWidget {
     );
   }
 
+  // ✅ v3.6: حرف واحد فقط (أول حرف من الاسم)
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '؟';
-    // ignore: deprecated_member_use
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
+    return name.trim().substring(0, 1).toUpperCase();
   }
 }

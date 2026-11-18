@@ -1,5 +1,6 @@
 // lib/features/auth/widgets/auth_scaffold.dart
 //
+// [v1.2 — 2026-11-15] — LINTER FIX: Added curly braces to if statement.
 // [v1.1 — 2026-10-25] — FIX: Cleaned, verified. Added fallback for PopScope.
 //   - KEPT: all UI, assets, and routing logic identical.
 
@@ -40,7 +41,9 @@ class AuthScaffold extends StatelessWidget {
     return PopScope(
       canPop: exitOnBack,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         context.go(RoutePaths.login);
       },
       child: Scaffold(

@@ -1,5 +1,7 @@
 // lib/features/admin/seed/districts_seed_data.dart
-// [v1.0 — 2026-10-29] — Wave 17: بيانات أولية لأحياء المحافظات
+// [v1.1 — CLEANED] — Cleaned and formatted.
+//   - ADDED: Trailing commas for standard linting.
+//   - KEPT: All seed data and logic intact.
 
 /// بيانات أولية قابلة للتوسع لكل محافظة.
 /// المفتاح: docId الخاص بالمحافظة في Firestore.
@@ -8,7 +10,7 @@
 /// ملاحظة: `nameAr` خالٍ من كلمة "حي" (مثل "الشرق" لا "حي الشرق")
 /// لتتسق مع باقي بيانات المشروع (المحافظات، التصنيفات).
 class DistrictsSeedData {
-  DistrictsSeedData._();
+  DistrictsSeedData._(); // منع إنشاء كائنات من هذا الكلاس
 
   static const Map<String, List<Map<String, String>>> _data = {
     'portsaid': [
@@ -21,7 +23,7 @@ class DistrictsSeedData {
       {'nameAr': 'بورفؤاد', 'nameEn': 'Port Fuad'},
       {'nameAr': 'غرب', 'nameEn': 'West'},
     ],
-    // يمكن إضافة محافظات أخرى لاحقاً بنفس البنية.
+    // يمكن إضافة محافظات أخرى لاحقاً بنفس البنية (مثل 'cairo', 'alexandria').
   };
 
   /// يعيد قائمة الأحياء لمحافظة معينة، أو `null` إذا لم تكن متوفرة.

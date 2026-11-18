@@ -9,8 +9,8 @@ android {
     namespace = "com.egypt.yabaladi_rebuild"
     compileSdk = flutter.compileSdkVersion
     
-    // [v3 — 2026-10-14] Firebase packages تتطلب NDK 27
-    ndkVersion = "27.0.12077973"
+    // ✅ [v4 — 2026-11-02] تم التحديث لحل خطأ البناء الخاص بـ jni و google_maps
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -1,8 +1,9 @@
 // lib/features/search/screens/explore_screen.dart
-// [v8.4 — 2026-11-01] — ANALYZER FIX: Used 'badgeColor' variable, made badge always visible.
-//   - FIXED: The value of the local variable 'badgeColor' isn't used.
-//   - CHANGED: Badge is now always visible on the card (gold if active, grey if inactive).
-//   - KEPT: All logic, search, filter, and the new creative card design.
+//
+// [v9.7 — 2026-11-17] — UNUSED VARIABLE FIX: Removed `geoZoneName` from
+//   _PlaceListCard (no longer needed since address formatting uses
+//   address/city/governorate directly).
+// [v9.6 — 2026-11-15] — SMART ADDRESS + LINTER FIX
 
 // ignore_for_file: deprecated_member_use
 
@@ -17,7 +18,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../models/geo_zone.dart';
 import '../../../repositories/geo_zones_repository.dart';
 import '../../../services/location_service.dart';
-import '../../places/screens/place_details_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   final String? categoryId;
@@ -41,6 +41,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _debounce;
 
+  late final Stream<QuerySnapshot> _placesStream;
+
   List<Map<String, dynamic>> _dynamicFilters = [];
   final Map<String, dynamic> _selectedFilters = {};
 
@@ -50,12 +52,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   LocationData? _userLocation;
   GeoZone? _myZone;
   bool _isLoadingZone = true;
-  bool _sortByDistance = false;
+
+  String _sortOption = 'rating'; // 'rating', 'distance', 'price'
 
   @override
   void initState() {
     super.initState();
     _searchCtrl.text = widget.searchQuery ?? '';
+    _placesStream = _buildQuery().snapshots();
     _fetchDynamicFilters();
     _detectZoneAndLocation();
   }
@@ -64,7 +68,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     try {
       final loc = await LocationService.getCurrentLocation();
       if (loc != null) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         setState(() => _userLocation = loc);
 
         final zone = await GeoZonesRepository.instance
@@ -76,10 +82,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
           });
         }
       } else {
-        if (mounted) setState(() => _isLoadingZone = false);
+        if (mounted) {
+          setState(() => _isLoadingZone = false);
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingZone = false);
+      if (mounted) {
+        setState(() => _isLoadingZone = false);
+      }
     }
   }
 
@@ -90,7 +100,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
           .where('isActive', isEqualTo: true)
           .get();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _dynamicFilters = snap.docs.map((d) => d.data()).toList();
         _dynamicFilters.sort((a, b) => ((a['order'] as num?) ?? 100)
@@ -106,38 +118,61 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final query = _searchCtrl.text.trim().toLowerCase();
 
     final filtered = allPlaces.where((place) {
+      // 1. Governorate match
       if (widget.governorate != null && widget.governorate!.isNotEmpty) {
-        if (place['governorate'] != widget.governorate) return false;
+        final placeGov = place['governorate']?.toString().trim() ?? '';
+        if (placeGov != widget.governorate!.trim()) {
+          return false;
+        }
       }
-      if (_openNowOnly && place['isOpen'] != true) return false;
-      if (_minRating > 0 && (place['rating'] as double) < _minRating) {
+
+      // 2. Open Now
+      if (_openNowOnly && place['isOpen'] != true) {
         return false;
       }
+
+      // 3. Minimum Rating
+      final placeRating = (place['rating'] as num?)?.toDouble() ?? 0.0;
+      if (_minRating > 0 && placeRating < _minRating) {
+        return false;
+      }
+
+      // 4. Text Search
       if (query.isNotEmpty) {
         final searchable =
             "${place['name']} ${place['description']} ${place['categoryName']}"
                 .toLowerCase();
-        if (!searchable.contains(query)) return false;
+        if (!searchable.contains(query)) {
+          return false;
+        }
       }
 
+      // 5. Dynamic Filters
       for (final entry in _selectedFilters.entries) {
         final key = entry.key;
         final selectedVal = entry.value;
 
         if (selectedVal is bool) {
-          if (selectedVal == true && place[key] != true) return false;
+          if (selectedVal == true && place[key] != true) {
+            return false;
+          }
         } else if (selectedVal is String) {
-          if (place[key]?.toString() != selectedVal) return false;
+          if (place[key]?.toString() != selectedVal) {
+            return false;
+          }
         } else if (selectedVal is num) {
-          if ((place[key] as num? ?? 0) < selectedVal) return false;
+          if ((place[key] as num? ?? 0) < selectedVal) {
+            return false;
+          }
         }
       }
 
       return true;
     }).toList();
 
+    // Sorting
     filtered.sort((a, b) {
-      if (_sortByDistance && _userLocation != null) {
+      if (_sortOption == 'distance' && _userLocation != null) {
         final locA = a['location'] as GeoPoint?;
         final locB = b['location'] as GeoPoint?;
         if (locA != null && locB != null) {
@@ -147,15 +182,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
               _userLocation!.longitude, locB.latitude, locB.longitude);
           return distA.compareTo(distB);
         }
-        if (locA != null) return -1;
-        if (locB != null) return 1;
+        if (locA != null) {
+          return -1;
+        }
+        if (locB != null) {
+          return 1;
+        }
+      } else if (_sortOption == 'price') {
+        final pA = (a['priceLevel'] as num?)?.toInt() ?? 0;
+        final pB = (b['priceLevel'] as num?)?.toInt() ?? 0;
+        return pA.compareTo(pB);
       }
 
-      final rA = (a['rating'] as double);
-      final rB = (b['rating'] as double);
-      if (rA != rB) return rB.compareTo(rA);
-      final cA = (a['reviewCount'] as int);
-      final cB = (b['reviewCount'] as int);
+      final rA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+      final rB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+      if (rA != rB) {
+        return rB.compareTo(rA);
+      }
+
+      final cA = (a['reviewCount'] as num?)?.toInt() ?? 0;
+      final cB = (b['reviewCount'] as num?)?.toInt() ?? 0;
       return cB.compareTo(cA);
     });
 
@@ -163,9 +209,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _onSearchChanged(String _) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+    }
     _debounce = Timer(const Duration(milliseconds: 400), () {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -180,7 +230,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           builder: (context, setSheetState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.8,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -196,7 +246,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             _selectedFilters.clear();
                             _openNowOnly = false;
                             _minRating = 0;
-                            _sortByDistance = false;
+                            _sortOption = 'rating';
                           });
                           setState(() {});
                         },
@@ -209,20 +259,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   Expanded(
                     child: ListView(
                       children: [
-                        if (_userLocation != null)
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('الأقرب إليّ أولاً',
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: const Text('ترتيب الأماكن حسب بعدها عنك'),
-                            value: _sortByDistance,
-                            onChanged: (val) {
-                              setSheetState(() => _sortByDistance = val);
-                              setState(() {});
-                            },
-                            activeThumbColor:
-                                Theme.of(context).colorScheme.primary,
+                        DropdownButtonFormField<String>(
+                          value: _sortOption,
+                          decoration: const InputDecoration(
+                            labelText: 'ترتيب حسب',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                           ),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'rating', child: Text('الأعلى تقييماً')),
+                            DropdownMenuItem(
+                                value: 'distance', child: Text('الأقرب إليّ')),
+                            DropdownMenuItem(
+                                value: 'price',
+                                child: Text('السعر (الأقل أولاً)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setSheetState(() => _sortOption = val);
+                              setState(() {});
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('مفتوح الآن فقط',
@@ -333,10 +394,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             );
                           }
                           return const SizedBox();
-                        }).toList(),
+                        }),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.check_circle, size: 20),
+                      label: const Text(
+                        'تطبيق الفلاتر',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                 ],
               ),
             );
@@ -348,6 +429,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
@@ -357,15 +439,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    String title = widget.categoryName ?? 'استكشاف الأماكن';
-    if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
-      title = 'نتائج البحث';
-    }
+    final String title =
+        widget.searchQuery != null && widget.searchQuery!.isNotEmpty
+            ? 'نتائج البحث'
+            : (widget.categoryName ?? 'استكشاف الأماكن');
 
     final int activeFiltersCount = _selectedFilters.length +
         (_openNowOnly ? 1 : 0) +
         (_minRating > 0 ? 1 : 0) +
-        (_sortByDistance ? 1 : 0);
+        (_sortOption != 'rating' ? 1 : 0);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -380,37 +462,51 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
       body: Column(
         children: [
-          if (_isLoadingZone)
-            const LinearProgressIndicator(minHeight: 2)
-          else if (_myZone != null)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.my_location,
-                      size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'أنت الآن في منطقة: ${_myZone!.nameAr}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
+          SizedBox(
+            height: 52,
+            child: _isLoadingZone
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: LinearProgressIndicator(minHeight: 2),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : _myZone != null
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.my_location,
+                                  size: 18, color: theme.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'أنت الآن في منطقة: ${_myZone!.nameAr}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
@@ -420,7 +516,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     controller: _searchCtrl,
                     onChanged: _onSearchChanged,
                     textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => setState(() {}),
                     decoration: InputDecoration(
                       hintText: 'ابحث داخل هذه النتائج...',
                       prefixIcon: const Icon(Icons.search),
@@ -474,7 +569,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _buildQuery().snapshots(),
+              stream: _placesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -484,23 +579,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 }
 
                 final docs = snapshot.data?.docs ?? [];
-
-                final allPlaces = docs.map((doc) {
+                final allPlaces = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final isActive = data['isActive'] != false;
+                  final banReason = (data['banReason'] ?? '').toString().trim();
+                  return isActive && banReason.isEmpty;
+                }).map((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   data['id'] = doc.id;
                   data['name'] = data['nameAr'] ?? data['name'] ?? 'بدون اسم';
-                  data['categoryName'] = data['categoryId'] ?? 'تصنيف';
+                  data['categoryName'] =
+                      data['category'] ?? data['categoryId'] ?? 'تصنيف';
                   data['rating'] =
                       (data['averageRating'] as num?)?.toDouble() ?? 0.0;
                   data['reviewCount'] =
                       (data['reviewCount'] as num?)?.toInt() ?? 0;
                   data['isOpen'] = data['isActive'] ?? true;
                   data['governorate'] = data['governorate'] ?? '';
-
                   data['geoZoneName'] = data['geoZoneName'] ?? '';
                   data['priceLevel'] =
                       (data['priceLevel'] as num?)?.toInt() ?? 0;
-
                   return data;
                 }).toList();
 
@@ -531,7 +629,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 _selectedFilters.clear();
                                 _openNowOnly = false;
                                 _minRating = 0;
-                                _sortByDistance = false;
+                                _sortOption = 'rating';
                                 _searchCtrl.clear();
                               });
                             },
@@ -619,7 +717,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// v8.4: Creative List Card (Full Width, Elegant)
+// Creative List Card (Full Width, Elegant)
 // ═══════════════════════════════════════════════════════════════
 class _PlaceListCard extends StatelessWidget {
   final Map<String, dynamic> place;
@@ -649,25 +747,93 @@ class _PlaceListCard extends StatelessWidget {
     }
   }
 
-  Widget _buildFilterIcons(ThemeData theme) {
-    final activeFilters = <IconData>[];
-    if (place['hasWifi'] == true) activeFilters.add(Icons.wifi);
-    if (place['hasParking'] == true) activeFilters.add(Icons.local_parking);
-    if (place['hasDelivery'] == true) activeFilters.add(Icons.delivery_dining);
-    if (place['isFamilyFriendly'] == true)
-      activeFilters.add(Icons.family_restroom);
-    if (place['hasReservation'] == true) activeFilters.add(Icons.event_seat);
-    if (place['isHalal'] == true) activeFilters.add(Icons.verified);
+  /// ✅ v9.7: تنسيق العنوان "الشارع - حي الشرق - بورسعيد"
+  String _formatAddress(String? address, String? city, String? gov) {
+    final List<String> parts = [];
 
-    if (activeFilters.isEmpty) return const SizedBox.shrink();
+    final trimmedAddress = address?.trim() ?? '';
+    if (trimmedAddress.isNotEmpty) {
+      parts.add(trimmedAddress);
+    }
 
-    return Row(
-      children: activeFilters.take(4).map((icon) {
-        return Padding(
-          padding: const EdgeInsets.only(left: 6),
-          child: Icon(icon, size: 14, color: theme.colorScheme.primary),
+    final trimmedCity = city?.trim() ?? '';
+    if (trimmedCity.isNotEmpty) {
+      final String formattedCity;
+      if (!trimmedCity.startsWith('حي ')) {
+        if (trimmedCity.startsWith('حي')) {
+          formattedCity = 'حي ${trimmedCity.substring(2).trim()}';
+        } else {
+          formattedCity = 'حي $trimmedCity';
+        }
+      } else {
+        formattedCity = trimmedCity;
+      }
+      parts.add(formattedCity);
+    }
+
+    final trimmedGov = gov?.trim() ?? '';
+    if (trimmedGov.isNotEmpty) {
+      parts.add(trimmedGov);
+    }
+
+    return parts.join(' - ');
+  }
+
+  Widget _buildFilterChips(ThemeData theme) {
+    final List<Widget> chips = [];
+
+    void addChip(IconData icon, String label, dynamic condition) {
+      if (condition == true) {
+        chips.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
-      }).toList(),
+      }
+    }
+
+    addChip(Icons.wifi, 'واي فاي', place['hasWifi']);
+    addChip(Icons.local_parking, 'موقف', place['hasParking']);
+    addChip(Icons.wc, 'دورة مياه', place['hasRestroom']);
+    addChip(Icons.accessible, 'إتاحة', place['hasAccessibility']);
+    addChip(Icons.family_restroom, 'عائلات', place['isFamilyFriendly']);
+    addChip(Icons.beach_access, 'ظل', place['hasShade']);
+    addChip(Icons.delivery_dining, 'توصيل', place['hasDelivery']);
+    addChip(Icons.event_seat, 'حجز', place['hasReservation']);
+    addChip(Icons.verified, 'حلال', place['isHalal']);
+
+    if (chips.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: chips,
+      ),
     );
   }
 
@@ -683,10 +849,12 @@ class _PlaceListCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     final name = place['name'] as String? ?? 'بدون اسم';
-    final categoryId = place['categoryId'] as String?;
-    final geoZoneName = place['geoZoneName'] as String? ?? '';
+    final categoryId =
+        place['category'] as String? ?? place['categoryId'] as String?;
+    // ✅ v9.7: تم حذف geoZoneName (غير مستخدم)
     final governorate = place['governorate'] as String? ?? '';
     final city = place['city'] as String? ?? '';
+    final address = place['address'] as String? ?? '';
     final rating = (place['rating'] as num?)?.toDouble() ?? 0.0;
     final reviews = (place['reviewCount'] as num?)?.toInt() ?? 0;
     final phone = (place['phone'] as String?)?.trim() ?? '';
@@ -694,13 +862,16 @@ class _PlaceListCard extends StatelessWidget {
     final facebook = (place['facebookPage'] as String?)?.trim() ?? '';
     final isOpen = place['isOpen'] as bool? ?? true;
 
-    final locationParts = <String>[
-      if (geoZoneName.isNotEmpty) geoZoneName,
-      if (city.isNotEmpty) city,
-      if (governorate.isNotEmpty) governorate,
-    ];
+    final views = (place['viewCount'] as num?)?.toInt() ?? 0;
+    final priceLevel = (place['priceLevel'] as num?)?.toInt() ?? 0;
+    final hasActiveOffer = place['hasActiveOffer'] == true;
+    final offerExpiry = (place['offerExpiryDate'] as Timestamp?)?.toDate();
+    final isOfferValid = hasActiveOffer &&
+        offerExpiry != null &&
+        offerExpiry.isAfter(DateTime.now());
 
-    // ✅ استخدام المتغير badgeColor هنا لحل التحذير وإظهار اللونين
+    final formattedAddress = _formatAddress(address, city, governorate);
+
     final bool isExcellenceActive =
         (place['isExcellence'] == true) || (rating >= 4.5 && reviews >= 10);
     final Color badgeColor =
@@ -717,11 +888,7 @@ class _PlaceListCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => PlaceDetailsScreen(placeId: place['id']),
-            ),
-          );
+          context.push('/home/place/${place['id']}');
         },
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -729,7 +896,7 @@ class _PlaceListCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Name + Icon + Badge
+              // Row 1: Name & Badges
               Row(
                 children: [
                   Icon(_iconForCategory(categoryId),
@@ -744,9 +911,27 @@ class _PlaceListCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // ✅ الشارة تظهر دائماً وتستخدم badgeColor
+                  if (isOfferValid) ...[
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFFFF7F50), Color(0xFFFF4500)]),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '🔥 عرض',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                   Padding(
-                    padding: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.only(left: 6),
                     child: Icon(
                       isExcellenceActive
                           ? Icons.workspace_premium
@@ -756,7 +941,7 @@ class _PlaceListCard extends StatelessWidget {
                     ),
                   ),
                   if (!isOpen) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
@@ -773,10 +958,9 @@ class _PlaceListCard extends StatelessWidget {
                   ]
                 ],
               ),
-
               const SizedBox(height: 8),
 
-              // 2. Rating + Filters + Photos soon
+              // Row 2: Rating & Views
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -791,9 +975,37 @@ class _PlaceListCard extends StatelessWidget {
                       Text('($reviews)',
                           style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant)),
+                      if (views > 0) ...[
+                        const SizedBox(width: 12),
+                        Icon(Icons.visibility,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('$views',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                      if (priceLevel >= 1 && priceLevel <= 4) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Text(
+                            '\$' * priceLevel,
+                            style: TextStyle(
+                                color: Colors.green.shade800,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  _buildFilterIcons(theme),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -818,9 +1030,12 @@ class _PlaceListCard extends StatelessWidget {
                 ],
               ),
 
+              // Row 3: Full Filter Chips
+              _buildFilterChips(theme),
+
               const SizedBox(height: 10),
 
-              // 3. Location + Contact
+              // Row 4: Location & Action Chips
               Row(
                 children: [
                   Icon(Icons.location_on,
@@ -828,8 +1043,8 @@ class _PlaceListCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      locationParts.isNotEmpty
-                          ? locationParts.join(' • ')
+                      formattedAddress.isNotEmpty
+                          ? formattedAddress
                           : 'الموقع غير محدد',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

@@ -1,4 +1,13 @@
 // lib/features/auth/screens/forgot_password_screen.dart
+//
+// [v1.2 — FIXED] — Critical bug + safety fixes:
+//   - FIXED: resetPassword returns AuthResult (not throws); old code
+//     always showed "success" even on failure. Now checks result.isSuccess.
+//   - FIXED: ScaffoldMessenger captured before async gap.
+//   - FIXED: Removed cascade chains.
+//   - IMPROVED: Success view now shows the email address that was used.
+//   - KEPT: All form fields, validation, and UI intact.
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,6 +25,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
   bool _emailSent = false;
   bool _isSubmitting = false;
+  String _sentToEmail = '';
 
   @override
   void dispose() {
@@ -27,20 +37,38 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_isSubmitting) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+    final String email = _emailCtrl.text.trim();
+
     setState(() => _isSubmitting = true);
 
     try {
       final auth = context.read<AuthController>();
-      final String email = _emailCtrl.text.trim();
-      await auth.resetPassword(email);
+      final result = await auth.resetPassword(email);
 
       if (!mounted) return;
-      setState(() => _emailSent = true);
+
+      if (result.isSuccess) {
+        setState(() {
+          _emailSent = true;
+          _sentToEmail = email;
+        });
+      } else {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'تعذر إرسال رابط الاستعادة'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ: ${e.toString()}'),
+          content: Text('حدث خطأ غير متوقع: $e'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -76,7 +104,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ─── واجهة نجاح الإرسال ───
+  // --- Success view ---
   Widget _buildSuccessView(ThemeData theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -97,8 +125,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        if (_sentToEmail.isNotEmpty) ...[
+          Text(
+            'إلى: $_sentToEmail',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Text(
-          'يرجى مراجعة بريدك الإلكتروني (بما في ذلك مجلد البريد العشوائي) واتباع التعليمات لإعادة تعيين كلمة المرور.',
+          'يرجى مراجعة بريدك الإلكتروني (بما في ذلك مجلد البريد العشوائي) '
+          'واتباع التعليمات لإعادة تعيين كلمة المرور.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -119,7 +159,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ─── واجهة إدخال البريد ───
+  // --- Form view ---
   Widget _buildFormView(ThemeData theme) {
     return Form(
       key: _formKey,
@@ -136,7 +176,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'أدخل بريدك الإلكتروني المسجل لدينا وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.',
+            'أدخل بريدك الإلكتروني المسجل لدينا وسنرسل لك رابطاً لإعادة '
+            'تعيين كلمة المرور.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,

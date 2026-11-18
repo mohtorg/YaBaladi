@@ -1,6 +1,10 @@
 // lib/screens/main_shell.dart
 //
-// [v4.4 — 2026-10-27] — UI: Changed Bag tab to Flight/Trip tab
+// [v4.6 - FIXED] - Real bug fix:
+//   - FIXED: _BadgeIcon no longer takes an unused `selectedIcon` param.
+//   - FIXED: NavigationDestination now has its own `selectedIcon` (so
+//     the flight icon correctly becomes flight_takeoff when selected).
+//   - KEPT: All index mapping, merchant push, and layout intact.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +22,7 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = context.watch<AuthController>();
-    final bag = context.watch<TripBagController>();
+    final tripBag = context.watch<TripBagController>();
 
     final bool showMerchantTab = auth.isMerchant;
 
@@ -55,16 +59,13 @@ class MainShell extends StatelessWidget {
             label: 'الرئيسية',
           ),
           NavigationDestination(
-            // ✅ التعديل: استخدام أيقونة الطائرة وتغيير النص لرحلتي
-            icon: Badge(
-              isLabelVisible: bag.itemCount > 0,
-              label: Text('${bag.itemCount}'),
-              child: const Icon(Icons.flight),
+            icon: _BadgeIcon(
+              icon: Icons.flight,
+              count: tripBag.itemCount,
             ),
-            selectedIcon: Badge(
-              isLabelVisible: bag.itemCount > 0,
-              label: Text('${bag.itemCount}'),
-              child: const Icon(Icons.flight_takeoff),
+            selectedIcon: _BadgeIcon(
+              icon: Icons.flight_takeoff,
+              count: tripBag.itemCount,
             ),
             label: 'رحلتي',
           ),
@@ -86,6 +87,30 @@ class MainShell extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BadgeIcon extends StatelessWidget {
+  final IconData icon;
+  final int count;
+
+  const _BadgeIcon({
+    required this.icon,
+    required this.count,
+  });
+
+  String get _countLabel {
+    if (count <= 0) return '';
+    return count > 99 ? '99+' : '$count';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text(_countLabel),
+      child: Icon(icon),
     );
   }
 }

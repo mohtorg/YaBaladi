@@ -1,14 +1,19 @@
 // lib/features/admin/screens/place_detail_screen.dart
-// [v1.8 — 2026-11-01] — EXCELLENCE BADGE: Added admin toggle for isExcellence.
-//   - ADDED: Switch to grant/revoke excellence badge manually.
-//   - KEPT: All existing block/unblock, delete, and view logic.
+// [v2.2.0 — 2026-11-15] — SMART ADDRESS + LINTER FIX:
+//   - Added `_formatAddress` and passed `address` & `governorate` to _buildHeader.
+//   - Added curly braces to all single-line if statements.
+// [v2.1.0 — ASYNC GAP FIX + SEVERITY ADDED]
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+
 import '../../../core/helpers/location_url_helper.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../theme/design_tokens.dart';
-import '../../notifications/services/notification_helper.dart';
+import '../../../core/helpers/notification_helper.dart';
+import '../../../core/services/audit_log_service.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../widgets/place_detail_sections.dart';
 import 'add_place_screen.dart';
 
@@ -23,7 +28,42 @@ class PlaceDetailScreen extends StatefulWidget {
 class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   bool _updating = false;
 
+  // ✅ v2.2: دالة تنسيق العنوان (الشارع - حي الشرق - بورسعيد)
+  String _formatAddress(String? address, String? city, String? governorate) {
+    final List<String> parts = [];
+
+    final trimmedAddress = address?.trim() ?? '';
+    if (trimmedAddress.isNotEmpty) {
+      parts.add(trimmedAddress);
+    }
+
+    final trimmedCity = city?.trim() ?? '';
+    if (trimmedCity.isNotEmpty) {
+      final String formattedCity;
+      if (!trimmedCity.startsWith('حي ')) {
+        if (trimmedCity.startsWith('حي')) {
+          formattedCity = 'حي ${trimmedCity.substring(2).trim()}';
+        } else {
+          formattedCity = 'حي $trimmedCity';
+        }
+      } else {
+        formattedCity = trimmedCity;
+      }
+      parts.add(formattedCity);
+    }
+
+    final trimmedGov = governorate?.trim() ?? '';
+    if (trimmedGov.isNotEmpty) {
+      parts.add(trimmedGov);
+    }
+
+    return parts.join(' - ');
+  }
+
   Future<void> _toggleStatus(String field, bool newValue) async {
+    // ✅ Capture BEFORE await
+    final admin = context.read<AuthController>();
+
     setState(() => _updating = true);
     try {
       final updateData = <String, dynamic>{
@@ -41,16 +81,29 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           .doc(widget.placeId)
           .update(updateData);
 
+      await AuditLogService.logAction(
+        action: newValue ? 'تفعيل مكان' : 'تعطيل مكان',
+        adminName: admin.displayName,
+        target: widget.placeId,
+        details: 'تم التغيير إلى $newValue',
+        severity: 'medium',
+      );
+
       _showSnack('✅ تم التحديث', Colors.green);
     } catch (e) {
       _showSnack('❌ خطأ: $e', Colors.red);
     } finally {
-      if (mounted) setState(() => _updating = false);
+      if (mounted) {
+        setState(() => _updating = false);
+      }
     }
   }
 
-  // ✅ دالة جديدة: تفعيل/إلغاء شارة التميز
+  // ✅ دالة تفعيل/إلغاء شارة التميز
   Future<void> _toggleExcellence(bool newValue) async {
+    // ✅ Capture BEFORE await
+    final admin = context.read<AuthController>();
+
     setState(() => _updating = true);
     try {
       await FirebaseFirestore.instance
@@ -60,117 +113,159 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
         'isExcellence': newValue,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      await AuditLogService.logAction(
+        action: newValue ? 'منح شارة التميز' : 'إلغاء شارة التميز',
+        adminName: admin.displayName,
+        target: widget.placeId,
+        severity: 'low',
+      );
+
       _showSnack(newValue ? '🌟 تم منح شارة التميز' : 'تم إلغاء شارة التميز',
           newValue ? Colors.green : Colors.orange);
     } catch (e) {
       _showSnack('❌ خطأ: $e', Colors.red);
     } finally {
-      if (mounted) setState(() => _updating = false);
+      if (mounted) {
+        setState(() => _updating = false);
+      }
     }
   }
 
   Future<void> _showBlockDialog(Map<String, dynamic> data) async {
     final reasonCtrl = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+    // ✅ Capture BEFORE await
+    final admin = context.read<AuthController>();
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.block, color: Colors.red, size: 28),
-            SizedBox(width: 10),
-            Text('حظر النشاط', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
             children: [
-              const Text(
-                'سيتم إخفاء هذا المكان فوراً من التطبيق. يرجى كتابة سبب الحظر لإبلاغ التاجر.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonCtrl,
-                decoration: InputDecoration(
-                  labelText: 'سبب الحظر (مطلوب)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  hintText: 'مثال: صور غير لائقة، نشاط غير قانوني...',
-                ),
-                maxLines: 3,
-              ),
+              Icon(Icons.block, color: Colors.red, size: 28),
+              SizedBox(width: 10),
+              Text('حظر النشاط', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (reasonCtrl.text.trim().isNotEmpty) {
-                Navigator.pop(ctx, true);
-              } else {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('يرجى كتابة سبب الحظر'),
-                    behavior: SnackBarBehavior.floating,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'سيتم إخفاء هذا المكان فوراً من التطبيق. يرجى كتابة سبب الحظر لإبلاغ التاجر.',
+                  style: TextStyle(fontSize: 14, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'سبب الحظر (مطلوب)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    hintText: 'مثال: صور غير لائقة، نشاط غير قانوني...',
                   ),
-                );
-              }
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                  maxLines: 3,
+                ),
+              ],
             ),
-            child: const Text('تأكيد الحظر'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reasonCtrl.text.trim().isNotEmpty) {
+                  Navigator.pop(ctx, true);
+                } else {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('يرجى كتابة سبب الحظر'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('تأكيد الحظر'),
+            ),
+          ],
+        ),
+      );
 
-    if (confirm == true) {
-      setState(() => _updating = true);
-      try {
-        final String reason = reasonCtrl.text.trim();
-        await FirebaseFirestore.instance
-            .collection('places')
-            .doc(widget.placeId)
-            .update({
-          'isActive': false,
-          'banReason': reason,
-          'bannedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+      if (confirm == true && mounted) {
+        setState(() => _updating = true);
+        try {
+          final String reason = reasonCtrl.text.trim();
+          await FirebaseFirestore.instance
+              .collection('places')
+              .doc(widget.placeId)
+              .update({
+            'isActive': false,
+            'banReason': reason,
+            'bannedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
-        final String ownerId = data['ownerId']?.toString() ?? '';
-        final String placeName =
-            FirestoreUtils.stringOf(data, 'nameAr', 'مكانك');
-        if (ownerId.isNotEmpty) {
-          await NotificationHelper.notifyPlaceBlocked(
-              ownerId, placeName, reason);
+          final String ownerId = data['ownerId']?.toString() ?? '';
+          final String placeName =
+              FirestoreUtils.stringOf(data, 'nameAr', 'مكانك');
+          if (ownerId.isNotEmpty) {
+            await NotificationHelper.notifyPlaceBlocked(
+                ownerId, placeName, reason);
+          }
+
+          await AuditLogService.logAction(
+            action: 'حظر مكان',
+            adminName: admin.displayName,
+            target: placeName,
+            details: 'السبب: $reason',
+            severity: 'high',
+          );
+
+          if (mounted) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('🚫 تم حظر النشاط بنجاح',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            messenger.showSnackBar(
+              SnackBar(content: Text('❌ خطأ: $e'), backgroundColor: Colors.red),
+            );
+          }
+        } finally {
+          if (mounted) {
+            setState(() => _updating = false);
+          }
         }
-
-        if (mounted) {
-          _showSnack('🚫 تم حظر النشاط بنجاح', Colors.red);
-        }
-      } catch (e) {
-        if (mounted) _showSnack('❌ خطأ: $e', Colors.red);
-      } finally {
-        if (mounted) setState(() => _updating = false);
       }
+    } finally {
+      reasonCtrl.dispose();
     }
   }
 
   Future<void> _showUnblockDialog(Map<String, dynamic> data) async {
+    final messenger = ScaffoldMessenger.of(context);
+    // ✅ Capture BEFORE await
+    final admin = context.read<AuthController>();
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -207,7 +302,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       ),
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
       setState(() => _updating = true);
       try {
         await FirebaseFirestore.instance
@@ -227,18 +322,42 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           await NotificationHelper.notifyPlaceUnblocked(ownerId, placeName);
         }
 
+        await AuditLogService.logAction(
+          action: 'فك حظر مكان',
+          adminName: admin.displayName,
+          target: placeName,
+          severity: 'medium',
+        );
+
         if (mounted) {
-          _showSnack('✅ تم فك الحظر وإعادة التفعيل', Colors.green);
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('✅ تم فك الحظر وإعادة التفعيل',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
       } catch (e) {
-        if (mounted) _showSnack('❌ خطأ: $e', Colors.red);
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(content: Text('❌ خطأ: $e'), backgroundColor: Colors.red),
+          );
+        }
       } finally {
-        if (mounted) setState(() => _updating = false);
+        if (mounted) {
+          setState(() => _updating = false);
+        }
       }
     }
   }
 
   Future<void> _deletePlace() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    // ✅ Capture BEFORE await
+    final admin = context.read<AuthController>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -274,21 +393,42 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       try {
         await FirebaseFirestore.instance
             .collection('places')
             .doc(widget.placeId)
             .delete();
-        if (mounted) Navigator.pop(context);
+
+        await AuditLogService.logAction(
+          action: 'حذف مكان',
+          adminName: admin.displayName,
+          target: widget.placeId,
+          details: 'تم الحذف نهائياً',
+          severity: 'critical',
+        );
+
+        if (mounted) {
+          navigator.pop();
+        }
       } catch (e) {
-        _showSnack('❌ خطأ: $e', Colors.red);
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('❌ خطأ: $e',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
 
   void _showSnack(String msg, Color color) {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -302,19 +442,27 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
   Future<void> _openOnMap(double lat, double lng) async {
     final url = LocationUrlHelper.mapUrl(lat: lat, lng: lng);
     final opened = await LocationUrlHelper.open(url);
-    if (!opened) _showSnack('لا يمكن فتح الخريطة', Colors.orange);
+    if (!opened) {
+      _showSnack('لا يمكن فتح الخريطة', Colors.orange);
+    }
   }
 
   Future<void> _openDirections(double lat, double lng) async {
     final url = LocationUrlHelper.directionsUrl(lat: lat, lng: lng);
     final opened = await LocationUrlHelper.open(url);
-    if (!opened) _showSnack('لا يمكن فتح الاتجاهات', Colors.orange);
+    if (!opened) {
+      _showSnack('لا يمكن فتح الاتجاهات', Colors.orange);
+    }
   }
 
   Future<void> _launchUrl(String url) async {
-    if (url.trim().isEmpty) return;
+    if (url.trim().isEmpty) {
+      return;
+    }
     final opened = await LocationUrlHelper.open(url);
-    if (!opened) _showSnack('لا يمكن فتح الرابط', Colors.orange);
+    if (!opened) {
+      _showSnack('لا يمكن فتح الرابط', Colors.orange);
+    }
   }
 
   String _getPriceText(int level) {
@@ -363,6 +511,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             .doc(widget.placeId)
             .snapshots(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('خطأ: ${snapshot.error}'));
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -383,12 +534,14 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           final facebookPage = FirestoreUtils.stringOf(data, 'facebookPage');
           final geoZoneName = FirestoreUtils.stringOf(data, 'geoZoneName');
           final city = FirestoreUtils.stringOf(data, 'city');
+          final governorate = FirestoreUtils.stringOf(data, 'governorate');
+          final address = FirestoreUtils.stringOf(data, 'address');
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildHeader(data, rating, reviewCount, geoZoneName, city),
-
+              _buildHeader(data, rating, reviewCount, geoZoneName, city,
+                  address, governorate),
               if (!isActive && banReason.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -446,7 +599,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 16),
               PlaceStatusSection(
                 isActive: isActive,
@@ -454,7 +606,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                 updating: _updating,
                 onToggle: _toggleStatus,
               ),
-
               if (isActive) ...[
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -479,7 +630,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   ),
                 ),
               ],
-
               if (!isActive && banReason.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -500,8 +650,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   ),
                 ),
               ],
-
-              // ✅ قسم التحكم في شارة التميز
               const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
@@ -516,30 +664,33 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     )
                   ],
                 ),
-                child: SwitchListTile(
-                  title: const Text(
-                    'شارة التميز (Excellence Badge)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: SwitchListTile(
+                    title: const Text(
+                      'شارة التميز (Excellence Badge)',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    subtitle: const Text(
+                      'تفعيل يدوي يمنح المكان شارة ذهبية مميزة',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    secondary: Icon(
+                      isExcellence
+                          ? Icons.workspace_premium
+                          : Icons.workspace_premium_outlined,
+                      color: isExcellence ? Colors.amber : Colors.grey,
+                      size: 28,
+                    ),
+                    value: isExcellence,
+                    onChanged: _updating ? null : _toggleExcellence,
+                    activeThumbColor: Colors.amber,
                   ),
-                  subtitle: const Text(
-                    'تفعيل يدوي يمنح المكان شارة ذهبية مميزة',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  secondary: Icon(
-                    isExcellence
-                        ? Icons.workspace_premium
-                        : Icons.workspace_premium_outlined,
-                    color: isExcellence ? Colors.amber : Colors.grey,
-                    size: 28,
-                  ),
-                  value: isExcellence,
-                  onChanged: _updating ? null : _toggleExcellence,
-                  activeThumbColor: Colors.amber,
                 ),
               ),
-
               const SizedBox(height: 16),
-
               if (priceLevel > 0 ||
                   businessEmail.isNotEmpty ||
                   website.isNotEmpty ||
@@ -548,7 +699,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     priceLevel, businessEmail, website, facebookPage),
                 const SizedBox(height: 16),
               ],
-
               PlaceLocationSection(
                 data: data,
                 onOpenMap: () {
@@ -565,7 +715,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               const SizedBox(height: 16),
               PlaceTagsSection(tags: tags),
               const SizedBox(height: 32),
-
               FilledButton.icon(
                 onPressed: () async {
                   await Navigator.push(
@@ -588,9 +737,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   elevation: 2,
                 ),
               ),
-
               const SizedBox(height: 12),
-
               OutlinedButton.icon(
                 onPressed: _deletePlace,
                 icon: const Icon(Icons.delete_outline,
@@ -609,7 +756,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 32),
             ],
           );
@@ -624,9 +770,13 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     int reviewCount,
     String geoZoneName,
     String city,
+    String address,
+    String governorate,
   ) {
     final isExcellence = FirestoreUtils.boolOf(data, 'isExcellence') ||
         (rating >= 4.5 && reviewCount >= 10);
+
+    final formattedAddress = _formatAddress(address, city, governorate);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -662,6 +812,8 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isExcellence)
@@ -682,9 +834,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               FirestoreUtils.stringOf(data, 'nameEn'),
               style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.8), fontSize: 15),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
-          if (geoZoneName.isNotEmpty || city.isNotEmpty) ...[
+          if (formattedAddress.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 6,
@@ -698,12 +852,14 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     maxWidth: MediaQuery.of(context).size.width - 80,
                   ),
                   child: Text(
-                    [geoZoneName, city].where((s) => s.isNotEmpty).join(' • '),
+                    formattedAddress,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.95),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

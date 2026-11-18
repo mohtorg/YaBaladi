@@ -1,14 +1,15 @@
 // lib/features/trip/widgets/timeline/timeline_transport_row.dart
 //
-// [v1.2 — 2026-10-18] — FIX: import path (3 → 4 levels up)
-//   - FIX (CRITICAL): '../../../models/trip_plan.dart' كان خطأ
-//     → الصحيح: '../../../../models/trip_plan.dart' (4 مستويات)
-//   - سبب الخطأ: timeline/ + widgets/ + trip/ + features/ = 4
-//
-// [v1.1 — 2026-10-18] — Wave 5.4 initial
+// [v1.3 - DARK THEME + ARABIC PLURALS]
+//   - FIXED: Explicit dark-friendly colors (was using theme.colorScheme,
+//     producing high-contrast white lines and unreadable grey text).
+//   - FIXED: Arabic pluralization for minutes (1/2/3-10/11+).
+//   - KEPT: Column widths (60/30/8), IntrinsicHeight, switch labels, icon.
+//   - KEPT: Import path (../../../../ = 4 levels up).
+
 import 'package:flutter/material.dart';
 
-import '../../../../models/trip_plan.dart'; // ✅ 4 مستويات
+import '../../../../models/trip_plan.dart';
 
 class TimelineTransportRow extends StatelessWidget {
   final int minutes;
@@ -20,9 +21,16 @@ class TimelineTransportRow extends StatelessWidget {
     required this.transportMode,
   });
 
+  /// Arabic pluralization for durations in minutes.
+  String _arabicDuration(int minutes) {
+    if (minutes == 1) return 'دقيقة واحدة';
+    if (minutes == 2) return 'دقيقتان';
+    if (minutes >= 3 && minutes <= 10) return '$minutes دقائق';
+    return '$minutes دقيقة';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final IconData icon = switch (transportMode) {
       TripTransportMode.walking => Icons.directions_walk,
       TripTransportMode.driving => Icons.directions_car,
@@ -38,20 +46,22 @@ class TimelineTransportRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Empty time column
+          // Empty time column (matches TimelineStationCard width)
           const SizedBox(width: 60),
-          // Dashed line
+
+          // Dashed connector (matches TimelineStationCard dot column)
           SizedBox(
             width: 30,
             child: Center(
               child: Container(
                 width: 2,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                color: Colors.white.withValues(alpha: 0.15),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          // Transport row
+
+          // Transport info row
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -60,13 +70,14 @@ class TimelineTransportRow extends StatelessWidget {
                   Icon(
                     icon,
                     size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: const Color(0xFF0EA5E9),
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '$label • $minutes دقيقة',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    '$label • ${_arabicDuration(minutes)}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
                       fontStyle: FontStyle.italic,
                     ),
                   ),

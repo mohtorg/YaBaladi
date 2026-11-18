@@ -1,11 +1,19 @@
 // lib/features/places/screens/near_me_screen.dart
+// [v1.2 — 2026-11-15] — INTEGRITY FIX: Passed `isRankable` and `sampleQuality`
+//   to PlaceCard to match other screens and show the "جديد" badge.
+// [v1.1 — 2026-11-11] — CENTRAL DISTANCE: Replaced DistanceHelper with LocationUrlHelper.
+//   - Fixed Linter warnings (added braces to all if statements).
+//   - Converted distance to km before passing to PlaceCard.
+// [v1.0 — 2026-10-19] — Initial version.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../widgets/place_card.dart';
-import '../../../core/utils/distance_helper.dart';
-import '../../../core/services/zone_service.dart'; // ✅ استيراد خدمة الأحياء
+import '../../../core/services/zone_service.dart';
+import '../../../core/services/adjusted_score_service.dart';
+import '../../../core/helpers/location_url_helper.dart'; // ✅ العقل المدبر للمسافات
 
 class NearMeScreen extends StatefulWidget {
   const NearMeScreen({super.key});
@@ -18,7 +26,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
   Position? _currentPosition;
   bool _isLoading = true;
   String? _error;
-  String _currentZoneName = 'جاري تحديد المنطقة...'; // ✅ متغير لحفظ اسم الحي
+  String _currentZoneName = 'جاري تحديد المنطقة...';
 
   @override
   void initState() {
@@ -63,12 +71,19 @@ class _NearMeScreenState extends State<NearMeScreen> {
       final zoneName = await ZoneService()
           .getZoneName(position.latitude, position.longitude);
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _currentPosition = position;
         _currentZoneName = zoneName ?? 'منطقة غير معروفة';
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = 'خطأ في جلب الموقع: $e';
         _isLoading = false;
@@ -133,16 +148,20 @@ class _NearMeScreenState extends State<NearMeScreen> {
                 }
 
                 final docs = snapshot.data!.docs.toList();
+
+                // ✅ ترتيب الأماكن باستخدام المحرك المركزي للمسافات
                 docs.sort((a, b) {
                   final locA = (a.data() as Map)['location'] as GeoPoint?;
                   final locB = (b.data() as Map)['location'] as GeoPoint?;
-                  if (locA == null || locB == null) return 0;
-                  final distA = DistanceHelper.calculateDistance(
+                  if (locA == null || locB == null) {
+                    return 0;
+                  }
+                  final distA = LocationUrlHelper.calculateDistanceMeters(
                       _currentPosition!.latitude,
                       _currentPosition!.longitude,
                       locA.latitude,
                       locA.longitude);
-                  final distB = DistanceHelper.calculateDistance(
+                  final distB = LocationUrlHelper.calculateDistanceMeters(
                       _currentPosition!.latitude,
                       _currentPosition!.longitude,
                       locB.latitude,
@@ -156,17 +175,28 @@ class _NearMeScreenState extends State<NearMeScreen> {
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
                     final loc = data['location'] as GeoPoint?;
-                    final distance = loc != null
-                        ? DistanceHelper.calculateDistance(
+
+                    // ✅ حساب المسافة بالكيلومتر لتمريرها للبطاقة
+                    final distanceMeters = loc != null
+                        ? LocationUrlHelper.calculateDistanceMeters(
                             _currentPosition!.latitude,
                             _currentPosition!.longitude,
                             loc.latitude,
                             loc.longitude)
                         : null;
+
+                    final distanceKm =
+                        distanceMeters != null ? distanceMeters / 1000.0 : null;
+
                     final images = (data['imageUrls'] as List?)
                             ?.map((e) => e.toString())
                             .toList() ??
                         [];
+
+                    // ✅ Phase 12: التحقق من قابلية الترتيب
+                    final isRankable = (data['isRankable'] as bool?) ??
+                        (((data['reviewCount'] as num?)?.toInt() ?? 0) >=
+                            AdjustedScoreService.minRatingsForRanking);
 
                     return PlaceCard(
                       placeId: docs[index].id,
@@ -176,12 +206,15 @@ class _NearMeScreenState extends State<NearMeScreen> {
                       rating:
                           (data['averageRating'] as num?)?.toDouble() ?? 0.0,
                       reviewCount: (data['reviewCount'] as num?)?.toInt() ?? 0,
+                      sampleQuality:
+                          (data['sampleQuality'] as num?)?.toDouble(),
+                      isRankable: isRankable,
                       categoryId: data['categoryId'],
                       geoZoneName: data['geoZoneName'],
                       city: data['city'],
                       governorate: data['governorate'],
                       address: data['address'],
-                      distanceInKm: distance,
+                      distanceInKm: distanceKm,
                     );
                   },
                 );

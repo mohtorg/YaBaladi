@@ -144,7 +144,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get versionLabel => 'الإصدار';
   @override
-  String get versionValue => '1.0.0+1';
+  String get versionValue => '1.0.0+6';
   @override
   String get clearCacheLabel => 'مسح الذاكرة المؤقتة';
   @override
@@ -183,6 +183,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get apply => 'تطبيق';
   @override
   String get select => 'اختيار';
+  @override
+  String get delete => 'حذف';
+  @override
+  String get edit => 'تعديل';
+  @override
+  String get done => 'تم';
+  @override
+  String get copy => 'نسخ';
+  @override
+  String get copiedToClipboard => 'تم النسخ إلى الحافظة';
   @override
   String get loginTitle => 'تسجيل الدخول';
   @override
@@ -238,7 +248,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get settingsPrivacySection => 'الخصوصية والأذونات';
   @override
-  String get settingsDangerSection => 'منطقة الخطر';
+  String get settingsDangerSection => 'إجراءات خطرة';
   @override
   String get continueAsGuest => 'متابعة كزائر';
   @override
@@ -270,7 +280,20 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get searchTrending => 'الأكثر بحثًا';
   @override
-  String searchResultsCount(int count) => 'نتائج: $count';
+  String searchResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نتيجة',
+      many: '$count نتيجة',
+      few: '$count نتائج',
+      two: 'نتيجتان',
+      one: 'نتيجة واحدة',
+      zero: 'لا توجد نتائج',
+    );
+    return '$_temp0';
+  }
+
   @override
   String get searchNoResults => 'لا توجد نتائج لـ';
   @override
@@ -320,24 +343,374 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get noCoordinates => 'لا توجد إحداثيات لعرض هذا المكان على الخريطة';
   @override
-  String get continueWithGoogle => 'المتابعة باستخدام Google';
+  String get continueWithGoogle => 'المتابعة باستخدام جوجل';
   @override
   String get registerCta => 'إنشاء حساب جديد';
   @override
-  String get googleSignInFailed => 'فشل تسجيل الدخول بـ Google';
+  String get googleSignInFailed => 'فشل تسجيل الدخول بجوجل';
   @override
   String get tripsTitle => 'رحلتي';
 
-  // 👈 النصوص المضافة حديثاً
+  // =====================================================================
+  // Location & Governorate Picker
+  // =====================================================================
   @override
-  String get planTripAction => 'خطط رحلتك';
+  String get chooseGovernorate => 'اختر المحافظة';
+  @override
+  String get useCurrentLocation => 'استخدام موقعي الحالي';
+  @override
+  String get fromGps => 'من GPS';
+  @override
+  String get orChooseAnotherGovernorate => 'أو اختر محافظة أخرى';
+  @override
+  String get chooseYourGovernorate => 'اختر محافظتك';
+  @override
+  String get defaultBadge => 'افتراضي';
+  @override
+  String get determineMyLocation => 'تحديد موقعي';
+  @override
+  String get locationDefined => 'موقع محدد';
+  @override
+  String get searchPlaceTitle => 'بحث عن مكان';
+  @override
+  String get searchPlaceHint => 'مثال: بورسعيد، الشرق';
+  @override
+  String get noMatchingResults => 'لا توجد نتائج مطابقة.';
+  @override
+  String get locationSourceGps => 'GPS (الأدق)';
+  @override
+  String get locationSourceGpsSub => 'قد يستغرق بضع ثوان';
+  @override
+  String get locationSourceNetwork => 'الشبكة (الأسرع)';
+  @override
+  String get locationSourceNetworkSub => 'Wi-Fi / بيانات الجوال';
+  @override
+  String get locationSourceLastKnown => 'آخر موقع معروف';
+  @override
+  String get locationSourceLastKnownSub => 'فوري — قد يكون قديماً';
+  @override
+  String get locationSourceManual => 'اختيار يدوي';
+  @override
+  String get locationSourceManualSub => 'من قائمة المحافظات';
+  @override
+  String get locationSourceOnline => 'بحث بالاسم';
+  @override
+  String get locationSourceOnlineSub => 'اكتب اسم مدينتك أو حيّك';
 
+  // =====================================================================
+  // Trip Planner
+  // =====================================================================
+  @override
+  String get planYourTrip => 'خطط لرحلتك';
+  @override
+  String get whereToGo => 'إلى أين تريد أن تذهب؟';
+  @override
+  String get chooseGovernorateToStart => 'اختر المحافظة لتبدأ التخطيط.';
+  @override
+  String foundInBasket(String count) {
+    return 'وجدنا $count في سلتك';
+  }
+
+  @override
+  String tripIn(String govName) {
+    return 'رحلة في $govName. كيف تريد أن تكون؟';
+  }
+
+  @override
+  String get governorate => 'المحافظة';
+  @override
+  String get duration => 'المدة';
+  @override
+  String get halfDay => 'نصف يوم';
+  @override
+  String get halfDaySub => '~4 ساعات';
+  @override
+  String get fullDay => 'يوم كامل';
+  @override
+  String get fullDaySub => '~8 ساعات';
+  @override
+  String get weekend => 'عطلة نهاية أسبوع';
+  @override
+  String get weekendSub => '~16 ساعة (يومان)';
+  @override
+  String get customDates => 'تواريخ مخصصة (3 أيام أو أكثر)';
+  @override
+  String tripDurationDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'مدة الرحلة: $days يوم',
+      many: 'مدة الرحلة: $days يوماً',
+      few: 'مدة الرحلة: $days أيام',
+      two: 'مدة الرحلة: يومان',
+      one: 'مدة الرحلة: يوم واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get transportMode => 'وسيلة النقل';
+  @override
+  String get transportDriving => 'سيارة';
+  @override
+  String get transportWalking => 'مشي';
+  @override
+  String get transportBus => 'حافلة';
+  @override
+  String get preparingBestOrder => 'نقوم بتجهيز أفضل ترتيب لرحلتك...';
+  @override
+  String get notEnoughPlaces => 'لم نجد أماكن كافية';
+  @override
+  String get modifyOptions => 'تعديل الخيارات';
+  @override
+  String get modifyPlacesManually => 'تعديل الأماكن يدوياً';
+  @override
+  String get finalTouches => 'اللمسات الأخيرة';
+  @override
+  String get addTripTitle => 'أضف عنواناً لرحلتك';
+  @override
+  String get tripTitleField => 'عنوان الرحلة';
+  @override
+  String get previous => 'السابق';
+  @override
+  String get generateTrip => 'توليد الرحلة';
+  @override
+  String get next => 'متابعة';
+  @override
+  String get saveTrip => 'حفظ الرحلة';
+  @override
+  String get tripSavedSuccess => 'تم حفظ الرحلة بنجاح';
+  @override
+  String get loginRequiredForSave => 'يجب تسجيل الدخول لحفظ الرحلة';
+  @override
+  String get saveFailed => 'تعذر الحفظ';
+  @override
+  String dayNumber(int day) {
+    return 'اليوم $day';
+  }
+
+  @override
+  String get minutes => 'دقيقة';
+  @override
+  String get minutesDual => 'دقيقتان';
+  @override
+  String get minutesPlural => 'دقائق';
+  @override
+  String get stations => 'محطة';
+  @override
+  String get stationsDual => 'محطتان';
+  @override
+  String get stationsPlural => 'محطات';
+  @override
+  String get hours => 'ساعة';
+  @override
+  String get hoursPlural => 'ساعات';
+  @override
+  String get places => 'مكان';
+  @override
+  String get placesDual => 'مكانان';
+  @override
+  String get placesPlural => 'أماكن';
+  @override
+  String get newTrip => 'رحلة جديدة';
+  @override
+  String tripTo(String govName) {
+    return 'رحلة إلى $govName';
+  }
+
+  // =====================================================================
+  // Bulk Import (Excel)
+  // =====================================================================
+  @override
+  String get bulkImportTitle => 'إدارة المعالم (رفع مجمع)';
+  @override
+  String get bulkImportIntro =>
+      'يمكنك إدخال عشرات المعالم دفعة واحدة عبر ملف Excel.\nقم بتحميل القالب، تعبئته، ثم رفعه.';
+  @override
+  String get downloadExcelTemplate => '1. تحميل قالب الإكسل';
+  @override
+  String get pickExcelFile => '2. اختيار ملف الإكسل ومراجعته';
+  @override
+  String confirmUploadPlaces(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count معلم',
+      many: '$count معلماً',
+      few: '$count معالم',
+      two: 'معلمين',
+      one: 'معلم واحد',
+    );
+    return '3. تأكيد رفع $_temp0 للقاعدة';
+  }
+
+  @override
+  String get preparingTemplate => 'جاري تحضير القالب...';
+  @override
+  String get templateReady => 'تم تجهيز القالب! يمكنك الآن حفظه أو مشاركته.';
+  @override
+  String templateError(String error) {
+    return 'حدث خطأ أثناء تحضير القالب: $error';
+  }
+
+  @override
+  String get readingFile => 'جاري قراءة الملف والتحقق من البيانات...';
+  @override
+  String get fileSelectionCancelled => 'تم إلغاء اختيار الملف.';
+  @override
+  String get noValidDataFound => 'لم يتم العثور على بيانات صالحة في الملف.';
+  @override
+  String get fileReadSuccess =>
+      'تم قراءة الملف بنجاح. يرجى مراجعة النتائج أدناه.';
+  @override
+  String get uploadingData => 'جاري رفع البيانات إلى قاعدة البيانات...';
+  @override
+  String uploadSuccess(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count معلم',
+      many: '$count معلماً',
+      few: '$count معالم',
+      two: 'معلمين',
+      one: 'معلم واحد',
+    );
+    return '🎉 تم رفع $_temp0 بنجاح!';
+  }
+
+  @override
+  String duplicatesSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count معلم مسجل مسبقاً',
+      many: '$count معلماً مسجلاً مسبقاً',
+      few: '$count معالم مسجلة مسبقاً',
+      two: 'معلمين مسجلين مسبقاً',
+      one: 'معلم مسجل مسبقاً',
+    );
+    return '(تم تجاهل $_temp0)';
+  }
+
+  @override
+  String get sortReport => '📊 تقرير الفرز:';
+  @override
+  String validPlaces(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count معلم',
+      many: '$count معلماً',
+      few: '$count معالم',
+      two: 'معلمين',
+      one: 'معلم واحد',
+      zero: 'لا يوجد',
+    );
+    return '✅ معالم صالحة للرفع: $_temp0';
+  }
+
+  @override
+  String errorLines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سطر',
+      many: '$count سطراً',
+      few: '$count أسطر',
+      two: 'سطرين',
+      one: 'سطر واحد',
+      zero: 'لا يوجد',
+    );
+    return '❌ أسطر بها أخطاء (سيتم تجاهلها): $_temp0';
+  }
+
+  @override
+  String get bulkUploadSuccessMsg => 'تمت عملية الرفع المجمع بنجاح';
+  @override
+  String get noDataToUpload => 'لا توجد بيانات صالحة للرفع.';
+  @override
+  String get allPlacesAlreadyRegistered =>
+      'كل المعالم الموجودة في الملف مسجلة مسبقاً في قاعدة البيانات أو مكررة داخل الملف.';
+  @override
+  String databaseConnectionError(String error) {
+    return 'حدث خطأ أثناء الاتصال بقاعدة البيانات: $error';
+  }
+
+  @override
+  String fileReadError(String error) {
+    return 'حدث خطأ أثناء قراءة الملف. تأكد من أن الملف بصيغة xlsx صحيحة وغير تالف. ($error)';
+  }
+
+  @override
+  String get templateGenerationFailed => 'فشل في إنشاء ملف الإكسل';
+  @override
+  String get templateShareText => 'قالب إدخال معالم يا بلدي (بورسعيد)';
+  @override
+  String get templateShareSubject => 'قالب استيراد المعالم';
+
+  // =====================================================================
+  // Notifications & FCM
+  // =====================================================================
+  @override
+  String get noValidFcmTokens => 'لا توجد رموز إشعارات صالحة لهذا المستخدم.';
+  @override
+  String get pushSentSuccess => 'تم إرسال الإشعار بنجاح.';
+  @override
+  String get pushFailed => 'فشل إرسال الإشعار.';
+  @override
+  String get notificationPlaceBlockedTitle => '🚫 تم إيقاف نشاطك مؤقتاً';
+  @override
+  String notificationPlaceBlockedBody(String placeName, String reason) {
+    return 'تم إيقاف "$placeName". السبب: $reason';
+  }
+
+  @override
+  String get notificationPlaceUnblockedTitle => '✅ تم تفعيل نشاطك';
+  @override
+  String notificationPlaceUnblockedBody(String placeName) {
+    return 'تم فك الحظر عن "$placeName" بنجاح. يمكنك الآن استقبال الطلبات.';
+  }
+
+  @override
+  String get notificationSupportReplyTitle => '💬 رد جديد من الدعم';
+  @override
+  String notificationSupportReplyBody(String code) {
+    return 'تم الرد على بلاغك ($code). يرجى فتح تفاصيل البلاغ للمراجعة.';
+  }
+
+  @override
+  String get notificationMerchantApprovedTitle => '🎉 تم قبول طلبك';
+  @override
+  String get notificationMerchantApprovedBody =>
+      'تمت الموافقة على طلبك كتاجر. ابدأ الآن في إدارة نشاطك التجاري!';
+  @override
+  String get notificationMerchantRejectedTitle => '⚠️ طلبك يحتاج تعديل';
+  @override
+  String notificationMerchantRejectedBody(String reason) {
+    return 'السبب: $reason';
+  }
+
+  @override
+  String notificationNewReviewTitle(String placeName) {
+    return '⭐ تقييم جديد على $placeName';
+  }
+
+  @override
+  String notificationNewReviewBody(String rating, String comment) {
+    return 'حصلت على تقييم $rating نجوم. "$comment"';
+  }
+
+  // =====================================================================
+  // Home Screen Actions
+  // =====================================================================
+  @override
+  String get planTripAction => 'خطط لرحلتك';
   @override
   String get myTripsAction => 'رحلاتي';
-
   @override
-  String topRatedIn(String governorateName) =>
-      'الأعلى تقييماً في $governorateName';
+  String topRatedIn(String governorateName) {
+    return 'الأعلى تقييماً في $governorateName';
+  }
 
   @override
   String get guestBannerTitle => 'سجل دخولك لتجربة أفضل!';

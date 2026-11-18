@@ -1,4 +1,9 @@
 // lib/services/auth_service.dart
+// [v1.1 — FIXED] — Defensive Null Safety & Cleanup.
+//   - FIXED: Replaced docSnap.data()! with ?? {} to prevent crashes.
+//   - FIXED: Added debugPrint in the rollback catch block.
+//   - KEPT: All Google/Email sign-in, delete account, and sync logic intact.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -114,7 +119,9 @@ class AuthService {
       // Rollback: don't leave an orphaned Auth account without a doc.
       try {
         await fbUser.delete();
-      } catch (_) {/* best-effort */}
+      } catch (e) {
+        debugPrint('⚠️ Rollback delete failed: $e');
+      }
       rethrow;
     }
   }
@@ -211,7 +218,8 @@ class AuthService {
       return appUser;
     }
 
-    return AppUser.fromMap(docSnap.id, docSnap.data()!);
+    // ✅ استخدام ?? {} لحماية التطبيق من الانهيار إذا كانت الوثيقة فارغة
+    return AppUser.fromMap(docSnap.id, docSnap.data() ?? {});
   }
 
   Future<AppUser?> getCurrentUserData() async {
@@ -220,7 +228,9 @@ class AuthService {
     try {
       final doc = await _firestore.collection('users').doc(user.uid).get();
       if (!doc.exists) return null;
-      return AppUser.fromMap(doc.id, doc.data()!);
+
+      // ✅ استخدام ?? {} لحماية التطبيق من الانهيار
+      return AppUser.fromMap(doc.id, doc.data() ?? {});
     } catch (e) {
       debugPrint('❌ getCurrentUserData: $e');
       return null;

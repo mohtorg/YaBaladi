@@ -67,7 +67,7 @@
   "aboutLabel": "About",
   "aboutSubtitle": "Info & licenses",
   "versionLabel": "Version",
-  "versionValue": "1.0.0+1",
+  "versionValue": "1.0.0+6",
   "clearCacheLabel": "Clear Cache",
   "clearCacheSubtitle": "Delete cached data",
   "clearCacheConfirm": "Do you want to clear cached data?",
@@ -87,6 +87,11 @@
   "no": "No",
   "apply": "Apply",
   "select": "Select",
+  "delete": "Delete",
+  "edit": "Edit",
+  "done": "Done",
+  "copy": "Copy",
+  "copiedToClipboard": "Copied to clipboard",
   "loginTitle": "Sign In",
   "loginSubtitle": "Enter your credentials to access your account",
   "registerTitle": "Create Account",
@@ -114,7 +119,7 @@
   "discoverPlaces": "Discover Places",
   "settingsAppearance": "Appearance",
   "settingsPrivacySection": "Privacy & Permissions",
-  "settingsDangerSection": "Danger Zone",
+  "settingsDangerSection": "Danger Actions",
   "continueAsGuest": "Continue as guest",
   "guest": "Guest",
   "loginRequired": "Login required",
@@ -129,7 +134,7 @@
   "searchClearAll": "Clear all",
   "searchQuickCategories": "Quick categories",
   "searchTrending": "Trending now",
-  "searchResultsCount": "Results: {count}",
+  "searchResultsCount": "{count, plural, =0{No results} =1{1 result} other{{count} results}}",
   "@searchResultsCount": {
     "placeholders": {
       "count": { "type": "int" }
@@ -162,5 +167,230 @@
   "continueWithGoogle": "Continue with Google",
   "googleSignInFailed": "Google sign-in failed",
   "registerCta": "Create New Account",
-  "tripsTitle": "My Trips"
+  "tripsTitle": "My Trips",
+
+  "// ─── Location & Governorate Picker ───": "",
+  "chooseGovernorate": "Choose Governorate",
+  "useCurrentLocation": "Use my current location",
+  "fromGps": "From GPS",
+  "orChooseAnotherGovernorate": "Or choose another governorate",
+  "chooseYourGovernorate": "Choose your governorate",
+  "defaultBadge": "Default",
+  "determineMyLocation": "Determine my location",
+  "locationDefined": "Selected Location",
+  "searchPlaceTitle": "Search for a place",
+  "searchPlaceHint": "e.g. Port Said, El-Sharq",
+  "noMatchingResults": "No matching results.",
+  "locationSourceGps": "GPS (Most accurate)",
+  "locationSourceGpsSub": "May take a few seconds",
+  "locationSourceNetwork": "Network (Fastest)",
+  "locationSourceNetworkSub": "Wi-Fi / Mobile data",
+  "locationSourceLastKnown": "Last known location",
+  "locationSourceLastKnownSub": "Instant — may be outdated",
+  "locationSourceManual": "Manual selection",
+  "locationSourceManualSub": "From governorate list",
+  "locationSourceOnline": "Search by name",
+  "locationSourceOnlineSub": "Type your city or district",
+
+  "// ─── Trip Planner ───": "",
+  "planYourTrip": "Plan Your Trip",
+  "whereToGo": "Where do you want to go?",
+  "chooseGovernorateToStart": "Choose the governorate to start planning.",
+  "foundInBasket": "Found {count} in your basket",
+  "@foundInBasket": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "tripIn": "A trip in {govName}. How do you want it to be?",
+  "@tripIn": {
+    "placeholders": {
+      "govName": { "type": "String" }
+    }
+  },
+  "governorate": "Governorate",
+  "duration": "Duration",
+  "halfDay": "Half Day",
+  "halfDaySub": "~4 hours",
+  "fullDay": "Full Day",
+  "fullDaySub": "~8 hours",
+  "weekend": "Weekend",
+  "weekendSub": "~16 hours (2 days)",
+  "customDates": "Custom dates (3+ days)",
+  "tripDurationDays": "{days, plural, =1{Trip duration: 1 day} other{Trip duration: {days} days}}",
+  "@tripDurationDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "transportMode": "Transport Mode",
+  "transportDriving": "Driving",
+  "transportWalking": "Walking",
+  "transportBus": "Bus",
+  "preparingBestOrder": "Preparing the best order for your trip...",
+  "notEnoughPlaces": "We couldn't find enough places",
+  "modifyOptions": "Modify Options",
+  "modifyPlacesManually": "Modify places manually",
+  "finalTouches": "Final Touches",
+  "addTripTitle": "Add a title to your trip",
+  "tripTitleField": "Trip Title",
+  "previous": "Previous",
+  "generateTrip": "Generate Trip",
+  "next": "Next",
+  "saveTrip": "Save Trip",
+  "tripSavedSuccess": "Trip saved successfully",
+  "loginRequiredForSave": "You must be logged in to save a trip",
+  "saveFailed": "Save failed",
+  "dayNumber": "Day {day}",
+  "@dayNumber": {
+    "placeholders": {
+      "day": { "type": "int" }
+    }
+  },
+  "minutes": "Minute",
+  "minutesDual": "Two minutes",
+  "minutesPlural": "Minutes",
+  "stations": "Stop",
+  "stationsDual": "Two stops",
+  "stationsPlural": "Stops",
+  "hours": "Hour",
+  "hoursPlural": "Hours",
+  "places": "Place",
+  "placesDual": "Two places",
+  "placesPlural": "Places",
+  "newTrip": "New Trip",
+  "tripTo": "Trip to {govName}",
+  "@tripTo": {
+    "placeholders": {
+      "govName": { "type": "String" }
+    }
+  },
+
+  "// ─── Bulk Import (Excel) ───": "",
+  "bulkImportTitle": "Manage Places (Bulk Import)",
+  "bulkImportIntro": "You can insert dozens of places at once via an Excel file.\nDownload the template, fill it in, then upload it.",
+  "downloadExcelTemplate": "1. Download Excel Template",
+  "pickExcelFile": "2. Pick and review Excel file",
+  "confirmUploadPlaces": "3. Confirm upload of {count, plural, =1{1 place} other{{count} places}}",
+  "@confirmUploadPlaces": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "preparingTemplate": "Preparing template...",
+  "templateReady": "Template is ready! You can now save or share it.",
+  "templateError": "An error occurred while preparing the template: {error}",
+  "@templateError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "readingFile": "Reading file and validating data...",
+  "fileSelectionCancelled": "File selection was cancelled.",
+  "noValidDataFound": "No valid data found in the file.",
+  "fileReadSuccess": "File read successfully. Please review the results below.",
+  "uploadingData": "Uploading data to the database...",
+  "uploadSuccess": "🎉 Successfully uploaded {count, plural, =1{1 place} other{{count} places}}!",
+  "@uploadSuccess": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "duplicatesSkipped": "({count, plural, =1{1 duplicate place skipped} other{{count} duplicate places skipped}})",
+  "@duplicatesSkipped": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "sortReport": "📊 Sort Report:",
+  "validPlaces": "✅ Valid places to upload: {count, plural, =1{1 place} other{{count} places}}",
+  "@validPlaces": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "errorLines": "❌ Lines with errors (will be skipped): {count, plural, =1{1 line} other{{count} lines}}",
+  "@errorLines": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkUploadSuccessMsg": "Bulk upload completed successfully",
+  "noDataToUpload": "No valid data to upload.",
+  "allPlacesAlreadyRegistered": "All places in the file are already registered in the database or duplicated within the file.",
+  "databaseConnectionError": "Database connection error: {error}",
+  "@databaseConnectionError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fileReadError": "An error occurred while reading the file. Ensure it is a valid, uncorrupted xlsx file. ({error})",
+  "@fileReadError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "templateGenerationFailed": "Failed to generate Excel file",
+  "templateShareText": "Ya Baladi Places Template (Port Said)",
+  "templateShareSubject": "Places Import Template",
+
+  "// ─── Notifications & FCM ───": "",
+  "noValidFcmTokens": "No valid FCM tokens found for this user.",
+  "pushSentSuccess": "Notification sent successfully.",
+  "pushFailed": "Failed to send notification.",
+  "notificationPlaceBlockedTitle": "🚫 Your activity has been temporarily suspended",
+  "notificationPlaceBlockedBody": "\"{placeName}\" has been suspended. Reason: {reason}",
+  "@notificationPlaceBlockedBody": {
+    "placeholders": {
+      "placeName": { "type": "String" },
+      "reason": { "type": "String" }
+    }
+  },
+  "notificationPlaceUnblockedTitle": "✅ Your activity has been reactivated",
+  "notificationPlaceUnblockedBody": "\"{placeName}\" has been unblocked successfully. You can now receive requests.",
+  "@notificationPlaceUnblockedBody": {
+    "placeholders": {
+      "placeName": { "type": "String" }
+    }
+  },
+  "notificationSupportReplyTitle": "💬 New reply from support",
+  "notificationSupportReplyBody": "Your ticket ({code}) has been replied to. Please open the ticket details for review.",
+  "@notificationSupportReplyBody": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "notificationMerchantApprovedTitle": "🎉 Your request has been approved",
+  "notificationMerchantApprovedBody": "You have been approved as a merchant. Start managing your business now!",
+  "notificationMerchantRejectedTitle": "⚠️ Your request needs adjustment",
+  "notificationMerchantRejectedBody": "Reason: {reason}",
+  "@notificationMerchantRejectedBody": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "notificationNewReviewTitle": "⭐ New review for {placeName}",
+  "@notificationNewReviewTitle": {
+    "placeholders": {
+      "placeName": { "type": "String" }
+    }
+  },
+  "notificationNewReviewBody": "You received a {rating}-star rating. \"{comment}\"",
+  "@notificationNewReviewBody": {
+    "placeholders": {
+      "rating": { "type": "String" },
+      "comment": { "type": "String" }
+    }
+  },
+
+  "// ─── Home Screen Actions ───": "",
+  "planTripAction": "Plan Your Trip",
+  "myTripsAction": "My Trips",
+  "topRatedIn": "Top rated in {governorateName}",
+  "@topRatedIn": {
+    "placeholders": {
+      "governorateName": { "type": "String" }
+    }
+  },
+  "guestBannerTitle": "Sign in for a better experience!"
 }

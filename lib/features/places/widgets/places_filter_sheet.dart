@@ -1,10 +1,8 @@
 // lib/features/places/widgets/places_filter_sheet.dart
 //
-// [v4.1 — 2026-10-25] — Wave 11 FIX: imports مصححة + pending_strings
-//
-//   - FIX: filters_controller path: ../../../ → ../../
-//   - FIX: filter_definition path: ../../../../ → ../../../
-//   - ADD: import pending_strings.dart (filterSheetTitle, showResultsCount, noMatchingResults)
+// [v4.3 — 2026-11-12] — NULLABLE CATEGORY FOR GENERAL SEARCH:
+//   - `categoryId` is now String? (null = show only general filters).
+//   - `showPlacesFilterSheet` returns Future<void> to allow awaiting.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -15,11 +13,12 @@ import '../../../models/filter_definition.dart';
 import '../../filters/controllers/filters_controller.dart';
 import '../controllers/places_controller.dart';
 
-void showPlacesFilterSheet({
+Future<void> showPlacesFilterSheet({
   required BuildContext context,
   required PlacesController controller,
+  String? categoryId, // ✅ nullable
 }) {
-  showModalBottomSheet(
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -27,13 +26,16 @@ void showPlacesFilterSheet({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => _FilterSheet(controller: controller),
+    builder: (_) =>
+        _FilterSheet(controller: controller, categoryId: categoryId),
   );
 }
 
 class _FilterSheet extends StatefulWidget {
   final PlacesController controller;
-  const _FilterSheet({required this.controller});
+  final String? categoryId;
+
+  const _FilterSheet({required this.controller, this.categoryId});
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -55,7 +57,16 @@ class _FilterSheetState extends State<_FilterSheet> {
     final filtersCtrl = context.watch<FiltersController>();
     final l10n = AppLocalizations.of(context);
 
-    final visibleFilters = filtersCtrl.visibleFor(filtersCtrl.currentRole);
+    // ✅ الفلاتر: عامة فقط إن لم يكن هناك تصنيف، وإلا عام + خاص
+    final baseFilters = widget.categoryId == null
+        ? filtersCtrl.generalFilters
+        : filtersCtrl.applicableFiltersFor(widget.categoryId!);
+
+    final visibleFilters = baseFilters
+        .where((f) =>
+            f.isActive && f.rolesAllowed.contains(filtersCtrl.currentRole))
+        .toList();
+
     final filtersCount = _temp.values.where((s) => s.isNotEmpty).length;
 
     return DraggableScrollableSheet(
@@ -74,7 +85,17 @@ class _FilterSheetState extends State<_FilterSheet> {
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 children: [
-                  ...visibleFilters.map((f) => _buildFilterSection(theme, f)),
+                  if (visibleFilters.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'لا توجد فلاتر متاحة في هذا القسم.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    )
+                  else
+                    ...visibleFilters.map((f) => _buildFilterSection(theme, f)),
                 ],
               ),
             ),
@@ -85,7 +106,8 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  // ─── Header ───
+  // ... (باقي الكود كما هو تماماً، لم أضف أي تغييرات عليه)
+
   Widget _buildHeader(ThemeData theme, AppLocalizations l10n, int count) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -126,7 +148,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  // ─── Active chips ───
   Widget _buildActiveChips(ThemeData theme, AppLocalizations l10n) {
     final chips = <Widget>[];
     _temp.forEach((filterId, selection) {
@@ -204,7 +225,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  // ─── Filter section (dynamic) ───
   Widget _buildFilterSection(ThemeData theme, FilterDefinition filter) {
     final selection = _temp[filter.id] ?? FilterSelection.empty;
 
@@ -344,7 +364,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     return null;
   }
 
-  // ─── Apply button ───
   Widget _buildApplyButton(
       ThemeData theme, AppLocalizations l10n, FiltersController ctrl) {
     final preview = widget.controller.applyFilters(_temp);
@@ -394,7 +413,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 
-  // ─── Helpers ───
   Widget _sectionCard(
     ThemeData theme, {
     required IconData icon,
@@ -459,10 +477,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// PremiumChip
-// ═══════════════════════════════════════════════════════════════
 
 class _PremiumChip extends StatelessWidget {
   final String label;

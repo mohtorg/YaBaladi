@@ -144,7 +144,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get versionLabel => 'Version';
   @override
-  String get versionValue => '1.0.0+1';
+  String get versionValue => '1.0.0+6';
   @override
   String get clearCacheLabel => 'Clear Cache';
   @override
@@ -184,6 +184,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get apply => 'Apply';
   @override
   String get select => 'Select';
+  @override
+  String get delete => 'Delete';
+  @override
+  String get edit => 'Edit';
+  @override
+  String get done => 'Done';
+  @override
+  String get copy => 'Copy';
+  @override
+  String get copiedToClipboard => 'Copied to clipboard';
   @override
   String get loginTitle => 'Sign In';
   @override
@@ -241,7 +251,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsPrivacySection => 'Privacy & Permissions';
   @override
-  String get settingsDangerSection => 'Danger Zone';
+  String get settingsDangerSection => 'Danger Actions';
   @override
   String get continueAsGuest => 'Continue as guest';
   @override
@@ -273,7 +283,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchTrending => 'Trending now';
   @override
-  String searchResultsCount(int count) => 'Results: $count';
+  String searchResultsCount(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count results',
+      one: '1 result',
+      zero: 'No results',
+    );
+    return '$_temp0';
+  }
+
   @override
   String get searchNoResults => 'No results for';
   @override
@@ -332,16 +352,353 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tripsTitle => 'My Trips';
 
-  // 👈 النصوص المضافة حديثاً
+  // =====================================================================
+  // Location & Governorate Picker
+  // =====================================================================
   @override
-  String get planTripAction => 'Plan Trip';
+  String get chooseGovernorate => 'Choose Governorate';
+  @override
+  String get useCurrentLocation => 'Use my current location';
+  @override
+  String get fromGps => 'From GPS';
+  @override
+  String get orChooseAnotherGovernorate => 'Or choose another governorate';
+  @override
+  String get chooseYourGovernorate => 'Choose your governorate';
+  @override
+  String get defaultBadge => 'Default';
+  @override
+  String get determineMyLocation => 'Determine my location';
+  @override
+  String get locationDefined => 'Selected Location';
+  @override
+  String get searchPlaceTitle => 'Search for a place';
+  @override
+  String get searchPlaceHint => 'e.g. Port Said, El-Sharq';
+  @override
+  String get noMatchingResults => 'No matching results.';
+  @override
+  String get locationSourceGps => 'GPS (Most accurate)';
+  @override
+  String get locationSourceGpsSub => 'May take a few seconds';
+  @override
+  String get locationSourceNetwork => 'Network (Fastest)';
+  @override
+  String get locationSourceNetworkSub => 'Wi-Fi / Mobile data';
+  @override
+  String get locationSourceLastKnown => 'Last known location';
+  @override
+  String get locationSourceLastKnownSub => 'Instant — may be outdated';
+  @override
+  String get locationSourceManual => 'Manual selection';
+  @override
+  String get locationSourceManualSub => 'From governorate list';
+  @override
+  String get locationSourceOnline => 'Search by name';
+  @override
+  String get locationSourceOnlineSub => 'Type your city or district';
 
+  // =====================================================================
+  // Trip Planner
+  // =====================================================================
+  @override
+  String get planYourTrip => 'Plan Your Trip';
+  @override
+  String get whereToGo => 'Where do you want to go?';
+  @override
+  String get chooseGovernorateToStart =>
+      'Choose the governorate to start planning.';
+  @override
+  String foundInBasket(String count) {
+    return 'Found $count in your basket';
+  }
+
+  @override
+  String tripIn(String govName) {
+    return 'A trip in $govName. How do you want it to be?';
+  }
+
+  @override
+  String get governorate => 'Governorate';
+  @override
+  String get duration => 'Duration';
+  @override
+  String get halfDay => 'Half Day';
+  @override
+  String get halfDaySub => '~4 hours';
+  @override
+  String get fullDay => 'Full Day';
+  @override
+  String get fullDaySub => '~8 hours';
+  @override
+  String get weekend => 'Weekend';
+  @override
+  String get weekendSub => '~16 hours (2 days)';
+  @override
+  String get customDates => 'Custom dates (3+ days)';
+  @override
+  String tripDurationDays(int days) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'Trip duration: $days days',
+      one: 'Trip duration: 1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get transportMode => 'Transport Mode';
+  @override
+  String get transportDriving => 'Driving';
+  @override
+  String get transportWalking => 'Walking';
+  @override
+  String get transportBus => 'Bus';
+  @override
+  String get preparingBestOrder => 'Preparing the best order for your trip...';
+  @override
+  String get notEnoughPlaces => 'We couldn\'t find enough places';
+  @override
+  String get modifyOptions => 'Modify Options';
+  @override
+  String get modifyPlacesManually => 'Modify places manually';
+  @override
+  String get finalTouches => 'Final Touches';
+  @override
+  String get addTripTitle => 'Add a title to your trip';
+  @override
+  String get tripTitleField => 'Trip Title';
+  @override
+  String get previous => 'Previous';
+  @override
+  String get generateTrip => 'Generate Trip';
+  @override
+  String get next => 'Next';
+  @override
+  String get saveTrip => 'Save Trip';
+  @override
+  String get tripSavedSuccess => 'Trip saved successfully';
+  @override
+  String get loginRequiredForSave => 'You must be logged in to save a trip';
+  @override
+  String get saveFailed => 'Save failed';
+  @override
+  String dayNumber(int day) {
+    return 'Day $day';
+  }
+
+  @override
+  String get minutes => 'Minute';
+  @override
+  String get minutesDual => 'Two minutes';
+  @override
+  String get minutesPlural => 'Minutes';
+  @override
+  String get stations => 'Stop';
+  @override
+  String get stationsDual => 'Two stops';
+  @override
+  String get stationsPlural => 'Stops';
+  @override
+  String get hours => 'Hour';
+  @override
+  String get hoursPlural => 'Hours';
+  @override
+  String get places => 'Place';
+  @override
+  String get placesDual => 'Two places';
+  @override
+  String get placesPlural => 'Places';
+  @override
+  String get newTrip => 'New Trip';
+  @override
+  String tripTo(String govName) {
+    return 'Trip to $govName';
+  }
+
+  // =====================================================================
+  // Bulk Import (Excel)
+  // =====================================================================
+  @override
+  String get bulkImportTitle => 'Manage Places (Bulk Import)';
+  @override
+  String get bulkImportIntro =>
+      'You can insert dozens of places at once via an Excel file.\nDownload the template, fill it in, then upload it.';
+  @override
+  String get downloadExcelTemplate => '1. Download Excel Template';
+  @override
+  String get pickExcelFile => '2. Pick and review Excel file';
+  @override
+  String confirmUploadPlaces(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places',
+      one: '1 place',
+    );
+    return '3. Confirm upload of $_temp0';
+  }
+
+  @override
+  String get preparingTemplate => 'Preparing template...';
+  @override
+  String get templateReady =>
+      'Template is ready! You can now save or share it.';
+  @override
+  String templateError(String error) {
+    return 'An error occurred while preparing the template: $error';
+  }
+
+  @override
+  String get readingFile => 'Reading file and validating data...';
+  @override
+  String get fileSelectionCancelled => 'File selection was cancelled.';
+  @override
+  String get noValidDataFound => 'No valid data found in the file.';
+  @override
+  String get fileReadSuccess =>
+      'File read successfully. Please review the results below.';
+  @override
+  String get uploadingData => 'Uploading data to the database...';
+  @override
+  String uploadSuccess(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places',
+      one: '1 place',
+    );
+    return '🎉 Successfully uploaded $_temp0!';
+  }
+
+  @override
+  String duplicatesSkipped(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count duplicate places skipped',
+      one: '1 duplicate place skipped',
+    );
+    return '($_temp0)';
+  }
+
+  @override
+  String get sortReport => '📊 Sort Report:';
+  @override
+  String validPlaces(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places',
+      one: '1 place',
+    );
+    return '✅ Valid places to upload: $_temp0';
+  }
+
+  @override
+  String errorLines(int count) {
+    final String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lines',
+      one: '1 line',
+    );
+    return '❌ Lines with errors (will be skipped): $_temp0';
+  }
+
+  @override
+  String get bulkUploadSuccessMsg => 'Bulk upload completed successfully';
+  @override
+  String get noDataToUpload => 'No valid data to upload.';
+  @override
+  String get allPlacesAlreadyRegistered =>
+      'All places in the file are already registered in the database or duplicated within the file.';
+  @override
+  String databaseConnectionError(String error) {
+    return 'Database connection error: $error';
+  }
+
+  @override
+  String fileReadError(String error) {
+    return 'An error occurred while reading the file. Ensure it is a valid, uncorrupted xlsx file. ($error)';
+  }
+
+  @override
+  String get templateGenerationFailed => 'Failed to generate Excel file';
+  @override
+  String get templateShareText => 'Ya Baladi Places Template (Port Said)';
+  @override
+  String get templateShareSubject => 'Places Import Template';
+
+  // =====================================================================
+  // Notifications & FCM
+  // =====================================================================
+  @override
+  String get noValidFcmTokens => 'No valid FCM tokens found for this user.';
+  @override
+  String get pushSentSuccess => 'Notification sent successfully.';
+  @override
+  String get pushFailed => 'Failed to send notification.';
+  @override
+  String get notificationPlaceBlockedTitle =>
+      '🚫 Your activity has been temporarily suspended';
+  @override
+  String notificationPlaceBlockedBody(String placeName, String reason) {
+    return '"$placeName" has been suspended. Reason: $reason';
+  }
+
+  @override
+  String get notificationPlaceUnblockedTitle =>
+      '✅ Your activity has been reactivated';
+  @override
+  String notificationPlaceUnblockedBody(String placeName) {
+    return '"$placeName" has been unblocked successfully. You can now receive requests.';
+  }
+
+  @override
+  String get notificationSupportReplyTitle => '💬 New reply from support';
+  @override
+  String notificationSupportReplyBody(String code) {
+    return 'Your ticket ($code) has been replied to. Please open the ticket details for review.';
+  }
+
+  @override
+  String get notificationMerchantApprovedTitle =>
+      '🎉 Your request has been approved';
+  @override
+  String get notificationMerchantApprovedBody =>
+      'You have been approved as a merchant. Start managing your business now!';
+  @override
+  String get notificationMerchantRejectedTitle =>
+      '⚠️ Your request needs adjustment';
+  @override
+  String notificationMerchantRejectedBody(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String notificationNewReviewTitle(String placeName) {
+    return '⭐ New review for $placeName';
+  }
+
+  @override
+  String notificationNewReviewBody(String rating, String comment) {
+    return 'You received a $rating-star rating. "$comment"';
+  }
+
+  // =====================================================================
+  // Home Screen Actions
+  // =====================================================================
+  @override
+  String get planTripAction => 'Plan Your Trip';
   @override
   String get myTripsAction => 'My Trips';
+  @override
+  String topRatedIn(String governorateName) {
+    return 'Top rated in $governorateName';
+  }
 
   @override
-  String topRatedIn(String governorateName) => 'Top rated in $governorateName';
-
-  @override
-  String get guestBannerTitle => 'Log in for a better experience!';
+  String get guestBannerTitle => 'Sign in for a better experience!';
 }

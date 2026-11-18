@@ -74,6 +74,7 @@ extension UserRoleX on UserRole {
   bool isAtLeast(UserRole other) => level >= other.level;
 
   /// هل يمكنه إدارة الأماكن (إضافة/تعديل أي مكان)؟
+  /// ملاحظة: هذا الفحص السريع متوافق مع الصلاحيات (placesWrite).
   bool get canManagePlaces =>
       this == UserRole.merchant ||
       this == UserRole.moderator ||
@@ -95,9 +96,13 @@ extension UserRoleX on UserRole {
 /// [v1.1] — يقبل 'user' كمرادف لـ 'member'
 ///   (لأن signUp() يكتب 'user' في Firestore بينما code = 'member').
 ///
-/// - `null` أو نص غير معروف → [UserRole.member] (افتراضي للمستخدمين المسجلين).
+/// - `null` أو نص غير معروف → [UserRole.member] (افتراضي للمستخدمين المسجلين
+///   لضمان عدم حرمانهم من الصلاحيات الأساسية إذا حدث خطأ في البيانات).
 UserRole roleFromCode(String? code) {
-  return switch (code) {
+  // تنظيف النص القادم من قاعدة البيانات لضمان دقة المطابقة
+  final normalizedCode = code?.trim().toLowerCase();
+
+  return switch (normalizedCode) {
     'visitor' => UserRole.visitor,
     'member' || 'user' => UserRole.member, // ← المرادف
     'merchant' => UserRole.merchant,
@@ -105,6 +110,6 @@ UserRole roleFromCode(String? code) {
     'moderator' => UserRole.moderator,
     'manager' => UserRole.manager,
     'admin' => UserRole.admin,
-    _ => UserRole.member,
+    _ => UserRole.member, // الافتراضي الآمن
   };
 }

@@ -1,12 +1,12 @@
 // lib/features/trip/screens/trip_bag_screen.dart
 //
-// [v1.3 — 2026-11-01] — UI ENHANCEMENT & SHARE FEATURE
-//   - KEPT: All original TripBagController logic (clearBag, bagItems, etc.)
-//   - KEPT: Navigation to '/trips/planner' and '/home'.
-//   - ADDED: WhatsApp Share button in AppBar.
-//   - ADDED: Navigation to PlaceDetailsScreen on tap.
-//   - ADDED: Confirmation dialog before clearing the bag.
-//   - IMPROVED: Card design and empty state UI.
+// [v2.0 - DARK THEME + BUG FIXES]
+//   - FIXED: ScaffoldMessenger crash in _showClearConfirmation (captured before pop).
+//   - FIXED: placeId type safety (cast to String explicitly).
+//   - FIXED: Ink splash warning on Card (added clipBehavior).
+//   - IMPROVED: Dark theme (#0F172A) matching entire trip flow.
+//   - IMPROVED: _shareTrip now has mounted checks.
+//   - KEPT: All logic, share feature, and navigation.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,45 +15,40 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/trip_bag_controller.dart';
 import '../../../features/places/screens/place_details_screen.dart';
-import '../../../theme/design_tokens.dart';
 
 class TripBagScreen extends StatelessWidget {
   const TripBagScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bag = context.watch<TripBagController>();
 
     if (!bag.isInitialized) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('سلة الرحلة',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: YaBaladiDesignTokens.primaryBlue,
-          foregroundColor: Colors.white,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body:
+            Center(child: CircularProgressIndicator(color: Color(0xFF0EA5E9))),
       );
     }
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text('سلة الرحلة',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'سلة الرحلة',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
-        backgroundColor: YaBaladiDesignTokens.primaryBlue,
-        foregroundColor: Colors.white,
         actions: [
-          // ✅ زر مشاركة الرحلة (WhatsApp)
           if (bag.itemCount > 0)
             IconButton(
-              icon: const Icon(Icons.share_outlined),
+              icon: const Icon(Icons.share_outlined, color: Colors.white),
               tooltip: 'مشاركة الرحلة',
-              onPressed: () => _shareTrip(bag.bagItems),
+              onPressed: () => _shareTrip(context, bag.bagItems),
             ),
-          // ✅ زر تفريغ السلة
           if (bag.itemCount > 0)
             IconButton(
               icon: const Icon(Icons.delete_sweep, color: Colors.white),
@@ -62,168 +57,218 @@ class TripBagScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: bag.isEmpty
-          ? _buildEmptyState(context, theme)
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: bag.itemCount,
-                    itemBuilder: (context, index) {
-                      final place = bag.bagItems[index];
-                      return _buildTripCard(context, theme, place, bag);
-                    },
+      body: SafeArea(
+        child: bag.isEmpty
+            ? _buildEmptyState(context)
+            : Column(
+                children: [
+                  // ─── Counter ───
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFF0EA5E9).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${bag.itemCount} ${bag.itemCount == 1 ? "مكان" : "أماكن"}',
+                            style: const TextStyle(
+                              color: Color(0xFF0EA5E9),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'جاهز للتخطيط',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                // زر إنشاء الرحلة (الأصلي الخاص بك)
-                Container(
-                  padding: EdgeInsets.fromLTRB(
-                      16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                        top: BorderSide(
-                            color: theme.colorScheme.outlineVariant)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      )
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        // ✅ التعديل: تمرير عناصر السلة في extra كما في الكود الأصلي
-                        context.push('/trips/planner', extra: bag.bagItems);
+
+                  // ─── Places List ───
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      itemCount: bag.itemCount,
+                      itemBuilder: (context, index) {
+                        final place = bag.bagItems[index];
+                        return _buildTripCard(context, place, bag);
                       },
-                      icon: const Icon(Icons.rocket_launch),
-                      label: Text('إنشاء رحلة (${bag.itemCount} أماكن)'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(55),
-                        backgroundColor: theme.colorScheme.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+
+                  // ─── Bottom Button ───
+                  Container(
+                    padding: EdgeInsets.fromLTRB(
+                        16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      border: Border(
+                        top: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          context.push('/trips/planner', extra: bag.bagItems);
+                        },
+                        icon: const Icon(Icons.rocket_launch, size: 22),
+                        label: Text(
+                          'إنشاء رحلة (${bag.itemCount} أماكن)',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          backgroundColor: const Color(0xFF0EA5E9),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 
-  // ✅ تصميم بطاقة المكان المحسنة
-  Widget _buildTripCard(BuildContext context, ThemeData theme,
-      Map<String, dynamic> place, TripBagController bag) {
-    final name = place['name'] ?? 'مكان';
-    final category = place['categoryName'] ?? 'تصنيف';
-    final governorate = place['governorate'] ?? '';
-    final placeId = place['id'];
+  // ═══════════════════════════════════════════════════════════════
+  // TRIP CARD
+  // ═══════════════════════════════════════════════════════════════
 
-    return Card(
-      elevation: 0,
+  Widget _buildTripCard(
+      BuildContext context, Map<String, dynamic> place, TripBagController bag) {
+    final name = (place['name'] ?? 'مكان').toString();
+    final category = (place['categoryName'] ?? 'تصنيف').toString();
+    final governorate = (place['governorate'] ?? '').toString();
+    // ✅ Type safety: cast to String
+    final placeId = place['id']?.toString() ?? '';
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
-      child: InkWell(
-        onTap: () {
-          if (placeId != null) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => PlaceDetailsScreen(placeId: placeId),
-              ),
-            );
-          }
-        },
+      // ✅ Material for ink splash
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // أيقونة المكان
-              Container(
-                width: 55,
-                height: 55,
-                decoration: BoxDecoration(
-                  color:
-                      theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            if (placeId.isNotEmpty) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PlaceDetailsScreen(placeId: placeId),
                 ),
-                child: Icon(
-                  Icons.place,
-                  color: theme.colorScheme.primary,
-                  size: 28,
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 55,
+                  height: 55,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.place,
+                    color: Color(0xFF0EA5E9),
+                    size: 28,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-
-              // تفاصيل المكان
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.category,
-                            size: 14, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          category,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
                         ),
-                        if (governorate.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Icon(Icons.location_on,
-                              size: 14, color: theme.colorScheme.primary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.category,
+                              size: 13, color: Color(0xFF0EA5E9)),
                           const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              governorate,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            category,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 12,
                             ),
                           ),
+                          if (governorate.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.location_on,
+                                size: 13, color: Color(0xFF0EA5E9)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                governorate,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-
-              // زر الحذف
-              IconButton(
-                icon:
-                    const Icon(Icons.remove_circle_outline, color: Colors.red),
-                tooltip: 'إزالة من الرحلة',
-                onPressed: () => bag.removePlace(placeId),
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline,
+                      color: Color(0xFFEF4444), size: 22),
+                  tooltip: 'إزالة من الرحلة',
+                  onPressed: () {
+                    if (placeId.isNotEmpty) bag.removePlace(placeId);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+  // ═══════════════════════════════════════════════════════════════
+  // EMPTY STATE
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -231,25 +276,34 @@ class TripBagScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.shopping_bag_outlined,
-                  size: 80, color: theme.colorScheme.primary),
+              child: Icon(
+                Icons.shopping_bag_outlined,
+                size: 72,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
             ),
             const SizedBox(height: 24),
-            Text('سلتك فارغة',
-                style: theme.textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const Text(
+              'سلتك فارغة',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'أضف بعض الأماكن إلى سلتك لتبدأ التخطيط لرحلتك القادمة.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 32),
             FilledButton.icon(
@@ -258,9 +312,10 @@ class TripBagScreen extends StatelessWidget {
               label: const Text('اكتشف أماكن'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(200, 50),
-                backgroundColor: YaBaladiDesignTokens.primaryBlue,
+                backgroundColor: const Color(0xFF0EA5E9),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),
@@ -270,28 +325,46 @@ class TripBagScreen extends StatelessWidget {
     );
   }
 
-  // ✅ دالة تأكيد تفريغ السلة
+  // ═══════════════════════════════════════════════════════════════
+  // CLEAR CONFIRMATION  [BUG FIXED]
+  // ═══════════════════════════════════════════════════════════════
+
   void _showClearConfirmation(BuildContext context, TripBagController bag) {
+    // ✅ Capture messenger BEFORE the dialog
+    final messenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تفريغ السلة'),
-        content:
-            const Text('هل أنت متأكد من رغبتك في إزالة جميع الأماكن من رحلتك؟'),
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text(
+          'تفريغ السلة',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'هل أنت متأكد من رغبتك في إزالة جميع الأماكن من رحلتك؟',
+          style: TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
           ),
           FilledButton(
             onPressed: () {
               bag.clearBag();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تم تفريغ السلة')),
+              Navigator.pop(dialogCtx);
+              // ✅ Use captured messenger (dialogCtx is now dead)
+              messenger.hideCurrentSnackBar();
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('تم تفريغ السلة'),
+                  backgroundColor: Color(0xFF10B981),
+                ),
               );
             },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
             child: const Text('تفريغ الكل'),
           ),
         ],
@@ -299,9 +372,16 @@ class TripBagScreen extends StatelessWidget {
     );
   }
 
-  // ✅ دالة مشاركة الرحلة
-  Future<void> _shareTrip(List<Map<String, dynamic>> places) async {
+  // ═══════════════════════════════════════════════════════════════
+  // SHARE TRIP
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> _shareTrip(
+      BuildContext context, List<Map<String, dynamic>> places) async {
     if (places.isEmpty) return;
+
+    // ✅ Capture messenger BEFORE await
+    final messenger = ScaffoldMessenger.of(context);
 
     final buffer = StringBuffer();
     buffer.writeln('🗺️ *رحلتي المقترحة* (عبر تطبيق يا بلدي)');
@@ -316,8 +396,20 @@ class TripBagScreen extends StatelessWidget {
     final text = Uri.encodeComponent(buffer.toString());
     final url = Uri.parse('https://wa.me/?text=$text');
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('تعذّر فتح واتساب')),
+        );
+      }
+    } catch (e) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ في المشاركة: $e')),
+      );
     }
   }
 }

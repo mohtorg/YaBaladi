@@ -1,23 +1,31 @@
 // lib/features/trip/screens/trip_place_picker_screen.dart
 //
-// [v1.3 — 2026-10-19] — Zero Internal Maps: Removed TripMapView.
-//   - FIX: Removed import of deleted trip_map_view.dart.
-//   - NEW: _buildMapTab now uses MapService to open external Google Maps.
-//   - FIX: trailing commas + const where needed.
-
-import 'dart:async';
+// [v2.1 - DARK THEME CONSISTENCY + FIXES]
+//   - ADDED: ThemeData.dark() wrapper matching the entire trip flow.
+//   - FIXED: Banner and counter bar now use dark-friendly colors.
+//   - FIXED: Cards converted to Glassmorphism (no more white snap).
+//   - FIXED: Search field has controller (can be cleared).
+//   - FIXED: Category ID mapped to Arabic label.
+//   - FIXED: Arabic pluralization for durations in _SelectedStopTile.
+//   - FIXED: TabBar colors explicit (blue on dark).
+//   - KEPT: All selection, validation, undo, and navigation logic.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../models/place.dart';
-import '../../../models/trip_draft.dart';
 import '../../../models/trip_plan.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../widgets/ya_app_bar.dart';
-import '../../../services/map_service.dart'; // ✅ استدعاء خدمة الخرائط
+import '../../../services/map_service.dart';
 import '../../places/controllers/places_controller.dart';
-import '../../../services/trip_draft_service.dart';
+
+// ─── Shared dark palette ───
+const _primaryBlue = Color(0xFF0EA5E9);
+const _bgColor = Color(0xFF0F172A);
+const _cardBg = Color(0x14FFFFFF); // white 8%
+const _cardBorder = Color(0x26FFFFFF); // white 15%
+const _amberWarning = Color(0xFFF59E0B);
 
 class TripPlacePickerScreen extends StatefulWidget {
   const TripPlacePickerScreen({
@@ -43,10 +51,10 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late List<TripStop> _selectedStops;
+  final _searchCtrl = TextEditingController();
 
   String _searchQuery = '';
   String? _selectedCategory;
-  Timer? _saveDebounce;
 
   @override
   void initState() {
@@ -66,19 +74,18 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
 
   @override
   void dispose() {
-    _saveDebounce?.cancel();
     _tabController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Actions
+  // Helpers
   // ═══════════════════════════════════════════════════════════════
 
   bool _isSelected(String placeId) =>
       _selectedStops.any((s) => s.placeId == placeId);
 
-  /// [v1.2] التحقق من إحداثيات المكان
   bool _hasValidCoords(Place p) {
     final lat = p.location?.latitude;
     final lng = p.location?.longitude;
@@ -89,6 +96,42 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     return true;
   }
 
+  String _arabicDuration(int minutes) {
+    if (minutes == 1) return 'دقيقة';
+    if (minutes == 2) return 'دقيقتان';
+    if (minutes >= 3 && minutes <= 10) return '$minutes دقائق';
+    return '$minutes دقيقة';
+  }
+
+  String _categoryLabel(String id) {
+    switch (id) {
+      case 'landmarks':
+        return 'معلم';
+      case 'restaurants':
+        return 'مطعم';
+      case 'cafes':
+        return 'مقهى';
+      case 'shopping':
+        return 'تسوق';
+      case 'hotels':
+        return 'فندق';
+      case 'parks':
+        return 'حديقة';
+      case 'family':
+        return 'عائلي';
+      case 'events':
+        return 'فعالية';
+      case 'beaches':
+        return 'شاطئ';
+      default:
+        return 'مكان';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Actions
+  // ═══════════════════════════════════════════════════════════════
+
   void _addPlace(Place place) {
     if (_isSelected(place.id)) return;
 
@@ -98,7 +141,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
         ..showSnackBar(
           SnackBar(
             content: Text(
-              '⚠️ "${place.nameAr}" لا يحتوي على إحداثيات صالحة للخريطة',
+              '"${place.nameAr}" لا يحتوي على إحداثيات صالحة للخريطة',
             ),
             backgroundColor: Colors.red.shade700,
             duration: const Duration(seconds: 4),
@@ -136,20 +179,18 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     );
 
     setState(() => _selectedStops.add(stop));
-    _scheduleSave();
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('✅ أُضيف: ${place.nameAr}'),
+          content: Text('أُضيف: ${place.nameAr}'),
           duration: const Duration(seconds: 2),
           action: SnackBarAction(
             label: 'تراجع',
             onPressed: () {
               if (!mounted) return;
               setState(() => _selectedStops.remove(stop));
-              _scheduleSave();
             },
           ),
         ),
@@ -159,76 +200,23 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
   void _removeStop(TripStop stop) {
     final removed = stop;
     setState(() => _selectedStops.remove(stop));
-    _scheduleSave();
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('🗑️ حُذف: ${removed.placeNameAr}'),
+          content: Text('حُذف: ${removed.placeNameAr}'),
           duration: const Duration(seconds: 5),
           action: SnackBarAction(
             label: 'تراجع',
             onPressed: () {
               if (!mounted) return;
               setState(() => _selectedStops.add(removed));
-              _scheduleSave();
             },
           ),
         ),
       );
   }
-
-  void _scheduleSave() {
-    _saveDebounce?.cancel();
-    _saveDebounce = Timer(const Duration(milliseconds: 500), _saveNow);
-  }
-
-  Future<void> _saveNow() async {
-    try {
-      final existing = await TripDraftService.load(widget.userId) ??
-          TripDraft.empty(widget.userId);
-
-      final tempPlan = TripPlan(
-        id: '',
-        userId: widget.userId,
-        title: existing.title,
-        governorateId: widget.governorateId,
-        governorateNameAr: widget.governorateNameAr,
-        transportMode: existing.transportMode,
-        durationType: existing.durationType,
-        interests: existing.interests,
-        status: TripStatus.draft,
-        stops: _selectedStops,
-        totalDistanceKm: 0,
-        totalDurationMin: 0,
-      );
-
-      final updated = existing.copyWith(
-        currentStep: 2,
-        governorateId: widget.governorateId,
-        generatedPlanJson: _encodePlan(tempPlan),
-      );
-      await TripDraftService.save(updated);
-    } on Exception catch (e) {
-      debugPrint('❌ _saveNow failed: $e');
-    }
-  }
-
-  String _encodePlan(TripPlan plan) => _manualJsonEncode(plan);
-
-  String _manualJsonEncode(TripPlan plan) {
-    return '{"stops":${_stopsToJson(plan.stops)},"title":"${_escape(plan.title)}","governorateId":"${plan.governorateId}","governorateNameAr":"${_escape(plan.governorateNameAr)}"}';
-  }
-
-  String _stopsToJson(List<TripStop> stops) {
-    final parts = stops.map((s) {
-      return '{"placeId":"${_escape(s.placeId)}","placeNameAr":"${_escape(s.placeNameAr)}","placeNameEn":"${_escape(s.placeNameEn)}","lat":${s.lat},"lng":${s.lng},"categoryId":"${_escape(s.categoryId)}","rating":${s.rating},"reviewCount":${s.reviewCount},"plannedDurationMin":${s.plannedDurationMin ?? 60}}';
-    }).join(',');
-    return '[$parts]';
-  }
-
-  String _escape(String s) => s.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 
   // ═══════════════════════════════════════════════════════════════
   // Filtering
@@ -268,6 +256,32 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Dark theme wrapper — matches trip planner / overview / day screens.
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: _bgColor,
+        colorScheme: const ColorScheme.dark(
+          primary: _primaryBlue,
+          surface: Color(0xFF1E293B),
+          onSurface: Colors.white,
+          surfaceContainerHighest: Color(0xFF1E293B),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: Colors.white,
+        ),
+        tabBarTheme: const TabBarThemeData(
+          labelColor: _primaryBlue,
+          unselectedLabelColor: Colors.white54,
+          indicatorColor: _primaryBlue,
+        ),
+      ),
+      child: _buildScreen(),
+    );
+  }
+
+  Widget _buildScreen() {
     final placesCtrl = context.watch<PlacesController>();
     final isLoading = placesCtrl.status == PlacesStatus.loading;
 
@@ -277,35 +291,44 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.of(context).pop(_selectedStops),
-            icon: const Icon(Icons.check),
-            label: Text('تم (${_selectedStops.length})'),
+            icon: const Icon(Icons.check, color: _primaryBlue),
+            label: Text(
+              'تم (${_selectedStops.length})',
+              style: const TextStyle(
+                color: _primaryBlue,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildCounterBar(),
-          _buildInvalidBanner(placesCtrl),
-          _buildTabBar(),
-          Expanded(
-            child: isLoading && placesCtrl.allPlacesRaw.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildCardsTab(placesCtrl),
-                      _buildMapTab(), // ✅ تم تحديثها
-                      _buildSelectedTab(),
-                    ],
-                  ),
-          ),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildCounterBar(),
+            _buildInvalidBanner(placesCtrl),
+            _buildTabBar(),
+            Expanded(
+              child: isLoading && placesCtrl.allPlacesRaw.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(color: _primaryBlue),
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildCardsTab(placesCtrl),
+                        _buildMapTab(),
+                        _buildSelectedTab(),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCounterBar() {
-    final theme = Theme.of(context);
     final pct = widget.maxStops > 0
         ? (_selectedStops.length / widget.maxStops).clamp(0.0, 1.0)
         : 0.0;
@@ -314,26 +337,29 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       color: isOver
-          ? Colors.orange.withValues(alpha: 0.1)
-          : theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+          ? _amberWarning.withValues(alpha: 0.1)
+          : _primaryBlue.withValues(alpha: 0.1),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.place_outlined,
-                  size: 16, color: theme.colorScheme.primary),
+              const Icon(Icons.place_outlined, size: 16, color: _primaryBlue),
               const SizedBox(width: 6),
               Text(
                 '${_selectedStops.length} من ${widget.maxStops}',
-                style: theme.textTheme.labelMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const Spacer(),
               if (isOver)
-                Text(
+                const Text(
                   'وصلت الحد',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.orange.shade900,
+                  style: TextStyle(
+                    color: _amberWarning,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -345,9 +371,9 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 4,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
               valueColor: AlwaysStoppedAnimation(
-                isOver ? Colors.orange : theme.colorScheme.primary,
+                isOver ? _amberWarning : _primaryBlue,
               ),
             ),
           ),
@@ -363,17 +389,17 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.amber.shade100,
+      color: _amberWarning.withValues(alpha: 0.15),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded,
-              color: Colors.amber.shade900, size: 18),
+          const Icon(Icons.warning_amber_rounded,
+              color: _amberWarning, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '$invalid مكان بدون إحداثيات صالحة — لن يظهر على الخريطة',
-              style: TextStyle(
-                color: Colors.amber.shade900,
+              style: const TextStyle(
+                color: _amberWarning,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -421,6 +447,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
                     place: places[i],
                     isSelected: _isSelected(places[i].id),
                     hasValidCoords: _hasValidCoords(places[i]),
+                    categoryLabel: _categoryLabel(places[i].categoryId),
                     onAdd: () => _addPlace(places[i]),
                   ),
                 ),
@@ -433,15 +460,29 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: TextField(
+        controller: _searchCtrl,
         onChanged: (v) => setState(() => _searchQuery = v),
+        style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: 'ابحث عن مكان...',
-          prefixIcon: const Icon(Icons.search),
+          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+          prefixIcon: const Icon(Icons.search, color: _primaryBlue),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear,
+                      color: Colors.white.withValues(alpha: 0.5)),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
           filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
           isDense: true,
         ),
       ),
@@ -473,6 +514,19 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               label: const Text('الكل'),
               selected: _selectedCategory == null,
               onSelected: (_) => setState(() => _selectedCategory = null),
+              selectedColor: _primaryBlue,
+              backgroundColor: Colors.white.withValues(alpha: 0.05),
+              labelStyle: TextStyle(
+                color:
+                    _selectedCategory == null ? Colors.white : Colors.white70,
+                fontWeight: _selectedCategory == null ? FontWeight.bold : null,
+              ),
+              checkmarkColor: Colors.white,
+              side: BorderSide(
+                color: _selectedCategory == null
+                    ? _primaryBlue
+                    : Colors.white.withValues(alpha: 0.1),
+              ),
             ),
           ),
           for (final c in categories)
@@ -483,6 +537,20 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
                 selected: _selectedCategory == c.id,
                 onSelected: (v) =>
                     setState(() => _selectedCategory = v ? c.id : null),
+                selectedColor: _primaryBlue,
+                backgroundColor: Colors.white.withValues(alpha: 0.05),
+                labelStyle: TextStyle(
+                  color:
+                      _selectedCategory == c.id ? Colors.white : Colors.white70,
+                  fontWeight:
+                      _selectedCategory == c.id ? FontWeight.bold : null,
+                ),
+                checkmarkColor: Colors.white,
+                side: BorderSide(
+                  color: _selectedCategory == c.id
+                      ? _primaryBlue
+                      : Colors.white.withValues(alpha: 0.1),
+                ),
               ),
             ),
         ],
@@ -500,19 +568,26 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
             Icon(
               Icons.place_outlined,
               size: 72,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: Colors.white.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               'لا توجد أماكن في ${widget.governorateNameAr}',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'جرّب محافظة أخرى من الخطوة 1',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -520,8 +595,10 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
     );
   }
 
-  /// ✅ [v1.3] تبويب الخريطة (نظام الصفر الداخلي)
   Widget _buildMapTab() {
+    // NOTE: This is a summary view, not a real map. A proper map view
+    // needs GoogleMap / flutter_map which are not integrated here.
+    // The purpose of this tab is to offer directions to the first stop.
     if (_selectedStops.isEmpty) {
       return Center(
         child: Padding(
@@ -532,18 +609,25 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               Icon(
                 Icons.map_outlined,
                 size: 72,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Colors.white.withValues(alpha: 0.3),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'أضف أماكن لعرض المسار عليها',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'اذهب لتبويب "بطاقات" واضغط "أضف"',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -557,14 +641,25 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.map,
-                size: 80, color: Theme.of(context).colorScheme.primary),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _primaryBlue.withValues(alpha: 0.15),
+              ),
+              child: const Icon(Icons.map, size: 64, color: _primaryBlue),
+            ),
             const SizedBox(height: 16),
-            Text('أنت اخترت ${_selectedStops.length} مكان',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'أنت اخترت ${_selectedStops.length} مكان',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 24),
-            // ✅ فتح المسار في تطبيق خارجي
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: () {
                 if (_selectedStops.isNotEmpty) {
                   MapService.openDirections(
@@ -573,6 +668,15 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               },
               icon: const Icon(Icons.navigation),
               label: const Text('ابدأ التوجيه إلى أول مكان'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _primaryBlue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),
@@ -591,18 +695,25 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
               Icon(
                 Icons.check_circle_outline,
                 size: 72,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: Colors.white.withValues(alpha: 0.3),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'لم تختر أماكن بعد',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'اذهب لتبويب "بطاقات" واضغط "أضف"',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -620,6 +731,7 @@ class _TripPlacePickerScreenState extends State<TripPlacePickerScreen>
         return _SelectedStopTile(
           index: i + 1,
           stop: stop,
+          durationLabel: _arabicDuration(stop.plannedDurationMin ?? 0),
           onRemove: () => _removeStop(stop),
         );
       },
@@ -636,22 +748,28 @@ class _PlaceCard extends StatelessWidget {
     required this.place,
     required this.isSelected,
     required this.hasValidCoords,
+    required this.categoryLabel,
     required this.onAdd,
   });
 
   final Place place;
   final bool isSelected;
   final bool hasValidCoords;
+  final String categoryLabel;
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
+    return Material(
+      color: _cardBg,
+      borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorder),
+        ),
         child: Row(
           children: [
             Container(
@@ -659,15 +777,13 @@ class _PlaceCard extends StatelessWidget {
               height: 56,
               decoration: BoxDecoration(
                 color: hasValidCoords
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.errorContainer,
+                    ? _primaryBlue.withValues(alpha: 0.2)
+                    : Colors.red.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 hasValidCoords ? Icons.place : Icons.location_off,
-                color: hasValidCoords
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onErrorContainer,
+                color: hasValidCoords ? _primaryBlue : Colors.redAccent,
               ),
             ),
             const SizedBox(width: 12),
@@ -679,33 +795,40 @@ class _PlaceCard extends StatelessWidget {
                     place.nameAr,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 12, color: Colors.amber.shade700),
+                      const Icon(Icons.star, size: 12, color: Colors.amber),
                       const SizedBox(width: 2),
                       Text(
                         place.averageRating.toStringAsFixed(1),
-                        style: theme.textTheme.bodySmall,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       if (!hasValidCoords)
-                        Text(
-                          '⚠️ بدون إحداثيات',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
+                        const Text(
+                          'بدون إحداثيات',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         )
                       else
                         Text(
-                          place.categoryId,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          categoryLabel,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 11,
                           ),
                         ),
                     ],
@@ -726,10 +849,8 @@ class _PlaceCard extends StatelessWidget {
                 isSelected ? 'مضاف' : (!hasValidCoords ? 'غير متاح' : 'أضف'),
               ),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: const Size(0, 32),
               ),
             ),
@@ -744,60 +865,74 @@ class _SelectedStopTile extends StatelessWidget {
   const _SelectedStopTile({
     required this.index,
     required this.stop,
+    required this.durationLabel,
     required this.onRemove,
   });
 
   final int index;
   final TripStop stop;
+  final String durationLabel;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary,
-          child: Text(
-            '$index',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+    return Material(
+      color: _cardBg,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _cardBorder),
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: _primaryBlue,
+            child: Text(
+              '$index',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
-        title: Text(
-          stop.placeNameAr,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Row(
-          children: [
-            Icon(Icons.star, size: 12, color: Colors.amber.shade700),
-            const SizedBox(width: 2),
-            Text(
-              stop.rating.toStringAsFixed(1),
-              style: theme.textTheme.bodySmall,
+          title: Text(
+            stop.placeNameAr,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.schedule,
-              size: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 2),
-            Text(
-              '${stop.plannedDurationMin ?? 0} د',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          tooltip: 'حذف',
-          onPressed: onRemove,
+          ),
+          subtitle: Row(
+            children: [
+              const Icon(Icons.star, size: 12, color: Colors.amber),
+              const SizedBox(width: 2),
+              Text(
+                stop.rating.toStringAsFixed(1),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.schedule, size: 12, color: _primaryBlue),
+              const SizedBox(width: 2),
+              Text(
+                durationLabel,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            tooltip: 'حذف',
+            onPressed: onRemove,
+          ),
         ),
       ),
     );

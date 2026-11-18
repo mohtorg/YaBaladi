@@ -1,5 +1,7 @@
 // lib/core/location/location_source_sheet.dart
 //
+// [v1.1.0 — 2026-11-05] — POLISH: safeArea, no-results UI, clear button,
+//                         robust error handling, isAutomatic icon logic.
 // [v1.0 — 2026-10-19] — Wave 5.5c: 5 خيارات لتحديد الموقع (ADR-2)
 
 import 'dart:async';
@@ -29,6 +31,7 @@ class LocationSourceSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true, // ✅ حماية من النوتش
       builder: (_) => LocationSourceSheet(
         controller: controller,
         currentLocation: currentLocation,
@@ -106,7 +109,7 @@ class _LocationSourceSheetState extends State<LocationSourceSheet> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(loc);
-    } on Exception catch (e) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -143,8 +146,11 @@ class _LocationSourceSheetState extends State<LocationSourceSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.my_location,
-                        color: theme.colorScheme.primary, size: 32),
+                    Icon(
+                      Icons.my_location,
+                      color: theme.colorScheme.primary,
+                      size: 32,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -169,26 +175,35 @@ class _LocationSourceSheetState extends State<LocationSourceSheet> {
               ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: theme.colorScheme.error),
+                textAlign: TextAlign.center,
+              ),
             ],
             const SizedBox(height: 16),
             ...LocationSource.values.map((source) {
-              // تجاهل manual في القائمة هنا لأنها تفتح Sheet آخر
-              // لكن نعرضها! المستخدم يجب أن يراها.
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading:
-                    Icon(_iconFor(source), color: theme.colorScheme.primary),
+                leading: Icon(
+                  _iconFor(source),
+                  color: theme.colorScheme.primary,
+                ),
                 title: Text(source.labelAr),
-                subtitle:
-                    Text(source.subtitleAr, style: theme.textTheme.bodySmall),
+                subtitle: Text(
+                  source.subtitleAr,
+                  style: theme.textTheme.bodySmall,
+                ),
                 trailing: _loading && _activeSource == source
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.chevron_left),
+                    : Icon(
+                        source.isAutomatic ? Icons.refresh : Icons.chevron_left,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                 onTap: _loading ? null : () => _pick(source),
               );
             }),
@@ -199,20 +214,19 @@ class _LocationSourceSheetState extends State<LocationSourceSheet> {
   }
 
   IconData _iconFor(LocationSource source) {
-    switch (source) {
-      case LocationSource.gps:
-        return Icons.gps_fixed;
-      case LocationSource.network:
-        return Icons.wifi_tethering;
-      case LocationSource.lastKnown:
-        return Icons.history;
-      case LocationSource.manual:
-        return Icons.map_outlined;
-      case LocationSource.onlineSearch:
-        return Icons.search;
-    }
+    return switch (source) {
+      LocationSource.gps => Icons.gps_fixed,
+      LocationSource.network => Icons.wifi_tethering,
+      LocationSource.lastKnown => Icons.history,
+      LocationSource.manual => Icons.map_outlined,
+      LocationSource.onlineSearch => Icons.search,
+    };
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Search Dialog (البحث عبر الإنترنت)
+// ═══════════════════════════════════════════════════════════════
 
 class _SearchDialog extends StatefulWidget {
   const _SearchDialog();
@@ -226,21 +240,35 @@ class _SearchDialogState extends State<_SearchDialog> {
   Timer? _debounce;
   List<PlaceSearchResult> _results = [];
   bool _loading = false;
+  bool _hasSearched = false; // لمعرفة ما إذا تم البحث أم لا
 
   void _onChanged(String q) {
     _debounce?.cancel();
     if (q.trim().length < 2) {
-      setState(() => _results = []);
+      setState(() {
+        _results = [];
+        _hasSearched = false;
+      });
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 600), () async {
       setState(() => _loading = true);
-      final r = await LocationService.searchPlaces(q);
-      if (!mounted) return;
-      setState(() {
-        _results = r;
-        _loading = false;
-      });
+      try {
+        final r = await LocationService.searchPlaces(q);
+        if (!mounted) return;
+        setState(() {
+          _results = r;
+          _loading = false;
+          _hasSearched = true;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _hasSearched = true;
+          _results = [];
+        });
+      }
     });
   }
 
@@ -264,9 +292,18 @@ class _SearchDialogState extends State<_SearchDialog> {
               controller: _ctrl,
               autofocus: true,
               onChanged: _onChanged,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'مثال: بورسعيد، الشرق',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _ctrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _ctrl.clear();
+                          _onChanged('');
+                        },
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 12),
@@ -274,6 +311,15 @@ class _SearchDialogState extends State<_SearchDialog> {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: CircularProgressIndicator(),
+              )
+            else if (_results.isEmpty && _hasSearched)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'لا توجد نتائج مطابقة.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
               Flexible(
@@ -283,8 +329,11 @@ class _SearchDialogState extends State<_SearchDialog> {
                   itemBuilder: (_, i) {
                     final r = _results[i];
                     return ListTile(
-                      title: Text(r.displayName,
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                      title: Text(
+                        r.displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       onTap: () => Navigator.of(context).pop(r),
                     );
                   },

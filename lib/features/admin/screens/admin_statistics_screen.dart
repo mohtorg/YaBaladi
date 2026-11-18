@@ -1,6 +1,10 @@
 // lib/features/admin/screens/admin_statistics_screen.dart
 //
-// [v2.0 — 2026-10-28] — CLEAN VERSION: No KPIs (they're in dashboard), Only Charts
+// [v2.1 — FIXED] — ACCURACY & STABILITY FIXES:
+//   - FIXED: Removed limit(200) to ensure statistics reflect ALL records.
+//   - FIXED: Added Division by Zero protection for progress bars.
+//   - FIXED: Added error handling (snapshot.hasError) to all streams.
+//   - KEPT: All UI, colors, and layout intact.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -108,9 +112,13 @@ class _CategoryStatsChart extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('places')
-          .limit(200)
+          // ✅ تم إزالة limit(200) لضمان دقة الإحصائيات
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('حدث خطأ في تحميل البيانات',
+              style: TextStyle(color: Colors.red));
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -120,12 +128,15 @@ class _CategoryStatsChart extends StatelessWidget {
 
         final Map<String, int> counts = {};
         for (var doc in places) {
-          final cat = doc['categoryId']?.toString() ?? 'غير مصنف';
+          final data = doc.data() as Map<String, dynamic>?;
+          final cat = data?['categoryId']?.toString() ?? 'غير مصنف';
           counts[cat] = (counts[cat] ?? 0) + 1;
         }
 
         final sorted = counts.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
+
+        if (sorted.isEmpty) return const Text('لا توجد بيانات.');
         final max = sorted.first.value;
 
         return Column(
@@ -148,7 +159,8 @@ class _CategoryStatsChart extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: e.value / max,
+                      // ✅ حماية من القسمة على صفر
+                      value: max > 0 ? (e.value / max) : 0.0,
                       minHeight: 8,
                       backgroundColor:
                           theme.colorScheme.surfaceContainerHighest,
@@ -175,9 +187,13 @@ class _GovernorateStatsChart extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('places')
-          .limit(200)
+          // ✅ تم إزالة limit(200)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('حدث خطأ في تحميل البيانات',
+              style: TextStyle(color: Colors.red));
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -187,12 +203,15 @@ class _GovernorateStatsChart extends StatelessWidget {
 
         final Map<String, int> counts = {};
         for (var doc in places) {
-          final gov = doc['governorate']?.toString() ?? 'غير محدد';
+          final data = doc.data() as Map<String, dynamic>?;
+          final gov = data?['governorate']?.toString() ?? 'غير محدد';
           counts[gov] = (counts[gov] ?? 0) + 1;
         }
 
         final sorted = counts.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
+
+        if (sorted.isEmpty) return const Text('لا توجد بيانات.');
         final max = sorted.first.value;
 
         return Column(
@@ -215,7 +234,8 @@ class _GovernorateStatsChart extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: e.value / max,
+                      // ✅ حماية من القسمة على صفر
+                      value: max > 0 ? (e.value / max) : 0.0,
                       minHeight: 8,
                       backgroundColor:
                           theme.colorScheme.surfaceContainerHighest,
@@ -240,9 +260,15 @@ class _UserStatsChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance.collection('users').limit(200).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          // ✅ تم إزالة limit(200)
+          .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('حدث خطأ في تحميل البيانات',
+              style: TextStyle(color: Colors.red));
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -252,13 +278,16 @@ class _UserStatsChart extends StatelessWidget {
 
         final Map<String, int> counts = {};
         for (var doc in users) {
-          final role = doc['role']?.toString() ?? 'member';
+          final data = doc.data() as Map<String, dynamic>?;
+          final role = data?['role']?.toString() ?? 'member';
           counts[role] = (counts[role] ?? 0) + 1;
         }
 
         final sorted = counts.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
         final total = users.length;
+
+        if (total == 0) return const Text('لا توجد بيانات.');
 
         return Column(
           children: sorted.map((e) {

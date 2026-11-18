@@ -1,3 +1,6 @@
+// lib/features/notifications/widgets/notification_bell.dart
+// [v1.1 — 2026-11-02] — Reviewed and formatted.
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';

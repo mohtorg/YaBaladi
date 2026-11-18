@@ -1,12 +1,10 @@
 // lib/features/admin/widgets/add_edit_category_dialog.dart
 //
-// [v1.4 — 2026-10-29] — FIX: إزالة RegExp كلياً (4 تحذيرات إهمال)
-//   - _splitList / عدّاد _ListField: تقسيم بالفاصلة وسطر جديد عبر _splitItems.
-//   - _validateSlug: فحص يدوي مطابق للشرط ^[a-z0-9_]+$.
-//   - inputFormatters: _SlugInputFormatter بدل FilteringTextInputFormatter.allow(RegExp).
-//   - _repo: يُنشأ مرة واحدة (late final) بدل إنشاء مستودع جديد عند كل استدعاء.
-//   - KEPT: جميع الحقول والتحقق والواجهة والتوقيعات العامة دون تغيير.
-// [v1.3 — 2026-10-26] — BULLETPROOF BUILD: SwitchListTile standard, strict analyzer compliance
+// [v1.5 — FIXED] — UI & UX ENHANCEMENTS:
+//   - FIXED: Replaced SizedBox with ConstrainedBox to prevent overflow on small screens.
+//   - FIXED: Changed _SwitchTile Container to Material to fix Ink Splash warnings.
+//   - ADDED: Unfocus keyboard when hitting save button.
+//   - KEPT: All slug validation, pickers, and logic intact.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -193,6 +191,9 @@ class _AddEditCategoryDialogState extends State<AddEditCategoryDialog> {
 
   // ─── Save ───
   Future<void> _save() async {
+    // ✅ إخفاء الكيبورد عند الحفظ
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
@@ -316,8 +317,9 @@ class _AddEditCategoryDialogState extends State<AddEditCategoryDialog> {
         ],
       ),
       contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      content: SizedBox(
-        width: 480,
+      // ✅ استخدام ConstrainedBox بدلاً من SizedBox الثابت لمنع تجاوز الحواف
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -650,13 +652,14 @@ class _SwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
+    // ✅ تحويل الـ Container إلى Material لمنع تحذير الـ Ink Splash
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
-      // ✅ [FIX] استخدام SwitchListTile العادي بدلاً من adaptive
-      // لأن activeThumbColor مدعومة بشكل أفضل فيه.
+      clipBehavior: Clip.antiAlias,
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,

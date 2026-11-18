@@ -1,23 +1,10 @@
 // lib/features/admin/screens/categories_management_screen.dart
 //
-// [v5.1 — 2026-10-24] — Fix: textDirection outside TextStyle.copyWith
-//   - FIX: `textDirection: TextDirection.ltr` moved from inside
-//     `style.copyWith(...)` to the `Text(...)` widget itself.
-//     In Flutter 3.27+ TextStyle does not accept textDirection;
-//     it belongs on the Text widget.
-//
-// [Wave 10 — file 5/12] — 2026-10-24
-// Categories Management Screen (Admin Dashboard)
-//
-// - Live stream of all categories from Firestore
-// - Search, sort (order/name/placesCount), pull-to-refresh
-// - Inline active toggle, popup menu (edit/featured/delete)
-// - FAB to create new category with auto-suggested order
-//
-// Depends on:
-//   - CategoriesRepository (v2.1)
-//   - AddEditCategoryDialog (file 6)
-//   - Category v2.0 (icon, color getters)
+// [v5.2 — FIXED] — PERFORMANCE & UI FIXES:
+//   - FIXED: Moved _repo.watchAll() to initState to prevent creating a new stream on every keystroke.
+//   - FIXED: Replaced 'context' with 'dialogContext' inside the delete AlertDialog.
+//   - FIXED: Added clipBehavior to Card to prevent ink splash overflow.
+//   - KEPT: All search, sort, toggle, and delete logic intact.
 
 import 'package:flutter/material.dart';
 
@@ -38,6 +25,8 @@ class CategoriesManagementScreen extends StatefulWidget {
 class _CategoriesManagementScreenState
     extends State<CategoriesManagementScreen> {
   late final CategoriesRepository _repo;
+  late final Stream<List<Category>> _categoriesStream; // ✅ تخزين الـ Stream
+
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   _SortMode _sortMode = _SortMode.byOrder;
@@ -47,6 +36,8 @@ class _CategoriesManagementScreenState
   void initState() {
     super.initState();
     _repo = widget.repository ?? CategoriesRepository();
+    // ✅ تم نقل إنشاء الـ Stream هنا لمنع إعادة إنشائه مع كل حرف يتم البحث به
+    _categoriesStream = _repo.watchAll();
   }
 
   @override
@@ -139,9 +130,10 @@ class _CategoriesManagementScreenState
       return;
     }
 
+    // ✅ تم استخدام dialogContext بدلاً من context هنا
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الحذف'),
         content: Text(
           'هل تريد حذف التصنيف "${cat.nameAr}" نهائياً؟\n\n'
@@ -149,14 +141,14 @@ class _CategoriesManagementScreenState
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('إلغاء'),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red.shade700,
             ),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.delete_forever, size: 18),
             label: const Text('حذف'),
           ),
@@ -235,7 +227,7 @@ class _CategoriesManagementScreenState
         ],
       ),
       body: StreamBuilder<List<Category>>(
-        stream: _repo.watchAll(),
+        stream: _categoriesStream, // ✅ استخدام الـ Stream المخزن
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
@@ -402,6 +394,7 @@ class _CategoryCard extends StatelessWidget {
     final canDelete = category.placesCount == 0;
 
     return Card(
+      clipBehavior: Clip.antiAlias, // ✅ يمنع تحذير الـ Ink Splash
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
@@ -456,7 +449,6 @@ class _CategoryCard extends StatelessWidget {
                         ],
                       ],
                     ),
-                    // [v5.1 FIX] textDirection moved out of style.copyWith
                     Text(
                       category.nameEn,
                       textDirection: TextDirection.ltr,

@@ -1,13 +1,8 @@
 // lib/models/filter_definition.dart
 //
 // [Wave 11 — Filters System] — 2026-10-25
-// نموذج تعريف الفلتر — Firestore-backed.
-//
-// يدعم 5 أنواع: single_choice, multi_choice, range, boolean, sort.
-// كل فلتر مرتبط بحقل في Place عبر fieldKey.
-//
-// ✅ Dynamic — يُدار من Admin Dashboard.
-// ✅ Role-aware — rolesAllowed يحدد من يرى الفلتر.
+// [v2.0.0 — 2026-11-12] — ADDED categoryId:
+//   - Added `categoryId` to support General (null) vs Specific filters.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -51,6 +46,7 @@ class FilterOption {
 
 class FilterDefinition {
   final String id; // slug: 'amenities', 'price'
+  final String? categoryId; // ✅ null = عام، غير null = خاص
   final String nameAr;
   final String nameEn;
   final FilterType type;
@@ -67,6 +63,7 @@ class FilterDefinition {
 
   const FilterDefinition({
     required this.id,
+    this.categoryId, // ✅ الحقل الجديد
     required this.nameAr,
     required this.nameEn,
     required this.type,
@@ -92,6 +89,10 @@ class FilterDefinition {
   factory FilterDefinition.fromMap(Map<String, dynamic> map, {String? id}) {
     return FilterDefinition(
       id: id ?? (map['id'] ?? '').toString(),
+      categoryId:
+          map['categoryId'] != null && map['categoryId'].toString().isNotEmpty
+              ? map['categoryId'].toString()
+              : null, // ✅ قراءة التصنيف
       nameAr: (map['nameAr'] ?? '').toString(),
       nameEn: (map['nameEn'] ?? '').toString(),
       type: _parseType(map['type']),
@@ -115,6 +116,7 @@ class FilterDefinition {
 
   Map<String, dynamic> toMap() => {
         'id': id,
+        'categoryId': categoryId, // ✅ حفظ التصنيف
         'nameAr': nameAr,
         'nameEn': nameEn,
         'type': _typeToString(type),
@@ -130,6 +132,7 @@ class FilterDefinition {
 
   FilterDefinition copyWith({
     String? id,
+    String? categoryId,
     String? nameAr,
     String? nameEn,
     FilterType? type,
@@ -141,9 +144,12 @@ class FilterDefinition {
     List<String>? rolesAllowed,
     List<FilterOption>? options,
     String? matchMode,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return FilterDefinition(
       id: id ?? this.id,
+      categoryId: categoryId ?? this.categoryId, // ✅
       nameAr: nameAr ?? this.nameAr,
       nameEn: nameEn ?? this.nameEn,
       type: type ?? this.type,
@@ -155,8 +161,8 @@ class FilterDefinition {
       rolesAllowed: rolesAllowed ?? this.rolesAllowed,
       options: options ?? this.options,
       matchMode: matchMode ?? this.matchMode,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

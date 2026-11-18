@@ -1,12 +1,49 @@
 // lib/features/admin/screens/admin_settings_screen.dart
+// [v1.2 — 2026-11-05] — ASYNC GAP FIX: Captured AuthController before await showDialog.
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../auth/controllers/auth_controller.dart';
 import '../../support/screens/admin_support_settings_dialog.dart';
 
 class AdminSettingsScreen extends StatelessWidget {
   const AdminSettingsScreen({super.key});
+
+  Future<void> _handleLogout(BuildContext context) async {
+    // ✅ Capture auth BEFORE any async operation
+    final auth = context.read<AuthController>();
+
+    // نافذة تأكيد لمنع تسجيل الخروج بالخطأ
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تسجيل الخروج',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content:
+            const Text('هل أنت متأكد من رغبتك في تسجيل الخروج من لوحة التحكم؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await auth.signOut();
+    if (context.mounted) {
+      context.go('/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +59,7 @@ class AdminSettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           const SizedBox(height: 16),
-          _SectionTitle(title: 'إعدادات المنصة'),
+          const _SectionTitle(title: 'إعدادات المنصة'),
           ListTile(
             leading:
                 Icon(Icons.support_agent, color: theme.colorScheme.primary),
@@ -33,7 +70,7 @@ class AdminSettingsScreen extends StatelessWidget {
             onTap: () => AdminSupportSettingsDialog.show(context),
           ),
           const Divider(),
-          _SectionTitle(title: 'الحساب'),
+          const _SectionTitle(title: 'الحساب'),
           ListTile(
             leading: CircleAvatar(
               backgroundColor: theme.colorScheme.primaryContainer,
@@ -47,13 +84,10 @@ class AdminSettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.logout, color: Colors.red),
             title:
                 const Text('تسجيل الخروج', style: TextStyle(color: Colors.red)),
-            onTap: () async {
-              await auth.signOut();
-              if (context.mounted) context.go('/login');
-            },
+            onTap: () => _handleLogout(context),
           ),
           const Divider(),
-          _SectionTitle(title: 'حول التطبيق'),
+          const _SectionTitle(title: 'حول التطبيق'),
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('إصدار لوحة التحكم'),

@@ -2,304 +2,279 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
-// [v5.9 — 2026-10-29] — Wave 17: DISTRICTS (subcollection) for governorates
-//   - ADD: /governorates/{govId}/districts/{districtId}
-//     • read: public (any user needs to see neighborhoods)
-//     • write: admin only
-//   - KEPT: all v5.8 rules intact.
-// [v5.8 — 2026-10-29] — SECURITY FIX: prevent self role escalation
+// [v6.1 — 2026-11-12] — FIX: Added rule for /review_criteria
+//   - ADDED: /review_criteria/{criterionId} — read public; write admin only.
+//   - Fixes PERMISSION_DENIED error when loading review criteria in the app.
+// [v6.0 — 2026-11-12] — CRITICAL: Added rating pipeline collections.
+//   - ADDED: /visits/{visitId}          — read owner/admin; create owner; delete admin.
+//   - ADDED: /ratings/{ratingId}        — read published or owner/moderator; create owner;
+//                                          update restricted to helpfulCount/reportCount +1;
+//                                          delete admin only.
+//   - ADDED: /place_aggregates/{placeId}— read public; create/update signed-in;
+//                                          delete admin only.
+//   - ADDED: /reports/{reportId}        — create signed-in reporter; read/update admin/mod.
+//   - DOCUMENTED: /zones supports `notes` (string) and `geoZoneId` (string)
+//                 via permissive admin write. No schema validation added — avoids
+//                 breaking existing data during migration.
+//   - Preserved: all v5.23 rules (users/places/districts/zones/governorates/etc.).
+//   - Preserved: catch-all deny at the bottom.
+// [v5.23 — 2026-11-11] — FIXED: Added root-level rules for districts and zones.
+// [v5.22 — 2026-11-09] — FIXED: Favorites (verified) + Notifications (preemptive fix).
 // ═══════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── HELPERS ───
+    // ─── دوال مساعدة أساسية ───
     function isSignedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
-    function userExists() {
-      return exists(/databases/$(database)/documents/users/$(uid()));
-    }
-    function userData() {
-      return get(/databases/$(database)/documents/users/$(uid())).data;
-    }
+    function userExists() { return exists(/databases/$(database)/documents/users/$(uid())); }
+    function userData() { return get(/databases/$(database)/documents/users/$(uid())).data; }
 
-    function isAdmin() {
-      return isSignedIn() && userExists() && userData().role == 'admin';
-    }
-    function isMerchant() {
-      return isSignedIn() && userExists() && userData().role == 'merchant';
-    }
-    function isModerator() {
-      return isSignedIn() && userExists() && userData().role == 'moderator';
-    }
-    function isModeratorOrAdmin() {
-      return isAdmin() || isModerator();
-    }
+    function isAdmin() { return isSignedIn() && userExists() && userData().role == 'admin'; }
+    function isMerchant() { return isSignedIn() && userExists() && userData().role == 'merchant'; }
+    function isModerator() { return isSignedIn() && userExists() && userData().role == 'moderator'; }
+    function isModeratorOrAdmin() { return isAdmin() || isModerator(); }
     function isSelf(userId) { return isSignedIn() && uid() == userId; }
 
-    function isString(field, minLen, maxLen) {
-      return field is string
-          && field.size() >= minLen
-          && field.size() <= maxLen;
-    }
-    function isValidRating(rating) {
-      return rating is number && rating >= 1 && rating <= 5;
-    }
+    // ─── دوال التحقق من الصحة (Validation) ───
+    function isString(field, minLen, maxLen) { return field is string && field.size() >= minLen && field.size() <= maxLen; }
+    function isValidRating(rating) { return rating is number && rating >= 1 && rating <= 5; }
     function authEmail() { return request.auth.token.email; }
 
-    // ─── Trip helpers ───
-    function isValidTripStatus(s) {
-      return s in ['draft', 'active', 'completed', 'cancelled'];
-    }
-    function isValidTransportMode(m) {
-      return m in ['walking', 'driving', 'transit', 'car'];
-    }
-    function isValidDurationType(d) {
-      return d in ['half_day', 'full_day', 'weekend'];
-    }
+    function isValidTripStatus(s) { return s in ['draft', 'active', 'completed', 'cancelled']; }
+    function isValidTransportMode(m) { return m in ['walking', 'driving', 'transit', 'car']; }
+    function isValidDurationType(d) { return d in ['halfDay', 'fullDay', 'weekend']; }
     function isValidStopsCount(n) { return n is int && n >= 0 && n <= 50; }
 
-    // ─── Categories helpers ───
-    function isValidSlug(s) {
-      return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$');
+    function isValidSlug(s) { return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$'); }
+    function isValidHexColor(c) { return c is string && c.size() == 7 && c.matches('^#[0-9A-Fa-f]+$'); }
+
+    function isValidFilterSlug(s) { return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$'); }
+    function isValidFilterData(data) { return data.keys().hasAll(['nameAr', 'nameEn', 'type', 'fieldKey', 'options']) && isString(data.nameAr, 1, 100) && isString(data.nameEn, 1, 100) && data.type in ['single_choice', 'multi_choice', 'range', 'boolean', 'sort'] && isString(data.fieldKey, 1, 50) && data.options is list && data.options.size() <= 50; }
+
+    function isMerchantOwner(placeId) { 
+      return isMerchant() && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == uid(); 
     }
-    function isValidHexColor(c) {
-      return c is string && c.size() == 7 && c.matches('^#[0-9A-Fa-f]+$');
+    function isPlaceOwner(placeId) { 
+      return isSignedIn() && exists(/databases/$(database)/documents/places/$(placeId)) && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == uid(); 
     }
 
-    // ─── Filters helpers ───
-    function isValidFilterSlug(s) {
-      return isString(s, 2, 50) && s.matches('^[a-z0-9_]+$');
-    }
-    function isValidFilterData(data) {
-      return data.keys().hasAll(['nameAr', 'nameEn', 'type', 'fieldKey', 'options'])
-          && isString(data.nameAr, 1, 100)
-          && isString(data.nameEn, 1, 100)
-          && data.type in ['single_choice', 'multi_choice', 'range', 'boolean', 'sort']
-          && isString(data.fieldKey, 1, 50)
-          && data.options is list
-          && data.options.size() <= 50;
-    }
-
-    // ─── Ownership helpers ───
-    function isMerchantOwner(placeId) {
-      return isMerchant() && (
-        get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == uid()
-      );
-    }
-    function isPlaceOwner(placeId) {
-      return isSignedIn()
-          && exists(/databases/$(database)/documents/places/$(placeId))
-          && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == uid();
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // USERS
-    // ═══════════════════════════════════════════════════════════
+    // ─── المستخدمون (Users) ───
     match /users/{userId} {
-      allow read: if isSelf(userId) || isAdmin();
-
-      allow create: if isSelf(userId)
-                    && request.resource.data.role == 'user';
-
-      allow update: if isAdmin() || (
-        isSelf(userId) &&
-        !request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasAny([
-            'role',
-            'createdAt',
-            'email',
-            'isVerified',
-            'isBanned',
-            'banReason',
-            'bannedAt'
-          ])
-      );
-
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin(); 
+      
+      allow create: if isSelf(userId) && request.resource.data.role in ['user', 'member'];
+      allow update: if isAdmin() || (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'createdAt', 'email', 'isVerified', 'isBanned', 'banReason', 'bannedAt', 'hasConfirmedReports', 'trustScore']));
       allow delete: if isSelf(userId) || isAdmin();
 
-      match /favorites/{placeId} {
-        allow read: if isSelf(userId);
-        allow create: if isSelf(userId);
-        allow delete: if isSelf(userId);
-        allow update: if false;
+      match /favorites/{placeId} { 
+        allow read, create, delete: if isSelf(userId); 
+        allow update: if false; 
       }
+      match /notification_reads/{notificationId} { allow read, write: if isSelf(userId); }
+      match /notification_hides/{notificationId} { allow read, write: if isSelf(userId); }
     }
 
-    // ─── FAVORITES (Top-level mirror) ───
+    // ─── المفضلة (Favorites) ───
     match /favorites/{favoriteId} {
-      allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow list: if isSignedIn() && resource.data.userId == uid(); 
       allow create: if isSignedIn() && request.resource.data.userId == uid();
       allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
       allow update: if false;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // PLACES
-    // ═══════════════════════════════════════════════════════════
+    // ─── الأماكن (Places) ───
     match /places/{placeId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-
-      allow update: if isAdmin() || (
-        isMerchantOwner(placeId) &&
-        !request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasAny(['ownerId', 'isApproved', 'averageRating', 'reviewCount', 'createdAt'])
-      );
+      allow get, list: if true;
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.ownerId == uid());
+      
+      allow update: if isAdmin() || 
+                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount'])) || 
+                    (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['averageRating', 'reviewCount'])) || 
+                    (isMerchantOwner(placeId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'isApproved', 'averageRating', 'reviewCount', 'createdAt', 'viewCount']));
 
       allow delete: if isAdmin();
 
       match /reviews/{reviewId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isSignedIn() && request.resource.data.userId == uid();
+        allow get, list: if true;
+        allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidRating(request.resource.data.rating);
         allow update, delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
       }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // CATEGORIES
-    // ═══════════════════════════════════════════════════════════
-    match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    match /{path=**}/reviews/{reviewId} {
+      allow read: if isModeratorOrAdmin();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // GOVERNORATES + DISTRICTS (Wave 17)
-    // ═══════════════════════════════════════════════════════════
+    match /reviews/{reviewId} {
+      allow read: if isModeratorOrAdmin();
+    }
+
+    match /hides/{hideId} { 
+      allow get: if isSignedIn() && resource.data.userId == uid(); 
+      allow list: if isAdmin(); 
+      allow write: if isSignedIn() && request.resource.data.userId == uid(); 
+    }
+
+    match /categories/{categoryId} { allow read: if true; allow write: if isAdmin(); }
+
     match /governorates/{governorateId} {
       allow read: if true;
       allow write: if isAdmin();
-
-      // ✅ [v5.9] الأحياء داخل المحافظة
-      match /districts/{districtId} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
+      match /districts/{districtId} { allow read: if true; allow write: if isAdmin(); }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // FILTERS
-    // ═══════════════════════════════════════════════════════════
-    match /filters/{filterId} {
+    // ─── الأحياء والمناطق (Districts / Zones) ───
+    match /districts/{districtId} {
       allow read: if true;
-      allow write: if isModeratorOrAdmin();
+      allow write: if isAdmin();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // REVIEWS (Top-level mirror)
-    // ═══════════════════════════════════════════════════════════
-    match /reviews/{reviewId} {
+    // ─── المناطق (Zones) ───
+    // حقول `notes` (string) و `geoZoneId` (string) مدعومة ضمنياً عبر
+    // allow write: if isAdmin() — لا يوجد schema validation هنا
+    // (لتجنّب كسر البيانات الحالية أثناء الهجرة التدريجية).
+    match /zones/{zoneId} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /geo_zones/{zoneId} { allow read: if true; allow write: if isAdmin(); }
+    match /filters/{filterId} { allow read: if true; allow write: if isModeratorOrAdmin(); }
+
+    // ─── معايير التقييم (Review Criteria) ───
+    // القراءة متاحة للجميع (لأن شاشة التقييم تحتاج جلب المعايير)
+    // الكتابة (إضافة/تعديل/حذف) متاحة للأدمن فقط
+    match /review_criteria/{criterionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ★★★ NEW in v6.0 — Rating Pipeline Collections ★★★
+    // ═══════════════════════════════════════════════════════════════
+
+    // ─── الزيارات (Visits) ───
+    // يُنشئها VisitService.createVisit() أثناء إرسال التقييم.
+    // قراءة المالك/المشرف فقط (تحتوي إحداثيات GPS + deviceId).
+    match /visits/{visitId} {
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isModeratorOrAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == uid() || isModeratorOrAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == uid();
-      allow update, delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow update, delete: if isAdmin();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // MERCHANT REQUESTS
-    // ═══════════════════════════════════════════════════════════
+    // ─── التقييمات (Ratings) ───
+    // قراءة:
+    //   - أي زائر → التقييمات المنشورة فقط (status == 'PUBLISHED')
+    //   - المالك → تقييماته (أي status)
+    //   - المشرف/الأدمن → الكل
+    // إنشاء: المستخدم المسجّل فقط، ولنفسه فقط.
+    // تحديث:
+    //   - المشرف/الأدمن → أي حقل
+    //   - المستخدم → helpfulCount +1 أو reportCount +1 فقط (بدون لمس بقية الحقول)
+    // حذف: الأدمن فقط.
+    match /ratings/{ratingId} {
+      allow get: if resource.data.status == 'PUBLISHED'
+                  || (isSignedIn() && resource.data.userId == uid())
+                  || isModeratorOrAdmin();
+      allow list: if resource.data.status == 'PUBLISHED'
+                   || (isSignedIn() && resource.data.userId == uid())
+                   || isModeratorOrAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == uid();
+
+      // helpfulCount +1 فقط (markHelpful)
+      allow update: if isModeratorOrAdmin()
+                    || (isSignedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
+                        && request.resource.data.helpfulCount == resource.data.helpfulCount + 1)
+                    || (isSignedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
+                        && request.resource.data.reportCount == resource.data.reportCount + 1);
+
+      allow delete: if isAdmin();
+    }
+
+    // ─── إحصاءات الأماكن (Place Aggregates) ───
+    // يحدّثها AggregateService عبر transactions من جهة العميل.
+    // قراءة عامة (تُعرض على بطاقة المكان). كتابة للمستخدمين المسجّلين فقط.
+    // حذف: الأدمن فقط.
+    match /place_aggregates/{placeId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // ─── البلاغات (Reports) ───
+    // يُنشئها RatingService.reportRating() — المستخدم المسجّل فقط لنفسه.
+    // القراءة/التحديث/الحذف: المشرف/الأدمن فقط.
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == uid();
+      allow get, list, update: if isModeratorOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // (بقية القواعد — كما هي في v5.23)
+    // ═══════════════════════════════════════════════════════════════
+
     match /merchant_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow list: if isAdmin(); 
       allow create: if isSignedIn() && request.resource.data.userId == uid();
       allow update: if isAdmin();
       allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // OFFERS
-    // ═══════════════════════════════════════════════════════════
     match /offers/{offerId} {
       allow get, list: if true;
       allow create: if isSignedIn() && (isAdmin() || isPlaceOwner(request.resource.data.placeId));
       allow update, delete: if isAdmin() || (isSignedIn() && isPlaceOwner(resource.data.placeId));
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // ADMIN STATS
-    // ═══════════════════════════════════════════════════════════
-    match /admin_stats/{docId} {
+    match /admin_stats/{docId} { allow read: if isModeratorOrAdmin(); allow write: if isAdmin(); }
+
+    match /audit_logs/{logId} {
       allow read: if isModeratorOrAdmin();
-      allow write: if isAdmin();
+      allow write: if isModeratorOrAdmin(); 
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // VISIT REQUESTS
-    // ═══════════════════════════════════════════════════════════
     match /visit_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow list: if isAdmin(); 
       allow create: if isSignedIn() && request.resource.data.userId == uid();
       allow update: if isAdmin() || (isSignedIn() && resource.data.userId == uid());
       allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // TRIP PLANS
-    // ═══════════════════════════════════════════════════════════
     match /trip_plans/{planId} {
-      allow create: if isSignedIn()
-                    && request.resource.data.userId == uid()
-                    && isValidTripStatus(request.resource.data.status);
-
-      allow read: if isSignedIn()
-                  && (resource.data.userId == uid() || isAdmin());
-
-      allow update: if isSignedIn()
-                    && (resource.data.userId == uid() || isAdmin())
-                    && isValidTripStatus(request.resource.data.status);
-
-      allow delete: if isSignedIn()
-                    && (resource.data.userId == uid() || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidTripStatus(request.resource.data.status);
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow list: if isAdmin(); 
+      allow update: if isSignedIn() && (resource.data.userId == uid() || isAdmin()) && isValidTripStatus(request.resource.data.status);
+      allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // SUPPORT TICKETS
-    // ═══════════════════════════════════════════════════════════
     match /support_tickets/{ticketId} {
-      allow create: if (
-          (request.auth != null && request.resource.data.userId == request.auth.uid) ||
-          (request.auth == null && request.resource.data.userId == 'anonymous')
-        ) && request.resource.data.status == 'open';
-
-      allow read: if isAdmin()
-                  || (isSignedIn() && resource.data.userId == uid());
-
+      allow create: if ((request.auth != null && request.resource.data.userId == request.auth.uid) || (request.auth == null && request.resource.data.userId == 'anonymous')) && request.resource.data.status == 'open';
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == uid());
+      allow list: if isAdmin(); 
       allow update, delete: if isAdmin();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // NOTIFICATIONS
-    // ═══════════════════════════════════════════════════════════
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && resource.data.userId == uid();
-
-      allow create: if isAdmin();
-
-      allow update: if isSignedIn()
-                    && resource.data.userId == uid()
-                    && !request.resource.data.diff(resource.data)
-                        .affectedKeys()
-                        .hasAny(['userId', 'title', 'body', 'type', 'createdAt']);
-
+      allow get: if isSignedIn() && (resource.data.userId == uid() || resource.data.userId == 'all');
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.userId == uid() || resource.data.userId == 'all')); 
+      allow create: if isSignedIn(); 
+      allow update: if isSignedIn() && resource.data.userId == uid() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'title', 'body', 'type', 'createdAt']);
       allow delete: if isSignedIn() && resource.data.userId == uid();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // SETTINGS
-    // ═══════════════════════════════════════════════════════════
-    match /settings/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // DEFAULT DENY ALL
-    // ═══════════════════════════════════════════════════════════
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /settings/{docId} { allow read: if true; allow write: if isAdmin(); }
+    
+    match /{document=**} { allow read, write: if false; }
   }
 }

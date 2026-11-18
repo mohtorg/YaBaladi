@@ -1,7 +1,7 @@
 // lib/features/search/screens/all_categories_screen.dart
 //
-// [v2.9 — 2026-10-27] — SAFE BUILD: Replaced withValues, simplified Query types
-// [v3.0 — 2026-10-27] — FIX ANALYZER: withOpacity → withValues(alpha:), Prefer final
+// [v3.1 — 2026-11-05] — FIXED: Added braces for if statements (Linter),
+//                      corrected 'category' key, and used context.push for navigation.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -59,11 +59,12 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
       final placesSnap = await placesQuery.get();
 
       // 3. حساب العدد الفعلي لكل تصنيف
-      final Map<String, int> realCounts = {}; // ✅ تمت إضافة final
+      final Map<String, int> realCounts = {};
       for (var doc in placesSnap.docs) {
         final data = doc.data() as Map<String, dynamic>?;
         if (data != null) {
-          final catId = data['categoryId'] as String?;
+          // ✅ Fix: Check both 'category' and 'categoryId'
+          final catId = (data['category'] ?? data['categoryId']) as String?;
           if (catId != null) {
             realCounts[catId] = (realCounts[catId] ?? 0) + 1;
           }
@@ -85,15 +86,19 @@ class _AllCategoriesScreenState extends State<AllCategoriesScreen> {
 
         final iconName = data['iconName'] as String? ?? 'category';
         IconData parsedIcon = Icons.category;
-        if (iconName.contains('restaurant'))
+
+        // ✅ Fix: Added braces for if statements (Linter)
+        if (iconName.contains('restaurant')) {
           parsedIcon = Icons.restaurant;
-        else if (iconName.contains('cafe'))
+        } else if (iconName.contains('cafe')) {
           parsedIcon = Icons.local_cafe;
-        else if (iconName.contains('hotel'))
+        } else if (iconName.contains('hotel')) {
           parsedIcon = Icons.hotel;
-        else if (iconName.contains('beach'))
+        } else if (iconName.contains('beach')) {
           parsedIcon = Icons.beach_access;
-        else if (iconName.contains('shop')) parsedIcon = Icons.shopping_bag;
+        } else if (iconName.contains('shop')) {
+          parsedIcon = Icons.shopping_bag;
+        }
 
         return _LocalCategory(
           id: doc.id,
@@ -187,15 +192,15 @@ class _CategoryGridCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           colors: [
-            baseColor.withValues(alpha: 0.9), // ✅ تم التعديل
-            baseColor.withValues(alpha: 0.6), // ✅ تم التعديل
+            baseColor.withValues(alpha: 0.9),
+            baseColor.withValues(alpha: 0.6),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: baseColor.withValues(alpha: 0.35), // ✅ تم التعديل
+            color: baseColor.withValues(alpha: 0.35),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -210,8 +215,9 @@ class _CategoryGridCard extends StatelessWidget {
             final govParam = (governorate != null && governorate!.isNotEmpty)
                 ? '&gov=${Uri.encodeComponent(governorate!)}'
                 : '';
-            context
-                .go('/home/category/${category.id}?name=$encodedName$govParam');
+            // ✅ Fix: Use context.push to preserve navigation stack
+            context.push(
+                '/home/category/${category.id}?name=$encodedName$govParam');
           },
           child: Padding(
             padding: const EdgeInsets.all(12.0),
@@ -221,12 +227,11 @@ class _CategoryGridCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3), // ✅ تم التعديل
+                    color: Colors.white.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            Colors.black.withValues(alpha: 0.1), // ✅ تم التعديل
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -263,12 +268,10 @@ class _CategoryGridCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color:
-                          Colors.black.withValues(alpha: 0.45), // ✅ تم التعديل
+                      color: Colors.black.withValues(alpha: 0.45),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 1), // ✅ تم التعديل
+                          color: Colors.white.withValues(alpha: 0.3), width: 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

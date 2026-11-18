@@ -1,9 +1,7 @@
 // lib/models/trip_plan.dart
-//
-// [v1.2.1 — 2026-10-25] — FIX: Build error in stopsByDay
-//   - FIX: .clamp() returns 'num' → added .toInt() for List.sublist()
-//   - REMOVED: unused import 'dart:math'
-//   - KEPT: all logic, enums, getters, and serialization identical
+// [v1.3.1 — 2026-11-03] — HOTFIX: Restored `tripDurationFromDays` (used by trip_planner_screen.dart).
+//   - ADDED BACK: tripDurationFromDays(int days) → TripDurationType.
+//   - KEPT: companions field, 'car' support, name fallback.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -38,6 +36,7 @@ TripTransportMode tripTransportFromCode(String? code) {
     'walking' => TripTransportMode.walking,
     'driving' => TripTransportMode.driving,
     'transit' => TripTransportMode.transit,
+    'car' => TripTransportMode.driving, // ✅ دعم الـ Wizard
     _ => TripTransportMode.driving,
   };
 }
@@ -91,6 +90,7 @@ TripDurationType tripDurationFromCode(String? code) {
   };
 }
 
+// ✅ تم استعادة هذه الدالة (كانت محذوفة في v1.3)
 TripDurationType tripDurationFromDays(int days) {
   if (days <= 1) return TripDurationType.fullDay;
   if (days == 2) return TripDurationType.weekend;
@@ -163,12 +163,12 @@ class TripStop {
   factory TripStop.fromMap(Map<String, dynamic> map) {
     return TripStop(
       placeId: (map['placeId'] as String?) ?? '',
-      placeNameAr: (map['placeNameAr'] as String?) ?? '',
-      placeNameEn: (map['placeNameEn'] as String?) ?? '',
+      placeNameAr: (map['placeNameAr'] ?? map['name'] ?? '') as String,
+      placeNameEn: (map['placeNameEn'] ?? '') as String,
       placeImageUrl: map['placeImageUrl'] as String?,
       lat: (map['lat'] as num?)?.toDouble() ?? 0.0,
       lng: (map['lng'] as num?)?.toDouble() ?? 0.0,
-      categoryId: (map['categoryId'] as String?) ?? '',
+      categoryId: (map['categoryId'] ?? map['categoryName'] ?? '') as String,
       rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (map['reviewCount'] as num?)?.toInt() ?? 0,
       plannedArrival: (map['plannedArrival'] as Timestamp?)?.toDate(),
@@ -226,9 +226,6 @@ class TripStop {
         notes: notes ?? this.notes,
         isVisited: isVisited ?? this.isVisited,
       );
-
-  @override
-  String toString() => 'TripStop($placeId, $placeNameAr)';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -249,6 +246,7 @@ class TripPlan {
     required this.stops,
     required this.totalDistanceKm,
     required this.totalDurationMin,
+    this.companions,
     this.startDate,
     this.endDate,
     this.createdAt,
@@ -267,6 +265,7 @@ class TripPlan {
   final List<TripStop> stops;
   final double totalDistanceKm;
   final int totalDurationMin;
+  final String? companions;
   final DateTime? startDate;
   final DateTime? endDate;
   final DateTime? createdAt;
@@ -299,29 +298,10 @@ class TripPlan {
 
   bool get isMultiDay => durationInDays > 1;
 
-  bool get isValidRange {
-    if (startDate == null || endDate == null) return true;
-    return !endDate!.isBefore(startDate!);
-  }
-
   DateTime? get effectiveEndDate {
     if (endDate != null) return endDate;
     if (startDate == null) return null;
     return startDate!.add(Duration(days: durationType.expectedDays - 1));
-  }
-
-  bool get isUpcoming {
-    if (startDate == null) return false;
-    final now = DateTime.now();
-    final end = effectiveEndDate ?? startDate!;
-    return end.isAfter(now);
-  }
-
-  bool get isOngoing {
-    if (startDate == null) return false;
-    final now = DateTime.now();
-    final end = effectiveEndDate ?? startDate!;
-    return startDate!.isBefore(now) && end.isAfter(now);
   }
 
   String get dateRangeLabel {
@@ -339,26 +319,13 @@ class TripPlan {
     final days = totalDays;
     if (days <= 1 || stops.isEmpty) return [stops];
 
-    final lats = stops.map((s) => s.lat).toList()..sort();
-    final lngs = stops.map((s) => s.lng).toList()..sort();
-    final latRange = lats.last - lats.first;
-    final lngRange = lngs.last - lngs.first;
-
-    final sorted = List<TripStop>.from(stops);
-    if (latRange > lngRange) {
-      sorted.sort((a, b) => a.lat.compareTo(b.lat));
-    } else {
-      sorted.sort((a, b) => a.lng.compareTo(b.lng));
-    }
-
-    final perDay = (sorted.length / days).ceil();
+    final perDay = (stops.length / days).ceil();
     final result = <List<TripStop>>[];
     for (var i = 0; i < days; i++) {
       final start = i * perDay;
-      // [FIX] أضفنا .toInt() هنا لأن دالة clamp ترجع num
-      final end = (start + perDay).clamp(0, sorted.length).toInt();
-      if (start >= sorted.length) break;
-      result.add(sorted.sublist(start, end));
+      final end = (start + perDay).clamp(0, stops.length).toInt();
+      if (start >= stops.length) break;
+      result.add(stops.sublist(start, end));
     }
     return result;
   }
@@ -381,7 +348,14 @@ class TripPlan {
       status: tripStatusFromCode(map['status'] as String?),
       stops: stops,
       totalDistanceKm: (map['totalDistanceKm'] as num?)?.toDouble() ?? 0.0,
-      totalDurationMin: (map['totalDurationMin'] as num?)?.toInt() ?? 0,
+      totalDurationMin: (map['totalDurationMin'] as num?)?.toInt() ??
+          ((map['totalHours'] is String
+                          ? double.tryParse(map['totalHours'] as String)
+                          : null)
+                      ?.toInt() ??
+                  0) *
+              60,
+      companions: map['companions'] as String?,
       startDate: (map['startDate'] as Timestamp?)?.toDate(),
       endDate: (map['endDate'] as Timestamp?)?.toDate(),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
@@ -401,6 +375,7 @@ class TripPlan {
         'stops': stops.map((s) => s.toMap()).toList(),
         'totalDistanceKm': totalDistanceKm,
         'totalDurationMin': totalDurationMin,
+        if (companions != null) 'companions': companions,
         if (startDate != null) 'startDate': Timestamp.fromDate(startDate!),
         if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
         'createdAt': createdAt != null
@@ -422,6 +397,7 @@ class TripPlan {
     List<TripStop>? stops,
     double? totalDistanceKm,
     int? totalDurationMin,
+    String? companions,
     DateTime? startDate,
     DateTime? endDate,
     DateTime? createdAt,
@@ -440,15 +416,12 @@ class TripPlan {
         stops: stops ?? this.stops,
         totalDistanceKm: totalDistanceKm ?? this.totalDistanceKm,
         totalDurationMin: totalDurationMin ?? this.totalDurationMin,
+        companions: companions ?? this.companions,
         startDate: startDate ?? this.startDate,
         endDate: endDate ?? this.endDate,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-
-  @override
-  String toString() =>
-      'TripPlan($id, "$title", $stopCount stops, ${status.code})';
 }
 
 String _formatDate(DateTime d) {

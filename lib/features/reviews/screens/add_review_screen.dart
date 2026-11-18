@@ -1,14 +1,16 @@
 // lib/features/reviews/screens/add_review_screen.dart
 //
-// [v1.2 — 2026-10-28] — UI/UX ENHANCEMENT: Animated Stars, Live Counter, Progress Bar
+// [v1.3 — TRANSACTIONAL REVIEW FIX]
+//   - FIXED: Replaced repository calls with runTransaction.
+//   - Ensures that adding/editing a review atomically updates the place's averageRating and reviewCount.
 
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ ضروري للـ Transaction
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/controllers/auth_controller.dart';
 import '../../../models/place.dart';
 import '../../../models/review.dart';
-import '../../../repositories/reviews_repository.dart';
 
 class AddReviewScreen extends StatefulWidget {
   final Place place;
@@ -75,26 +77,68 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     setState(() => _submitting = true);
 
     final isEditing = widget.existingReview != null;
-    final repo = ReviewsRepository();
-    final safeName = auth.displayName;
-
-    final review = Review(
-      id: widget.existingReview?.id ?? '',
-      placeId: widget.place.id,
-      userId: auth.uid,
-      userName: safeName,
-      rating: _rating.toDouble(),
-      comment: _commentController.text.trim(),
-      createdAt: widget.existingReview?.createdAt,
-      isVerified: widget.existingReview?.isVerified ?? false,
-    );
+    final db = FirebaseFirestore.instance;
+    final placeRef = db.collection('places').doc(widget.place.id);
+    // نحدد مسار التقييم: إما تعديل تقييم موجود، أو إنشاء تقييم جديد
+    final reviewRef = isEditing
+        ? db.collection('reviews').doc(widget.existingReview!.id)
+        : db.collection('reviews').doc();
 
     try {
-      if (isEditing) {
-        await repo.update(review);
-      } else {
-        await repo.create(review);
-      }
+      // ✅ استخدام Transaction لضمان التزامن بين حفظ التقييم وتحديث المكان
+      await db.runTransaction((transaction) async {
+        final placeSnap = await transaction.get(placeRef);
+        if (!placeSnap.exists) {
+          throw Exception('المكان غير موجود');
+        }
+
+        final placeData = placeSnap.data() as Map<String, dynamic>;
+        final int oldCount = (placeData['reviewCount'] as num?)?.toInt() ?? 0;
+        final double oldAvg =
+            (placeData['averageRating'] as num?)?.toDouble() ?? 0.0;
+
+        int newCount;
+        double newAvg;
+
+        if (isEditing) {
+          // إذا كان تعديلاً، نقوم بطرح التقييم القديم وإضافة الجديد
+          final oldRating = widget.existingReview!.rating;
+          newCount = oldCount; // العدد لا يتغير
+          newAvg = oldCount > 0
+              ? ((oldAvg * oldCount) - oldRating + _rating) / oldCount
+              : _rating.toDouble();
+        } else {
+          // إذا كان تقييماً جديداً، نزيد العدد ونحسب المتوسط
+          newCount = oldCount + 1;
+          newAvg = ((oldAvg * oldCount) + _rating) / newCount;
+        }
+
+        // 1. تحديث وثيقة المكان
+        transaction.update(placeRef, {
+          'reviewCount': newCount,
+          'averageRating':
+              double.parse(newAvg.toStringAsFixed(1)), // تقريب لرقم عشري واحد
+        });
+
+        // 2. حفظ أو تحديث التقييم
+        final reviewData = {
+          'placeId': widget.place.id,
+          'userId': auth.uid,
+          'userName': auth.displayName,
+          'rating': _rating.toDouble(),
+          'comment': _commentController.text.trim(),
+          'createdAt': isEditing
+              ? widget.existingReview!.createdAt ?? FieldValue.serverTimestamp()
+              : FieldValue.serverTimestamp(),
+          'isVerified': widget.existingReview?.isVerified ?? false,
+        };
+
+        if (isEditing) {
+          transaction.update(reviewRef, reviewData);
+        } else {
+          transaction.set(reviewRef, reviewData);
+        }
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,7 +151,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
         ),
       );
       Navigator.of(context).pop(true);
-    } on Exception catch (e) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -149,7 +193,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ═══════════════════════════════════════════════════════
-                // 1. بطاقة المكان (لتذكير المستخدم)
+                // 1. بطاقة المكان
                 // ═══════════════════════════════════════════════════════
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -307,11 +351,10 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.3),
-                    counterText: '', // إخفاء العدّاد الافتراضي، نستخدم المخصص
+                    counterText: '',
                   ),
                 ),
                 const SizedBox(height: 4),
-                // ✅ العدّاد المخصص
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -335,7 +378,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                 const SizedBox(height: 24),
 
                 // ═══════════════════════════════════════════════════════
-                // 4. شريط التقدم (أثناء الإرسال)
+                // 4. شريط التقدم
                 // ═══════════════════════════════════════════════════════
                 if (_submitting)
                   Column(

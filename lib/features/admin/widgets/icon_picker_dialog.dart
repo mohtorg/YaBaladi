@@ -1,18 +1,11 @@
 // lib/features/admin/widgets/icon_picker_dialog.dart
 //
-// [Wave 10 — file 7/12] — 2026-10-24
-// Icon Picker Dialog for Category management.
-//
-// Reads from Category.availableIcons (v2.0) — single source of truth.
-// Returns the icon's string key (e.g. 'restaurant') or null on cancel.
-//
-// Usage:
-//   final iconName = await IconPickerDialog.show(
-//     context,
-//     initialIconName: category.iconName,
-//     accentColor: category.color,
-//   );
-//   if (iconName != null) { ... }
+// [v1.2 — 2026-11-15] — LINTER FIX: Added curly braces to single-line if statement in _filteredIcons.
+// [v1.1 — FIXED] — UI & LAYOUT SAFETY FIXES:
+//   - FIXED: Changed Column to MainAxisSize.max to support Expanded GridView without crashing.
+//   - FIXED: Wrapped _IconTile content with Material to show ink splashes.
+//   - FIXED: Added unfocus to hide keyboard on selection.
+//   - KEPT: All Arabic labels, search logic, and grid layout intact.
 
 import 'package:flutter/material.dart';
 
@@ -167,7 +160,9 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
     // Sort by key for stable display
     all.sort((a, b) => a.key.compareTo(b.key));
 
-    if (q.isEmpty) return all;
+    if (q.isEmpty) {
+      return all;
+    }
 
     return all.where((entry) {
       final key = entry.key.toLowerCase();
@@ -200,7 +195,8 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
           maxHeight: 520,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          // ✅ استخدام max لملء المساحة المخصصة ودعم Expanded بشكل سليم
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ─── Preview ───
@@ -321,7 +317,11 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
           child: const Text('إلغاء'),
         ),
         FilledButton.icon(
-          onPressed: () => Navigator.of(context).pop(_selected),
+          onPressed: () {
+            // ✅ إخفاء الكيبورد قبل اختيار الأيقونة
+            FocusScope.of(context).unfocus();
+            Navigator.of(context).pop(_selected);
+          },
           icon: const Icon(Icons.check, size: 18),
           label: const Text('اختيار'),
         ),
@@ -354,48 +354,55 @@ class _IconTile extends StatelessWidget {
     final theme = Theme.of(context);
     final outline = theme.colorScheme.outlineVariant;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? accent.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
-                ),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? accent : outline,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 26,
-              color: isSelected ? accent : theme.colorScheme.onSurface,
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 9,
-                  color:
-                      isSelected ? accent : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: isSelected ? FontWeight.bold : null,
-                ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? accent.withValues(alpha: 0.15)
+            : theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.4,
               ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelected ? accent : outline,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      // ✅ تغليف المحتوى بـ Material شفاف لظهور تأثير الموجة (Ink Splash) بشكل سليم
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 26,
+                  color: isSelected ? accent : theme.colorScheme.onSurface,
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 9,
+                      color: isSelected
+                          ? accent
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: isSelected ? FontWeight.bold : null,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

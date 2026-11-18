@@ -1,17 +1,8 @@
 // lib/models/address_info.dart
 //
+// [v1.2 — 2026-11-15] — FORMATTING: Added "حي" prefix to district and
+//   changed shortLabel order to "District - Governorate".
 // [v1.1 — 2026-10-18] — Defensive Casting + Consistency
-//   - FIX: json['address'] defensive cast (is Map check بدل as Map?)
-//     → لا يرمي لو كانت Nominatim تُرجع Address كـ Map<dynamic, dynamic>
-//   - FIX: address['state'] / suburb / city_district / county / neighbourhood
-//     defensive casts (is String check)
-//   - FIX: json['display_name'] defensive cast
-//   - NEW: copyWith(), ==, hashCode — للاتساق مع باقي النماذج
-//   - NEW: toJson() / fromJson() — للتخزين المؤقت (SharedPreferences)
-//   - DOC: Nominatim field mapping موثق
-//
-// [v1.0 — 2026-10-14] — G4.2-c-4: Address info model
-//   - نموذج للعنوان المُستخرَج من Reverse Geocoding (Nominatim).
 
 class AddressInfo {
   const AddressInfo({
@@ -39,16 +30,31 @@ class AddressInfo {
   // DISPLAY
   // ═══════════════════════════════════════════════════════════════
 
-  /// تسمية مختصرة للعرض: "بورسعيد - الشرق".
+  /// تسمية مختصرة للعرض: "حي الشرق - بورسعيد".
   String get shortLabel {
     final g = governorate?.trim();
     final d = district?.trim();
 
-    if (g != null && g.isNotEmpty && d != null && d.isNotEmpty) {
-      return '$g - $d';
+    String formattedDistrict = '';
+    if (d != null && d.isNotEmpty) {
+      if (!d.startsWith('حي ') &&
+          !d.startsWith('مدينة ') &&
+          !d.startsWith('مركز ')) {
+        formattedDistrict = 'حي $d';
+      } else {
+        formattedDistrict = d;
+      }
     }
-    if (g != null && g.isNotEmpty) return g;
-    if (d != null && d.isNotEmpty) return d;
+
+    if (g != null && g.isNotEmpty && formattedDistrict.isNotEmpty) {
+      return '$formattedDistrict - $g';
+    }
+    if (g != null && g.isNotEmpty) {
+      return g;
+    }
+    if (formattedDistrict.isNotEmpty) {
+      return formattedDistrict;
+    }
     return 'موقع غير معروف';
   }
 
@@ -93,7 +99,9 @@ class AddressInfo {
       final keys = ['suburb', 'city_district', 'neighbourhood', 'county'];
       for (final key in keys) {
         final raw = address[key];
-        if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+        if (raw is String && raw.trim().isNotEmpty) {
+          return raw.trim();
+        }
       }
       return null;
     }

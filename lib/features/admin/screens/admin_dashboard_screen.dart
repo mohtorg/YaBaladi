@@ -1,14 +1,20 @@
 // lib/features/admin/screens/admin_dashboard_screen.dart
 //
-// [v9.6 — 2026-11-01] — ADDED: Offer Requests link in More Menu
-//   - ADDED: Import for AdminOfferRequestsScreen.
-//   - ADDED: New grid item in _showMoreMenu to navigate to Offer Requests.
-//   - KEPT: All previous v9.5 logic and UI.
+// [v12.3.1 — 2026-11-12] — OVERFLOW FIX:
+//   - Wrapped the More menu content in SingleChildScrollView so the sheet
+//     becomes scrollable when items exceed screen height.
+// [v12.3 — 2026-11-12] — RECOMPUTE BUTTON.
+// [v12.2 — 2026-11-12] — OWNER CLAIMS BUTTON.
+// [v12.1 — 2026-11-12] — Reports button with counter.
+// [v12.0 — 2026-11-12] — Category delete protections.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/audit_log_service.dart';
 import '../../../core/utils/firestore_utils.dart';
 import '../../../models/category.dart';
 import '../../../repositories/categories_repository.dart';
@@ -21,21 +27,23 @@ import '../widgets/add_edit_category_dialog.dart';
 import '../widgets/common_widgets.dart';
 import 'add_place_screen.dart';
 import 'filters_management_screen.dart';
-import 'import_excel_screen.dart';
 import 'merchant_requests_screen.dart';
 import 'place_detail_screen.dart';
 import 'place_statistics_screen.dart';
 import 'review_statistics_screen.dart';
 import 'user_statistics_screen.dart';
-import 'governorates_management_screen.dart';
 import 'admin_settings_screen.dart';
 import 'admin_statistics_screen.dart';
 import 'geo_zones_admin_screen.dart';
-import 'admin_offer_requests_screen.dart'; // ✅ استيراد شاشة طلبات العروض الجديدة
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN SCREEN
-// ═══════════════════════════════════════════════════════════════
+import 'manage_geo_hierarchy_screen.dart';
+import 'admin_offer_requests_screen.dart';
+import 'admin_broadcast_notification_screen.dart';
+import 'admin_merchants_screen.dart';
+import 'audit_log_management_screen.dart';
+import 'manage_review_criteria_screen.dart';
+import 'admin_reports_screen.dart';
+import 'owner_claim_requests_screen.dart';
+import 'admin_recompute_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -47,17 +55,28 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _pages = [
-    _OverviewTab(), // 0
-    _PlacesTab(), // 1
-    _CategoriesTab(), // 2
-    FiltersManagementScreen(), // 3
-    MerchantRequestsScreen(), // 4
-    _UsersTab(), // 5
-    GovernoratesManagementScreen(), // 6
-    AdminSupportScreen(), // 7
-    _AuditLogsTab(), // 8
-  ];
+  Widget _getPage(int index) {
+    switch (index) {
+      case 0:
+        return const _OverviewTab();
+      case 1:
+        return const _PlacesTab();
+      case 2:
+        return const _CategoriesTab();
+      case 3:
+        return const FiltersManagementScreen();
+      case 4:
+        return const MerchantRequestsScreen();
+      case 5:
+        return const _UsersTab();
+      case 7:
+        return const AdminSupportScreen();
+      case 8:
+        return const AuditLogManagementScreen();
+      default:
+        return const _OverviewTab();
+    }
+  }
 
   int get _bottomNavIndex => switch (_selectedIndex) {
         0 => 0,
@@ -82,108 +101,209 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showMoreMenu() {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
         final theme = Theme.of(context);
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: screenHeight * 0.85, // ✅ حد أقصى 85% من الشاشة
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text('المزيد من الأدوات',
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                GridView.count(
-                  shrinkWrap: true,
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.1,
-                  physics: const NeverScrollableScrollPhysics(),
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                // ✅ قابل للتمرير عند الحاجة
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMoreItem(
-                        context, 'التصنيفات', Icons.category, Colors.blue, () {
-                      Navigator.pop(context);
-                      setState(() => _selectedIndex = 2);
-                    }),
-                    _buildMoreItem(
-                        context, 'الفلاتر', Icons.tune, Colors.purple, () {
-                      Navigator.pop(context);
-                      setState(() => _selectedIndex = 3);
-                    }),
-                    _buildMoreItem(
-                        context, 'المستخدمون', Icons.people, Colors.green, () {
-                      Navigator.pop(context);
-                      setState(() => _selectedIndex = 5);
-                    }),
-                    _buildMoreItem(
-                        context, 'المحافظات', Icons.map, Colors.orange, () {
-                      Navigator.pop(context);
-                      setState(() => _selectedIndex = 6);
-                    }),
-                    _buildMoreItem(
-                        context, 'السجل', Icons.history, Colors.blueGrey, () {
-                      Navigator.pop(context);
-                      setState(() => _selectedIndex = 8);
-                    }),
-                    _buildMoreItem(
-                        context, 'الإحصائيات', Icons.analytics, Colors.teal,
-                        () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const AdminStatisticsScreen()),
-                      );
-                    }),
-                    _buildMoreItem(
-                        context, 'المناطق الجغرافية', Icons.public,
-                        Colors.indigo, () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const GeoZonesAdminScreen()),
-                      );
-                    }),
-                    // ✅ إضافة: طلبات تفعيل العروض
-                    _buildMoreItem(
-                        context, 'طلبات العروض', Icons.local_offer,
-                        Colors.deepOrange, () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const AdminOfferRequestsScreen()),
-                      );
-                    }),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text('المزيد من الأدوات',
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.1,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildMoreItem(
+                            context, 'إدارة المواقع', Icons.map_outlined,
+                            Colors.blue, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const ManageGeoHierarchyScreen()),
+                          );
+                        }),
+                        _buildMoreItem(context, 'التصنيفات', Icons.category,
+                            Colors.blue, () {
+                          Navigator.pop(context);
+                          setState(() => _selectedIndex = 2);
+                        }),
+                        _buildMoreItem(
+                            context, 'الفلاتر', Icons.tune, Colors.purple, () {
+                          Navigator.pop(context);
+                          setState(() => _selectedIndex = 3);
+                        }),
+                        _buildMoreItem(context, 'إدارة المعايير',
+                            Icons.fact_check_outlined, Colors.orange, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const ManageReviewCriteriaScreen()),
+                          );
+                        }),
+                        _buildReportsMenuItem(context),
+                        _buildMoreItem(
+                          context,
+                          'طلبات الاستلام',
+                          Icons.assignment_ind_outlined,
+                          Colors.teal.shade700,
+                          () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const OwnerClaimRequestsScreen()),
+                            );
+                          },
+                        ),
+                        _buildMoreItem(context, 'إدارة التجار',
+                            Icons.people_alt, Colors.brown, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminMerchantsScreen()),
+                          );
+                        }),
+                        _buildMoreItem(context, 'المستخدمون', Icons.people,
+                            Colors.green, () {
+                          Navigator.pop(context);
+                          setState(() => _selectedIndex = 5);
+                        }),
+                        _buildMoreItem(context, 'الحدود الجغرافية', Icons.public,
+                            Colors.indigo, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const GeoZonesAdminScreen()),
+                          );
+                        }),
+                        _buildMoreItem(context, 'السجل', Icons.history,
+                            Colors.blueGrey, () {
+                          Navigator.pop(context);
+                          setState(() => _selectedIndex = 8);
+                        }),
+                        _buildMoreItem(context, 'الإحصائيات', Icons.analytics,
+                            Colors.teal, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminStatisticsScreen()),
+                          );
+                        }),
+                        _buildMoreItem(context, 'طلبات العروض',
+                            Icons.local_offer, Colors.deepOrange, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const AdminOfferRequestsScreen()),
+                          );
+                        }),
+                        _buildMoreItem(
+                          context,
+                          'إعادة الحساب',
+                          Icons.autorenew_rounded,
+                          Colors.cyan.shade700,
+                          () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const AdminRecomputeScreen()),
+                            );
+                          },
+                        ),
+                        _buildMoreItem(context, 'إشعار عام', Icons.campaign,
+                            Colors.red, () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const AdminBroadcastNotificationScreen()),
+                          );
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReportsMenuItem(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('reports')
+          .where('status', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.hasError ? 0 : (snapshot.data?.docs.length ?? 0);
+
+        return _buildMoreItem(
+          context,
+          'البلاغات',
+          Icons.flag_outlined,
+          Colors.red.shade700,
+          () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
+            );
+          },
+          badgeCount: count,
         );
       },
     );
@@ -194,22 +314,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String title,
     IconData icon,
     Color color,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    int? badgeCount,
+  }) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
+    final showBadge = badgeCount != null && badgeCount > 0;
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(16),
-        ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: color),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 32, color: color),
+                if (showBadge)
+                  Positioned(
+                    top: -6,
+                    right: -10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      constraints: const BoxConstraints(minWidth: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: theme.colorScheme.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             Text(title,
                 style:
@@ -236,7 +388,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .map((s) => s.docs.length),
       initialData: 0,
       builder: (context, snapshot) {
-        final pendingCount = snapshot.data ?? 0;
+        final pendingCount = snapshot.hasError ? 0 : (snapshot.data ?? 0);
 
         return Scaffold(
           appBar: AppBar(
@@ -265,7 +417,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const _UserProfileMenu(),
             ],
           ),
-          body: IndexedStack(index: _selectedIndex, children: _pages),
+          body: _getPage(_selectedIndex),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: _bottomNavIndex,
             onTap: _onBottomNavTapped,
@@ -295,8 +447,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ALERT BANNER
+// Helper widgets
 // ═══════════════════════════════════════════════════════════════
+
 class _SmartAlertBanner extends StatelessWidget {
   const _SmartAlertBanner();
 
@@ -310,7 +463,8 @@ class _SmartAlertBanner extends StatelessWidget {
           .where('status', isEqualTo: 'open')
           .snapshots(),
       builder: (context, supportSnap) {
-        final supportCount = supportSnap.data?.docs.length ?? 0;
+        final supportCount =
+            supportSnap.hasError ? 0 : (supportSnap.data?.docs.length ?? 0);
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -318,7 +472,9 @@ class _SmartAlertBanner extends StatelessWidget {
               .where('status', isEqualTo: 'pending')
               .snapshots(),
           builder: (context, merchantSnap) {
-            final merchantCount = merchantSnap.data?.docs.length ?? 0;
+            final merchantCount = merchantSnap.hasError
+                ? 0
+                : (merchantSnap.data?.docs.length ?? 0);
 
             if (supportCount == 0 && merchantCount == 0) {
               return const SizedBox.shrink();
@@ -384,9 +540,6 @@ class _SmartAlertBanner extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// BADGE ICON
-// ═══════════════════════════════════════════════════════════════
 class _BadgeIcon extends StatelessWidget {
   final IconData icon;
   final int count;
@@ -409,9 +562,6 @@ class _BadgeIcon extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// OVERVIEW TAB
-// ═══════════════════════════════════════════════════════════════
 class _OverviewTab extends StatefulWidget {
   const _OverviewTab();
 
@@ -425,7 +575,24 @@ class _OverviewTabState extends State<_OverviewTab> {
   @override
   void initState() {
     super.initState();
-    _controller = AdminStatsController()..load();
+    _controller = AdminStatsController();
+    _refreshTokenAndLoadStats();
+  }
+
+  Future<void> _refreshTokenAndLoadStats() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.getIdToken(true);
+        debugPrint('✅ Admin Token forcefully refreshed successfully.');
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing token: $e');
+    }
+
+    if (mounted) {
+      _controller.load();
+    }
   }
 
   @override
@@ -444,7 +611,7 @@ class _OverviewTabState extends State<_OverviewTab> {
             return const Center(child: CircularProgressIndicator());
           }
           return RefreshIndicator(
-            onRefresh: ctrl.load,
+            onRefresh: _refreshTokenAndLoadStats,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
@@ -506,6 +673,14 @@ class _OverviewTabState extends State<_OverviewTab> {
                       const Expanded(child: _PendingMerchantKpiCard()),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Expanded(child: _BannedMerchantsKpiCard()),
+                      SizedBox(width: 12),
+                      Expanded(child: _PendingOffersKpiCard()),
+                    ],
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -517,9 +692,6 @@ class _OverviewTabState extends State<_OverviewTab> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PENDING MERCHANT KPI CARD
-// ═══════════════════════════════════════════════════════════════
 class _PendingMerchantKpiCard extends StatelessWidget {
   const _PendingMerchantKpiCard();
 
@@ -531,7 +703,7 @@ class _PendingMerchantKpiCard extends StatelessWidget {
           .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
-        final count = snapshot.data?.docs.length ?? 0;
+        final count = snapshot.hasError ? 0 : (snapshot.data?.docs.length ?? 0);
         return AdminKpiCard(
           title: 'طلبات التجار',
           count: count,
@@ -540,7 +712,64 @@ class _PendingMerchantKpiCard extends StatelessWidget {
           color: Colors.orange,
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const MerchantRequestsScreen()),
+            MaterialPageRoute(builder: (_) => const MerchantRequestsPage()),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BannedMerchantsKpiCard extends StatelessWidget {
+  const _BannedMerchantsKpiCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'merchant')
+          .where('isBanned', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.hasError ? 0 : (snapshot.data?.docs.length ?? 0);
+        return AdminKpiCard(
+          title: 'التجار المحظورون',
+          count: count,
+          unit: 'تاجر',
+          icon: Icons.block,
+          color: Colors.red,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminMerchantsScreen()),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PendingOffersKpiCard extends StatelessWidget {
+  const _PendingOffersKpiCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('places')
+          .where('offerRequestPending', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.hasError ? 0 : (snapshot.data?.docs.length ?? 0);
+        return AdminKpiCard(
+          title: 'طلبات العروض',
+          count: count,
+          unit: 'طلب',
+          icon: Icons.local_offer,
+          color: Colors.deepOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminOfferRequestsScreen()),
           ),
         );
       },
@@ -549,8 +778,9 @@ class _PendingMerchantKpiCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PLACES TAB
+// Places Tab
 // ═══════════════════════════════════════════════════════════════
+
 class _PlacesTab extends StatefulWidget {
   const _PlacesTab();
 
@@ -591,10 +821,15 @@ class _PlacesTabState extends State<_PlacesTab> {
   }
 
   Future<void> _loadInitial() async {
+    if (mounted) {
+      setState(() {
+        _initialLoading = true;
+      });
+    }
+
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('places')
-          .orderBy('createdAt', descending: true)
           .limit(_pageSize)
           .get();
 
@@ -622,7 +857,6 @@ class _PlacesTabState extends State<_PlacesTab> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('places')
-          .orderBy('createdAt', descending: true)
           .startAfterDocument(_lastDoc!)
           .limit(_pageSize)
           .get();
@@ -656,10 +890,20 @@ class _PlacesTabState extends State<_PlacesTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('إدارة الأماكن',
-                  style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('إدارة الأماكن',
+                      style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface)),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.blue),
+                    tooltip: 'تحديث القائمة',
+                    onPressed: _initialLoading ? null : _loadInitial,
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -685,20 +929,14 @@ class _PlacesTabState extends State<_PlacesTab> {
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
-                      onPressed: () async {
-                        await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ImportExcelScreen()));
-                        if (!mounted) return;
-                        _loadInitial();
+                      onPressed: () {
+                        context.push('/admin/bulk-import');
                       },
-                      icon: const Icon(Icons.upload_file, size: 18),
-                      label: const Text('استيراد CSV'),
+                      icon: const Icon(Icons.table_view, size: 18),
+                      label: const Text('استيراد إكسل'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: YaBaladiDesignTokens.primaryBlue,
-                        side: const BorderSide(
-                            color: YaBaladiDesignTokens.primaryBlue),
+                        foregroundColor: Colors.green.shade700,
+                        side: BorderSide(color: Colors.green.shade700),
                         minimumSize: const Size(0, 40),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -720,14 +958,15 @@ class _PlacesTabState extends State<_PlacesTab> {
     }
     if (_error != null) {
       return Center(
-        child: Text('❌ خطأ: $_error',
+        child: Text('خطأ: $_error',
             style:
                 textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
       );
     }
     if (_places.isEmpty) {
       return Center(
-        child: Text('لا توجد أماكن بعد. ابدأ بـ "إضافة مكان" أو "استيراد CSV".',
+        child: Text(
+            'لا توجد أماكن بعد. ابدأ بـ "إضافة مكان" أو "استيراد إكسل".',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
@@ -749,6 +988,7 @@ class _PlacesTabState extends State<_PlacesTab> {
           final place = _places[index];
           final data = FirestoreUtils.dataOfSnapshot(place);
           return Card(
+            clipBehavior: Clip.antiAlias,
             margin: const EdgeInsets.only(bottom: 8),
             elevation: 0,
             color: theme.colorScheme.surface,
@@ -794,8 +1034,9 @@ class _PlacesTabState extends State<_PlacesTab> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CATEGORIES TAB
+// Categories Tab
 // ═══════════════════════════════════════════════════════════════
+
 class _CategoriesTab extends StatefulWidget {
   const _CategoriesTab();
 
@@ -836,20 +1077,34 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   }
 
   Future<void> _openAdd() async {
+    final auth = context.read<AuthController>();
     final saved = await AddEditCategoryDialog.show(
       context,
       repository: _repo,
       suggestedOrder: _nextOrder(),
     );
     if (saved == true && mounted) {
+      await AuditLogService.logAction(
+        action: 'إضافة تصنيف',
+        adminName: auth.displayName,
+        target: 'تصنيف جديد',
+        severity: 'low',
+      );
       _snack('تم إنشاء التصنيف بنجاح', success: true);
     }
   }
 
   Future<void> _openEdit(Category cat) async {
+    final auth = context.read<AuthController>();
     final saved = await AddEditCategoryDialog.show(context,
         category: cat, repository: _repo);
     if (saved == true && mounted) {
+      await AuditLogService.logAction(
+        action: 'تعديل تصنيف',
+        adminName: auth.displayName,
+        target: cat.nameAr,
+        severity: 'low',
+      );
       _snack('تم تحديث التصنيف', success: true);
     }
   }
@@ -877,6 +1132,37 @@ class _CategoriesTabState extends State<_CategoriesTab> {
       return;
     }
 
+    try {
+      final criteriaSnap = await FirebaseFirestore.instance
+          .collection('review_criteria')
+          .where('categoryId', isEqualTo: cat.id)
+          .limit(1)
+          .get();
+
+      if (criteriaSnap.docs.isNotEmpty) {
+        _snack(
+            'لا يمكن حذف "${cat.nameAr}" — يحتوي على معايير تقييم مرتبطة به. احذف المعايير أولاً أو عطّل التصنيف.');
+        return;
+      }
+
+      final filtersSnap = await FirebaseFirestore.instance
+          .collection('filters')
+          .where('categoryId', isEqualTo: cat.id)
+          .limit(1)
+          .get();
+
+      if (filtersSnap.docs.isNotEmpty) {
+        _snack(
+            'لا يمكن حذف "${cat.nameAr}" — يحتوي على فلاتر بحث مرتبطة به. احذف الفلاتر أولاً أو عطّل التصنيف.');
+        return;
+      }
+    } catch (e) {
+      _snack('تعذر التحقق من الارتباطات: $e');
+      return;
+    }
+
+    final auth = context.read<AuthController>();
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -900,7 +1186,15 @@ class _CategoriesTabState extends State<_CategoriesTab> {
 
     try {
       await _repo.delete(cat.id);
-      if (mounted) _snack('تم حذف التصنيف', success: true);
+      if (mounted) {
+        await AuditLogService.logAction(
+          action: 'حذف تصنيف',
+          adminName: auth.displayName,
+          target: cat.nameAr,
+          severity: 'high',
+        );
+        _snack('تم حذف التصنيف', success: true);
+      }
     } catch (e) {
       if (mounted) _snack('فشل الحذف: $e');
     }
@@ -1088,9 +1382,6 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CATEGORY ROW CARD
-// ═══════════════════════════════════════════════════════════════
 class _CategoryRowCard extends StatelessWidget {
   final Category category;
   final VoidCallback onEdit;
@@ -1116,6 +1407,7 @@ class _CategoryRowCard extends StatelessWidget {
     final canDelete = category.placesCount == 0;
 
     return Card(
+      clipBehavior: Clip.antiAlias,
       elevation: 0,
       margin: EdgeInsets.zero,
       color: theme.colorScheme.surface,
@@ -1288,8 +1580,9 @@ class _CategoryRowCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// USERS TAB
+// Users Tab
 // ═══════════════════════════════════════════════════════════════
+
 class _UsersTab extends StatefulWidget {
   const _UsersTab();
 
@@ -1332,6 +1625,7 @@ class _UsersTabState extends State<_UsersTab> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
+          .orderBy(FieldPath.documentId)
           .limit(_pageSize)
           .get();
       if (!mounted) return;
@@ -1345,6 +1639,9 @@ class _UsersTabState extends State<_UsersTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _initialLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر تحميل المستخدمين: $e')),
+      );
     }
   }
 
@@ -1354,6 +1651,7 @@ class _UsersTabState extends State<_UsersTab> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
+          .orderBy(FieldPath.documentId)
           .startAfterDocument(_lastDoc!)
           .limit(_pageSize)
           .get();
@@ -1422,6 +1720,7 @@ class _UsersTabState extends State<_UsersTab> {
                           FirestoreUtils.stringOf(data, 'role', 'member');
                       final isAdmin = role == 'admin';
                       return Card(
+                        clipBehavior: Clip.antiAlias,
                         margin: const EdgeInsets.only(bottom: 8),
                         elevation: 0,
                         color: theme.colorScheme.surface,
@@ -1487,18 +1786,24 @@ class _UsersTabState extends State<_UsersTab> {
   Future<void> _showUserRoleDialog(
       BuildContext context, String userId, String currentRole) async {
     final messenger = ScaffoldMessenger.of(context);
+    final auth = context.read<AuthController>();
+
     final newRole = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('تعديل الصلاحية'),
         content: RadioGroup<String>(
           groupValue: currentRole,
-          onChanged: (val) => Navigator.pop(c, val),
+          onChanged: (val) {
+            if (val != null) Navigator.pop(c, val);
+          },
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: ['member', 'merchant', 'moderator', 'admin']
-                .map((role) =>
-                    RadioListTile<String>(title: Text(role), value: role))
+                .map((role) => RadioListTile<String>(
+                      title: Text(role),
+                      value: role,
+                    ))
                 .toList(),
           ),
         ),
@@ -1512,6 +1817,15 @@ class _UsersTabState extends State<_UsersTab> {
           .doc(userId)
           .update({'role': newRole});
       if (!mounted) return;
+
+      await AuditLogService.logAction(
+        action: 'تغيير صلاحية مستخدم',
+        adminName: auth.displayName,
+        target: 'المستخدم $userId',
+        details: 'من $currentRole إلى $newRole',
+        severity: 'critical',
+      );
+
       messenger
           .showSnackBar(const SnackBar(content: Text('تم تحديث الصلاحية')));
       await _loadInitial();
@@ -1524,109 +1838,6 @@ class _UsersTabState extends State<_UsersTab> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AUDIT LOGS TAB
-// ═══════════════════════════════════════════════════════════════
-class _AuditLogsTab extends StatelessWidget {
-  const _AuditLogsTab();
-
-  String _formatTimestamp(dynamic ts) {
-    if (ts == null) return '—';
-    try {
-      final date = (ts as Timestamp).toDate();
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return '—';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text('سجل التدقيق',
-                style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface)),
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('audit_logs')
-                .orderBy('timestamp', descending: true)
-                .limit(50)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text('السجل فارغ أو حدث خطأ.',
-                      style: textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final logs = snapshot.data!.docs;
-              if (logs.isEmpty) {
-                return Center(
-                  child: Text('لا توجد سجلات بعد.',
-                      style: textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                );
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: logs.length,
-                itemBuilder: (context, index) {
-                  final log = FirestoreUtils.dataOfSnapshot(logs[index]);
-                  final action = FirestoreUtils.stringOf(log, 'action', '—');
-                  final target = FirestoreUtils.stringOf(log, 'targetName',
-                      FirestoreUtils.stringOf(log, 'targetId'));
-                  final by =
-                      FirestoreUtils.stringOf(log, 'performedBy', 'غير معروف');
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    color: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: theme.colorScheme.outlineVariant),
-                    ),
-                    child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12),
-                      leading: Icon(Icons.history,
-                          color: theme.colorScheme.onSurfaceVariant),
-                      title: Text('$action - $target',
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: theme.colorScheme.onSurface)),
-                      subtitle: Text(
-                          'بواسطة: $by • ${_formatTimestamp(log['timestamp'])}',
-                          style: textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// USER PROFILE MENU
-// ═══════════════════════════════════════════════════════════════
 class _UserProfileMenu extends StatelessWidget {
   const _UserProfileMenu();
 

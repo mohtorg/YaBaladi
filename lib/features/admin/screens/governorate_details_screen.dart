@@ -1,8 +1,10 @@
 // lib/features/admin/screens/governorate_details_screen.dart
-// [v1.1 — 2026-10-29] — WAVE 17: إضافة زر زرع أحياء أولية
-//   - يظهر الزر فقط عند: وجود بيانات أولية في DistrictsSeedData + قائمة أحياء فارغة.
-//   - يضيف الأحياء الثمانية دفعة واحدة مع تقرير بالنتائج.
-//   - KEPT: كل السلوك السابق (المفاتيح الثلاثة، إضافة/تعديل/حذف/تفعيل حي).
+// [v1.2 — FIXED] — PERFORMANCE & UI FIXES:
+//   - FIXED: Moved _watchThisGov stream to initState to prevent recreation on every setState.
+//   - FIXED: Wrapped SwitchListTile in Material to prevent ink splash warnings.
+//   - FIXED: Added clipBehavior to all Cards.
+//   - FIXED: Added text overflow protection in _buildDistrictTile.
+//   - KEPT: All seeding, CRUD, and toggle logic intact.
 
 import 'package:flutter/material.dart';
 
@@ -24,14 +26,19 @@ class GovernorateDetailsScreen extends StatefulWidget {
 class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
   final GovernoratesRepository _repo = GovernoratesRepository.instance;
 
+  // ✅ تخزين الـ Stream في initState لمنع إعادة إنشائه مع كل setState
+  late final Stream<GovernorateConfig?> _govStream;
+
   bool _togglingGov = false;
   bool _togglingDelivery = false;
   bool _togglingTrips = false;
   bool _seeding = false;
   final Set<String> _busyDistricts = {};
 
-  Stream<GovernorateConfig?> _watchThisGov() {
-    return _repo.watchAllGovernorates().map((list) {
+  @override
+  void initState() {
+    super.initState();
+    _govStream = _repo.watchAllGovernorates().map((list) {
       for (final g in list) {
         if (g.docId == widget.govDocId) return g;
       }
@@ -228,7 +235,7 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
     final theme = Theme.of(context);
 
     return StreamBuilder<GovernorateConfig?>(
-      stream: _watchThisGov(),
+      stream: _govStream, // ✅ استخدام الـ Stream المخزن
       builder: (context, govSnap) {
         if (govSnap.connectionState == ConnectionState.waiting) {
           return Scaffold(
@@ -273,6 +280,7 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
 
   Widget _buildConfigCard(ThemeData theme, GovernorateConfig gov) {
     return Card(
+      clipBehavior: Clip.antiAlias, // ✅ منع تحذير الـ Ink Splash
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -325,13 +333,17 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
     required bool value,
     required ValueChanged<bool>? onChanged,
   }) {
-    return SwitchListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      secondary: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      value: value,
-      onChanged: onChanged,
+    // ✅ تغليف SwitchListTile بـ Material لمنع تحذير الـ Ink Splash
+    return Material(
+      color: Colors.transparent,
+      child: SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(vertical: 4),
+        secondary: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+        value: value,
+        onChanged: onChanged,
+      ),
     );
   }
 
@@ -390,6 +402,7 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
     final seedData = DistrictsSeedData.forGovernorate(widget.govDocId);
     final theme = Theme.of(context);
     return Card(
+      clipBehavior: Clip.antiAlias, // ✅
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -446,6 +459,7 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
     final theme = Theme.of(context);
     final busy = _busyDistricts.contains(d.id);
     return Card(
+      clipBehavior: Clip.antiAlias, // ✅
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
@@ -468,8 +482,12 @@ class _GovernorateDetailsScreenState extends State<GovernorateDetailsScreen> {
         title: Text(
           d.nameAr,
           style: const TextStyle(fontWeight: FontWeight.w600),
+          maxLines: 1, // ✅ حماية النص
+          overflow: TextOverflow.ellipsis,
         ),
-        subtitle: d.nameEn.isNotEmpty ? Text(d.nameEn) : null,
+        subtitle: d.nameEn.isNotEmpty
+            ? Text(d.nameEn, maxLines: 1, overflow: TextOverflow.ellipsis)
+            : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

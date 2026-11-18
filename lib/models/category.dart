@@ -1,11 +1,6 @@
 // lib/models/category.dart
 //
-// [v2.0 — 2026-10-23] — Firestore-backed Category
-//   - ADDED: iconName, colorHex, isActive, isFeatured, parentId,
-//            aliases, placesCount, searchKeywords, createdAt, updatedAt.
-//   - icon/color now getters (Firestore can't store IconData/Color).
-//   - Defensive fromMap (backwards-compatible with old data).
-//   - Full copyWith.
+// [v2.0.1 — 2026-11-05] — LINTER FIX: Added braces for if statements.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -196,7 +191,10 @@ class Category {
 
   static Color _colorFromHex(String hex) {
     var h = hex.trim().replaceFirst('#', '');
-    if (h.length == 6) h = 'FF$h';
+    // ✅ FIX: Added braces for if statement
+    if (h.length == 6) {
+      h = 'FF$h';
+    }
     final value = int.tryParse(h, radix: 16) ?? 0xFF0D6EFD;
     return Color(value);
   }
@@ -212,22 +210,34 @@ class Category {
   static String _str(dynamic v) => v?.toString() ?? '';
   static int _int(dynamic v, int fallback) =>
       v is num ? v.toInt() : (int.tryParse(v?.toString() ?? '') ?? fallback);
+
   static bool _bool(dynamic v, bool fallback) => v is bool
       ? v
       : (v?.toString() == 'true'
           ? true
           : (v?.toString() == 'false' ? false : fallback));
+
   static List<String> _strList(dynamic v) {
-    if (v is List) return v.map((e) => e.toString()).toList();
-    if (v is String && v.isNotEmpty)
+    // ✅ FIX: Added braces for if statements
+    if (v is List) {
+      return v.map((e) => e.toString()).toList();
+    }
+    if (v is String && v.isNotEmpty) {
       return v.split(',').map((e) => e.trim()).toList();
+    }
     return const [];
   }
 
   static DateTime? _date(dynamic v) {
-    if (v is Timestamp) return v.toDate();
-    if (v is DateTime) return v;
-    if (v is String) return DateTime.tryParse(v);
+    if (v is Timestamp) {
+      return v.toDate();
+    }
+    if (v is DateTime) {
+      return v;
+    }
+    if (v is String) {
+      return DateTime.tryParse(v);
+    }
     return null;
   }
 

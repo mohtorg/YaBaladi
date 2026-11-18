@@ -1,10 +1,11 @@
 // lib/features/admin/widgets/color_picker_dialog.dart
 //
-// [v1.2 — 2026-10-29] — FIX: إزالة RegExp كلياً (3 تحذيرات إهمال)
-//   - _normalize / _isValidHex: فحص يدوي لستة أحرف hex (0-9 A-F).
-//   - inputFormatters: _CharFilterFormatter بدل FilteringTextInputFormatter.allow(RegExp).
-//   - KEPT: اللوحة والمعاينة والإدخال المخصص والتوقيعات العامة دون تغيير.
-// [v1.1 — 2026-10-26] — BUILD FIX: Strict analyzer compliance, types normalized
+// [v1.3 — FIXED] — UI & UX ENHANCEMENTS:
+//   - FIXED: Wrapped _SwatchTile with Material to show ink splashes.
+//   - FIXED: Added unfocus to hide keyboard on confirm.
+//   - FIXED: Added hideCurrentSnackBar to prevent SnackBar queueing.
+//   - FIXED: Removed redundant maxLength property.
+//   - KEPT: All RegExp-free validation, palette, and logic intact.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -164,8 +165,13 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
   }
 
   void _confirm() {
+    // ✅ إخفاء الكيبورد قبل التحقق
+    FocusScope.of(context).unfocus();
+
     final hexText = _hexController.text.trim();
     if (!_isValidHex(hexText)) {
+      // ✅ مسح أي رسالة قديمة قبل عرض الجديدة
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('الرجاء إدخال لون hex صحيح (6 أحرف: 0-9, A-F)'),
@@ -214,7 +220,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                   crossAxisCount: 6,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
-                  childAspectRatio: 1.0, // ✅ استخدام 1.0 بدلاً من 1
+                  childAspectRatio: 1.0,
                 ),
                 itemCount: _palette.length,
                 itemBuilder: (_, i) {
@@ -236,7 +242,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                 controller: _hexController,
                 textDirection: TextDirection.ltr,
                 textAlign: TextAlign.center,
-                maxLength: 6,
+                // ✅ تمت إزالة maxLength (لأننا نستخدم LengthLimitingTextInputFormatter)
                 inputFormatters: [
                   _CharFilterFormatter(_isHexChar),
                   LengthLimitingTextInputFormatter(6),
@@ -256,7 +262,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                     fontSize: 16,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  counterText: '',
+                  counterText: '', // يخفي عداد الأحرف الافتراضي
                   border: const OutlineInputBorder(),
                   errorText:
                       showError ? 'يجب أن يكون 6 أحرف hex (0-9, A-F)' : null,
@@ -348,21 +354,27 @@ class _SwatchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final outline = Theme.of(context).colorScheme.outlineVariant;
-    return InkWell(
-      onTap: onTap,
+
+    // ✅ تغليف بـ Material لضمان ظهور تأثير الموجة (Ink Splash) فوق اللون
+    return Material(
+      color: color,
       borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? checkColor : outline,
-            width: isSelected ? 3 : 1,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? checkColor : outline,
+              width: isSelected ? 3 : 1,
+            ),
           ),
+          child: isSelected
+              ? Icon(Icons.check, color: checkColor, size: 20)
+              : null,
         ),
-        child:
-            isSelected ? Icon(Icons.check, color: checkColor, size: 20) : null,
       ),
     );
   }

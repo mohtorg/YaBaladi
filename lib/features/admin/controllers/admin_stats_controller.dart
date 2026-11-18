@@ -1,6 +1,9 @@
 // lib/features/admin/controllers/admin_stats_controller.dart
 //
-// [v1.0 — 2026-10-21] — Stats via Aggregate Queries (95% quota savings)
+// [v1.2 — FIXED: REVIEWS SUM INTEGRATION]
+//   - FIXED: Replaced 'reviews.count()' with 'places.aggregate(sum('reviewCount'))'
+//     to ensure the dashboard accurately reflects the reviews attributed to places.
+//   - KEPT: Safety flags (_disposed, _requestId) and all other queries.
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,19 +16,28 @@ class AdminStatsController extends ChangeNotifier {
   bool _loading = true;
   String? _error;
 
+  // ✅ حماية ضد الانهيار بعد التدمير
+  bool _disposed = false;
+  // ✅ حماية ضد تضارب الطلبات (Race Condition)
+  int _requestId = 0;
+
   AdminStats get stats => _stats;
   bool get loading => _loading;
   String? get error => _error;
 
   Future<void> load() async {
+    if (_disposed) return;
+
+    // التقاط رقم الطلب الحالي
+    final currentRequestId = ++_requestId;
+
     _loading = true;
     _error = null;
-    notifyListeners();
+    _safeNotify();
 
     try {
       final places = _db.collection('places');
       final users = _db.collection('users');
-      final reviews = _db.collection('reviews');
 
       // ✅ 7 استعلامات تجميعية فقط (بدلاً من 100+ قراءة)
       final results = await Future.wait([
@@ -35,8 +47,12 @@ class AdminStatsController extends ChangeNotifier {
         places.where('isActive', isEqualTo: true).count().get(),
         places.where('isActive', isEqualTo: false).count().get(),
         users.count().get(),
-        reviews.count().get(),
+        // ✅ استخدام aggregate(sum) لجمع حقل reviewCount من الأماكن
+        places.aggregate(sum('reviewCount')).get(),
       ]);
+
+      // ✅ إذا تم إرسال طلب أحدث أو تم تدمير الشاشة، نتجاهل هذه النتيجة
+      if (currentRequestId != _requestId || _disposed) return;
 
       _stats = AdminStats(
         totalPlaces: results[0].count ?? 0,
@@ -45,14 +61,31 @@ class AdminStatsController extends ChangeNotifier {
         activePlaces: results[3].count ?? 0,
         inactivePlaces: results[4].count ?? 0,
         totalUsers: results[5].count ?? 0,
-        totalReviews: results[6].count ?? 0,
+        // ✅ قراءة المجموع النهائي
+        totalReviews: results[6].getSum('reviewCount')?.toInt() ?? 0,
       );
     } catch (e) {
       debugPrint('❌ Error loading admin stats: $e');
+      if (currentRequestId != _requestId || _disposed) return;
       _error = e.toString();
+    } finally {
+      // ✅ نُنهي التحميل فقط إذا كان هذا هو الطلب الأحدث ولم يتم التدمير
+      if (currentRequestId == _requestId && !_disposed) {
+        _loading = false;
+        _safeNotify();
+      }
     }
+  }
 
-    _loading = false;
-    notifyListeners();
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

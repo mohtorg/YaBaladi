@@ -1,14 +1,7 @@
 // lib/features/admin/widgets/add_edit_filter_dialog.dart
 //
-// [v1.4 — 2026-10-29] — FIX:
-//   - إزالة RegExp (تحذير الإهمال) واستبداله بالدالة _isValidSlug (نفس الشرط ^[a-z0-9_]+$).
-//   - matchMode: إن كانت القيمة المخزنة خارج القائمة المعروفة تُضاف للقائمة
-//     (كان Dropdown ينهار بـ assertion عند قيمة غير معروفة).
-//   - صفوف الخيارات: مفتاح ObjectKey لكل صف حتى لا تنتقل الحالة بين الصفوف عند الحذف،
-//     وتأجيل dispose للـ controllers إلى ما بعد الإطار.
-//   - KEPT: جميع الحقول والتحقق والواجهة والتوقيعات دون تغيير.
-// [v1.2 — 2026-10-26] — BUILD FIX: Changed initialValue to value in Dropdowns
-// [v1.3 — 2026-10-27] — FIX ANALYZER: DropdownButtonFormField value → initialValue
+// [v1.6 — 2026-11-12] — ADDED categoryId:
+//   - Added `categoryId` parameter to pass to the new FilterDefinition.
 
 import 'package:flutter/material.dart';
 
@@ -17,11 +10,13 @@ import '../../../../models/filter_definition.dart';
 class AddEditFilterDialog extends StatefulWidget {
   final FilterDefinition? existing;
   final int? suggestedOrder;
+  final String? categoryId; // ✅ تمرير التصنيف
 
   const AddEditFilterDialog({
     super.key,
     this.existing,
     this.suggestedOrder,
+    this.categoryId,
   });
 
   @override
@@ -67,9 +62,11 @@ class _AddEditFilterDialogState extends State<AddEditFilterDialog> {
     _isActive = e?.isActive ?? true;
     _isRequired = e?.isRequired ?? false;
     _matchMode = e?.matchMode ?? 'exact';
+
     // قيمة مخزنة غير معروفة: تُضاف للقائمة بدل أن ينهار الـ Dropdown.
     _matchModes = List<String>.from(_knownMatchModes);
     if (!_matchModes.contains(_matchMode)) _matchModes.add(_matchMode);
+
     _rolesAllowed = Set.from(
         e?.rolesAllowed ?? const ['user', 'merchant', 'moderator', 'admin']);
     _options =
@@ -106,8 +103,10 @@ class _AddEditFilterDialogState extends State<AddEditFilterDialog> {
     if (!_formKey.currentState!.validate()) return null;
     final id = _isEdit ? widget.existing!.id : _idCtrl.text.trim();
     if (id.isEmpty) return null;
+
     return FilterDefinition(
       id: id,
+      categoryId: widget.categoryId, // ✅ حفظ التصنيف هنا
       nameAr: _nameArCtrl.text.trim(),
       nameEn: _nameEnCtrl.text.trim(),
       type: _type,
@@ -129,8 +128,8 @@ class _AddEditFilterDialogState extends State<AddEditFilterDialog> {
     final theme = Theme.of(context);
     return AlertDialog(
       title: Text(_isEdit ? 'تعديل الفلتر' : 'فلتر جديد'),
-      content: SizedBox(
-        width: 560,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -396,6 +395,8 @@ class _AddEditFilterDialogState extends State<AddEditFilterDialog> {
         ),
         FilledButton.icon(
           onPressed: () {
+            // ✅ إخفاء الكيبورد قبل محاولة الحفظ
+            FocusScope.of(context).unfocus();
             final result = _buildResult();
             if (result != null) Navigator.pop(context, result);
           },

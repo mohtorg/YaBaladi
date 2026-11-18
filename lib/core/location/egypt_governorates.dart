@@ -1,5 +1,6 @@
 // lib/core/location/egypt_governorates.dart
 //
+// [v1.2 — 2026-11-05] — ENHANCEMENT: Added input trimming for robust search, documented geographic limitations.
 // [v1.1 — 2026-10-25] — FIX: Safe orElse, NaN protection in Haversine, clean formatting
 //   - ADDED: orElse in kDefaultGovernorate to prevent StateError.
 //   - ADDED: clamp(0.0, 1.0) in _haversineKm to prevent NaN.
@@ -235,27 +236,38 @@ EgyptGovernorate get kDefaultGovernorate => kEgyptGovernorates.firstWhere(
 
 /// البحث بـ id — يُعيد `null` إن لم يوجد.
 EgyptGovernorate? governorateById(String? id) {
-  if (id == null || id.isEmpty) return null;
+  if (id == null || id.trim().isEmpty) return null;
+  final cleanId = id.trim();
   for (final g in kEgyptGovernorates) {
-    if (g.id == id) return g;
+    if (g.id == cleanId) return g;
   }
   return null;
 }
 
 /// البحث بالاسم العربي — يُعيد `null` إن لم يوجد.
 EgyptGovernorate? governorateByArName(String? nameAr) {
-  if (nameAr == null || nameAr.isEmpty) return null;
+  if (nameAr == null || nameAr.trim().isEmpty) return null;
+  final cleanName = nameAr.trim();
   for (final g in kEgyptGovernorates) {
-    if (g.nameAr == nameAr) return g;
+    if (g.nameAr == cleanName) return g;
   }
   return null;
 }
 
 /// هل [id] معرّف محافظة مصرية صحيح؟
-bool isEgyptGovernorateId(String? id) =>
-    id != null && kEgyptGovernorates.any((g) => g.id == id);
+bool isEgyptGovernorateId(String? id) {
+  if (id == null) return false;
+  final cleanId = id.trim();
+  return kEgyptGovernorates.any((g) => g.id == cleanId);
+}
 
 /// أقرب محافظة لإحداثيات [lat], [lng].
+///
+/// ⚠️ ملاحظة جغرافية: هذه الدالة تعتمد على المسافة إلى "المركز التقريبي"
+/// للمحافظة. بالنسبة للمحافظات الشاسعة (مثل البحر الأحمر والوادي الجديد)،
+/// قد يكون هذا التقريب غير دقيق للمستخدمين القريبين من الحدود.
+/// للدقة العالية (على مستوى الأحياء)، يُفضل استخدام حزمة `geo_fence_utils`
+/// مع ملف GeoJSON الذي يحدد الحدود الفعلية.
 EgyptGovernorate nearestGovernorate(double lat, double lng) {
   EgyptGovernorate best = kEgyptGovernorates.first;
   double bestDist = double.infinity;
@@ -270,7 +282,7 @@ EgyptGovernorate nearestGovernorate(double lat, double lng) {
   return best;
 }
 
-// ─── Haversine ───
+// ─── Haversine (لحساب المسافة بين نقطتين على سطح الكرة الأرضية) ───
 const double _earthRadiusKm = 6371.0;
 
 double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
@@ -288,6 +300,8 @@ double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
   // [FIX] استخدام clamp لمنع القيم السالبة أو الأكبر من 1 التي تسبب NaN
   final c = 2 *
       math.atan2(
-          math.sqrt(a.clamp(0.0, 1.0)), math.sqrt((1 - a).clamp(0.0, 1.0)));
+        math.sqrt(a.clamp(0.0, 1.0)),
+        math.sqrt((1 - a).clamp(0.0, 1.0)),
+      );
   return _earthRadiusKm * c;
 }

@@ -1,41 +1,83 @@
 // lib/features/admin/screens/filters_management_screen.dart
-//
-// [v1.3 — 2026-10-25] — FIX: Tab-safe (no nested Scaffold/AppBar/FAB)
-//   - REMOVED: Scaffold + AppBar → replaced with Column header
-//     (caused DOUBLE AppBar when embedded in AdminDashboardScreen's IndexedStack)
-//   - REMOVED: FloatingActionButton.extended → moved to header FilledButton.icon
-//     (matches _CategoriesTab / _UsersTab pattern; no FAB inside tab)
-//   - KEPT: Consumer<FiltersController> (no setState-during-build crash)
-//   - KEPT: all CRUD, RBAC, empty/error states, search
-//
-// [v1.2 — 2026-10-25] — FIX: "setState() called during build" crash
-//   - REMOVED: StreamBuilder calling bindStream() inside build()
-//   - REPLACED with: Consumer<FiltersController> reading ctrl.all
+// [v3.0.0 - GENERAL/SPECIFIC TABS]
+//   - Added tabs for General Filters and Specific Filters.
+//   - Dynamically passes `categoryId` to AddEditFilterDialog.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/design_tokens.dart';
+import '../../../core/services/audit_log_service.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../filters/controllers/filters_controller.dart';
 import '../../../models/filter_definition.dart';
 import '../widgets/add_edit_filter_dialog.dart';
 
-class FiltersManagementScreen extends StatefulWidget {
+class FiltersManagementScreen extends StatelessWidget {
   const FiltersManagementScreen({super.key});
 
   @override
-  State<FiltersManagementScreen> createState() =>
-      _FiltersManagementScreenState();
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(text: 'فلاتر عامة', icon: Icon(Icons.public)),
+              Tab(text: 'فلاتر خاصة', icon: Icon(Icons.category)),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _FiltersList(categoryId: null),
+                _SpecificFiltersCategoriesView(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
+// ═══════════════════════════════════════════════════════════════
+// 1. قائمة الفلاتر (تُستخدم للعام والخاص)
+// ═══════════════════════════════════════════════════════════════
+
+class _FiltersList extends StatefulWidget {
+  final String? categoryId; // null = عام، غير null = خاص
+
+  const _FiltersList({this.categoryId});
+
+  @override
+  State<_FiltersList> createState() => _FiltersListState();
+}
+
+class _FiltersListState extends State<_FiltersList> {
+  final TextEditingController _searchCtrl = TextEditingController();
   String _search = '';
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   List<FilterDefinition> _filtered(List<FilterDefinition> all) {
+    // 1. فلترة حسب التصنيف (عام/خاص)
+    final byCat = all.where((f) {
+      // نفترض أن الموديل يحتوي على حقل categoryId
+      // إذا لم يكن موجوداً، سنحتاج لتحديث الموديل
+      return f.categoryId == widget.categoryId;
+    }).toList();
+
+    // 2. فلترة حسب البحث
     final q = _search.trim().toLowerCase();
-    if (q.isEmpty) return all;
-    return all.where((f) {
+    if (q.isEmpty) return byCat;
+    return byCat.where((f) {
       return f.id.toLowerCase().contains(q) ||
           f.nameAr.contains(q) ||
           f.nameEn.toLowerCase().contains(q);
@@ -49,14 +91,16 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
 
     return Column(
       children: [
-        // ─── Header (بدل AppBar + FAB) ───
+        // ─── Header ───
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
               Expanded(
                 child: Text(
-                  'إدارة الفلاتر',
+                  widget.categoryId == null
+                      ? 'الفلاتر العامة'
+                      : 'الفلاتر الخاصة',
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
@@ -64,7 +108,7 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
                 ),
               ),
               FilledButton.icon(
-                onPressed: _openAdd,
+                onPressed: () => _openAdd(context),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('فلتر جديد'),
                 style: FilledButton.styleFrom(
@@ -81,6 +125,7 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: TextField(
+            controller: _searchCtrl,
             decoration: InputDecoration(
               hintText: 'ابحث بالاسم أو المعرف...',
               prefixIcon: const Icon(Icons.search),
@@ -89,7 +134,10 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
               suffixIcon: _search.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear),
-                      onPressed: () => setState(() => _search = ''),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _search = '');
+                      },
                     )
                   : null,
             ),
@@ -118,7 +166,9 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'لا نتائج لـ "$_search"',
+                      _search.isNotEmpty
+                          ? 'لا نتائج لـ "$_search"'
+                          : 'لا توجد فلاتر في هذا القسم.',
                       style: theme.textTheme.bodyMedium,
                       textAlign: TextAlign.center,
                     ),
@@ -134,10 +184,10 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
                   final f = filtered[i];
                   return _FilterCard(
                     filter: f,
-                    isAdmin: auth.role == 'admin',
-                    onEdit: () => _openEdit(ctrl, f),
-                    onToggle: () => _toggleActive(ctrl, f),
-                    onDelete: () => _confirmDelete(ctrl, f),
+                    isAdmin: auth.isAdmin,
+                    onEdit: () => _openEdit(context, ctrl, f),
+                    onToggle: () => _toggleActive(context, ctrl, f),
+                    onDelete: () => _confirmDelete(context, ctrl, f),
                   );
                 },
               );
@@ -148,49 +198,97 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
     );
   }
 
-  Future<void> _openAdd() async {
+  Future<void> _openAdd(BuildContext context) async {
     final ctrl = context.read<FiltersController>();
+    final admin = context.read<AuthController>();
+    final messenger = ScaffoldMessenger.of(context);
+
     final result = await showDialog<FilterDefinition>(
       context: context,
       builder: (_) => AddEditFilterDialog(
         suggestedOrder: ctrl.all.length + 1,
+        categoryId: widget.categoryId, // ✅ تمرير التصنيف
       ),
     );
-    if (result != null && mounted) {
+    if (result != null && context.mounted) {
       try {
         await ctrl.create(result);
-        if (mounted) _snack('تم إنشاء الفلتر');
+        if (context.mounted) {
+          await AuditLogService.logAction(
+            action: 'إضافة فلتر',
+            adminName: admin.displayName,
+            target: result.nameAr,
+            severity: 'low',
+          );
+          _snack('تم إنشاء الفلتر', messenger: messenger);
+        }
       } catch (e) {
-        if (mounted) _snack('فشل: $e', isError: true);
+        if (context.mounted) {
+          _snack('فشل: $e', isError: true, messenger: messenger);
+        }
       }
     }
   }
 
-  Future<void> _openEdit(FiltersController ctrl, FilterDefinition f) async {
+  Future<void> _openEdit(
+      BuildContext context, FiltersController ctrl, FilterDefinition f) async {
+    final admin = context.read<AuthController>();
+    final messenger = ScaffoldMessenger.of(context);
+
     final result = await showDialog<FilterDefinition>(
       context: context,
-      builder: (_) => AddEditFilterDialog(existing: f),
+      builder: (_) => AddEditFilterDialog(
+        existing: f,
+        categoryId: widget.categoryId, // ✅ تمرير التصنيف
+      ),
     );
-    if (result != null && mounted) {
+    if (result != null && context.mounted) {
       try {
         await ctrl.update(result.id, result);
-        if (mounted) _snack('تم تحديث الفلتر');
+        if (context.mounted) {
+          await AuditLogService.logAction(
+            action: 'تعديل فلتر',
+            adminName: admin.displayName,
+            target: result.nameAr,
+            severity: 'low',
+          );
+          _snack('تم تحديث الفلتر', messenger: messenger);
+        }
       } catch (e) {
-        if (mounted) _snack('فشل: $e', isError: true);
+        if (context.mounted) {
+          _snack('فشل: $e', isError: true, messenger: messenger);
+        }
       }
     }
   }
 
-  Future<void> _toggleActive(FiltersController ctrl, FilterDefinition f) async {
+  Future<void> _toggleActive(
+      BuildContext context, FiltersController ctrl, FilterDefinition f) async {
+    final admin = context.read<AuthController>();
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       await ctrl.toggleActive(f.id, !f.isActive);
+      if (context.mounted) {
+        await AuditLogService.logAction(
+          action: !f.isActive ? 'تفعيل فلتر' : 'تعطيل فلتر',
+          adminName: admin.displayName,
+          target: f.nameAr,
+          severity: 'low',
+        );
+      }
     } catch (e) {
-      if (mounted) _snack('فشل: $e', isError: true);
+      if (context.mounted) {
+        _snack('فشل: $e', isError: true, messenger: messenger);
+      }
     }
   }
 
   Future<void> _confirmDelete(
-      FiltersController ctrl, FilterDefinition f) async {
+      BuildContext context, FiltersController ctrl, FilterDefinition f) async {
+    final admin = context.read<AuthController>();
+    final messenger = ScaffoldMessenger.of(context);
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -212,19 +310,92 @@ class _FiltersManagementScreenState extends State<FiltersManagementScreen> {
     if (ok != true) return;
     try {
       await ctrl.delete(f.id);
-      if (mounted) _snack('تم حذف الفلتر');
+      if (context.mounted) {
+        await AuditLogService.logAction(
+          action: 'حذف فلتر',
+          adminName: admin.displayName,
+          target: f.nameAr,
+          severity: 'medium',
+        );
+        _snack('تم حذف الفلتر', messenger: messenger);
+      }
     } catch (e) {
-      if (mounted) _snack('فشل: $e', isError: true);
+      if (context.mounted) {
+        _snack('فشل: $e', isError: true, messenger: messenger);
+      }
     }
   }
 
-  void _snack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _snack(String msg,
+      {bool isError = false, ScaffoldMessengerState? messenger}) {
+    (messenger ?? ScaffoldMessenger.of(context)).showSnackBar(
       SnackBar(
         content: Text(msg),
         backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 2. شاشة التصنيفات (للفلاتر الخاصة)
+// ═══════════════════════════════════════════════════════════════
+
+class _SpecificFiltersCategoriesView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('categories')
+          .orderBy('order')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('حدث خطأ: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red)),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('لا توجد تصنيفات بعد'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(YaBaladiDesignTokens.space4),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final nameAr = data['nameAr'] as String? ?? 'بدون اسم';
+
+            return Card(
+              child: ListTile(
+                title: Text(nameAr,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: Text('فلاتر: $nameAr')),
+                        body: _FiltersList(categoryId: docs[index].id),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -267,6 +438,7 @@ class _FilterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
+      clipBehavior: Clip.antiAlias,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -298,10 +470,14 @@ class _FilterCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          filter.nameAr,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                        Flexible(
+                          child: Text(
+                            filter.nameAr,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Container(
@@ -324,6 +500,8 @@ class _FilterCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Wrap(
@@ -376,7 +554,7 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.filter_alt_off,
               size: 64, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 12),
-          const Text('لا توجد فلاتر بعد'),
+          const Text('لا توجد فلاتر في هذا القسم'),
           const SizedBox(height: 4),
           Text(
             'اضغط "فلتر جديد" لإضافة أول فلتر.',

@@ -1,6 +1,7 @@
 // lib/features/search/controllers/places_search_controller.dart
 //
-// [v1.1.2 — 2026-10-26] — Wave 13: unawaited() wrappers to prevent lint warnings
+// [v1.2 — 2026-11-11] — RACE CONDITION GUARD: Added generation counter to ignore stale search results.
+// [v1.1.2 — 2026-10-26] — Wave 13: unawaited() wrappers to prevent lint warnings.
 //   - KEPT: all logic, state management, and public API identical.
 
 import 'dart:async';
@@ -25,6 +26,9 @@ class PlacesSearchController extends ChangeNotifier {
   List<Place> _results = const [];
   String? _error;
 
+  // ✅ حماية من سباق البيانات (لتجاهل نتائج الطلبات القديمة)
+  int _requestGeneration = 0;
+
   // ─── Getters ───
   String get query => _query;
   String? get categoryId => _categoryId;
@@ -46,7 +50,6 @@ class PlacesSearchController extends ChangeNotifier {
 
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
-      // [FIX] unawaited() يمنع تحذير unawaited_futures
       unawaited(_run());
     });
   }
@@ -54,7 +57,6 @@ class PlacesSearchController extends ChangeNotifier {
   void setCategory(String? id) {
     _categoryId = id;
     _debounce?.cancel();
-    // [FIX] unawaited() يمنع تحذير unawaited_futures
     unawaited(_run());
   }
 
@@ -67,6 +69,7 @@ class PlacesSearchController extends ChangeNotifier {
     _results = const [];
     _status = PlacesSearchStatus.idle;
     _error = null;
+    _requestGeneration++; // إلغاء أي طلبات معلقة
     notifyListeners();
   }
 
@@ -75,6 +78,8 @@ class PlacesSearchController extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> _run() async {
+    final myGen = ++_requestGeneration;
+
     if (!isActive) {
       _results = const [];
       _status = PlacesSearchStatus.idle;
@@ -87,17 +92,30 @@ class PlacesSearchController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ✅ الآن يطابق signature الجديد في PlacesRepository
-      _results = await _repo.search(
+      final results = await _repo.search(
         query: _query,
         categoryId: _categoryId,
       );
+
+      // ✅ إذا كان هناك طلب أحدث تم تنفيذه، تجاهل هذا الطلب القديم
+      if (myGen != _requestGeneration) {
+        return;
+      }
+
+      _results = results;
       _status = PlacesSearchStatus.loaded;
     } on Exception catch (e) {
+      // ✅ نفس الحماية عند حدوث خطأ
+      if (myGen != _requestGeneration) {
+        return;
+      }
       _error = e.toString();
       _status = PlacesSearchStatus.error;
     }
-    notifyListeners();
+
+    if (myGen == _requestGeneration) {
+      notifyListeners();
+    }
   }
 
   @override

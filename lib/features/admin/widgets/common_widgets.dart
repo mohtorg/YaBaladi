@@ -1,9 +1,11 @@
 // lib/features/admin/widgets/common_widgets.dart
 //
-// [v2.0 — 2026-10-23] — Bold & Vivid typography/colors
-//   - AdminKpiCard: solid gradient (vivid) + white text + w900 numbers
-//   - AdminMiniStat, AdminDetailRow, AdminServiceChip: bolder for consistency
-//   - All text uses higher FontWeight for clarity
+// [v2.1 — FIXED] — UI OVERFLOW & INK SPLASH FIXES:
+//   - FIXED: Added Flexible/FittedBox in AdminKpiCard to prevent number overflow.
+//   - FIXED: Added Flexible in AdminMiniStat for long titles.
+//   - FIXED: Used Expanded in AdminDetailRow to balance label/value widths.
+//   - FIXED: Converted AdminSection Container to Material with clipBehavior.
+//   - KEPT: All vivid gradients, colors, and typography intact.
 
 import 'package:flutter/material.dart';
 import '../../../theme/design_tokens.dart';
@@ -39,7 +41,6 @@ class AdminKpiCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            // ✅ Gradient حيوي (vivid) بلون البطاقة الكامل
             gradient: LinearGradient(
               colors: [
                 color,
@@ -49,12 +50,10 @@ class AdminKpiCard extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            // ✅ حد واضح
             border: Border.all(
               color: Color.lerp(color, Colors.white, 0.35)!,
               width: 1.5,
             ),
-            // ✅ ظل قوي
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.4),
@@ -70,7 +69,6 @@ class AdminKpiCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // ✅ أيقونة داخل دائرة بيضاء شفافة
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
@@ -92,7 +90,6 @@ class AdminKpiCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              // ✅ العنوان — أبيض عريض
               Text(
                 title,
                 style: const TextStyle(
@@ -105,28 +102,39 @@ class AdminKpiCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
-              // ✅ الرقم — أبيض Black جداً
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1.0,
-                      letterSpacing: -1,
+                  // ✅ تغليف الرقم بـ Flexible و FittedBox لمنع انهيار الشاشة
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.0,
+                          letterSpacing: -1,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    unit,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w800,
+                  // ✅ تغليف الوحدة بـ Flexible
+                  Flexible(
+                    child: Text(
+                      unit,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -179,12 +187,17 @@ class AdminMiniStat extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(
-            title,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+          // ✅ تغليف النص بـ Flexible لمنع انهيار الشاشة
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -214,15 +227,23 @@ class AdminDetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          // ✅ استخدام Expanded لضمان توزيع المساحة بالتساوي ومنع الانكسار
+          Expanded(
+            flex: 1,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Flexible(
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 1,
             child: Text(
               value,
               textAlign: TextAlign.end,
@@ -231,6 +252,8 @@ class AdminDetailRow extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -291,15 +314,19 @@ class AdminSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+
+    // ✅ تحويل الـ Container إلى Material مع clipBehavior
+    // لضمان بقاء تأثير الموجة (Ink Splash) داخل الحواف الدائرية لأي ListTile بداخل children
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
+        side: BorderSide(
           color: theme.colorScheme.outlineVariant,
           width: 1.5,
         ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

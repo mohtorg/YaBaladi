@@ -67,7 +67,7 @@
   "aboutLabel": "عن التطبيق",
   "aboutSubtitle": "معلومات وتراخيص",
   "versionLabel": "الإصدار",
-  "versionValue": "1.0.0+1",
+  "versionValue": "1.0.0+6",
   "clearCacheLabel": "مسح الذاكرة المؤقتة",
   "clearCacheSubtitle": "حذف البيانات المخزنة مؤقتًا",
   "clearCacheConfirm": "هل تريد مسح البيانات المخزنة مؤقتًا؟",
@@ -87,6 +87,11 @@
   "no": "لا",
   "apply": "تطبيق",
   "select": "اختيار",
+  "delete": "حذف",
+  "edit": "تعديل",
+  "done": "تم",
+  "copy": "نسخ",
+  "copiedToClipboard": "تم النسخ إلى الحافظة",
   "loginTitle": "تسجيل الدخول",
   "loginSubtitle": "أدخل بياناتك للوصول إلى حسابك",
   "registerTitle": "إنشاء حساب جديد",
@@ -114,7 +119,7 @@
   "discoverPlaces": "اكتشف الأماكن",
   "settingsAppearance": "المظهر",
   "settingsPrivacySection": "الخصوصية والأذونات",
-  "settingsDangerSection": "منطقة الخطر",
+  "settingsDangerSection": "إجراءات خطرة",
   "continueAsGuest": "متابعة كزائر",
   "guest": "زائر",
   "loginRequired": "تسجيل الدخول مطلوب",
@@ -129,7 +134,7 @@
   "searchClearAll": "مسح الكل",
   "searchQuickCategories": "تصنيفات سريعة",
   "searchTrending": "الأكثر بحثًا",
-  "searchResultsCount": "نتائج: {count}",
+  "searchResultsCount": "{count, plural, =0{لا توجد نتائج} =1{نتيجة واحدة} =2{نتيجتان} few{{count} نتائج} many{{count} نتيجة} other{{count} نتيجة}}",
   "@searchResultsCount": {
     "placeholders": {
       "count": { "type": "int" }
@@ -159,8 +164,223 @@
   "details": "التفاصيل",
   "recenter": "إعادة التمركز",
   "noCoordinates": "لا توجد إحداثيات لعرض هذا المكان على الخريطة",
-  "continueWithGoogle": "المتابعة باستخدام Google",
+  "continueWithGoogle": "المتابعة باستخدام جوجل",
+  "googleSignInFailed": "فشل تسجيل الدخول بجوجل",
   "registerCta": "إنشاء حساب جديد",
-  "googleSignInFailed": "فشل تسجيل الدخول بـ Google",
-  "tripsTitle": "رحلتي"
+  "tripsTitle": "رحلتي",
+  "chooseGovernorate": "اختر المحافظة",
+  "useCurrentLocation": "استخدام موقعي الحالي",
+  "fromGps": "من GPS",
+  "orChooseAnotherGovernorate": "أو اختر محافظة أخرى",
+  "chooseYourGovernorate": "اختر محافظتك",
+  "defaultBadge": "افتراضي",
+  "determineMyLocation": "تحديد موقعي",
+  "locationDefined": "موقع محدد",
+  "searchPlaceTitle": "بحث عن مكان",
+  "searchPlaceHint": "مثال: بورسعيد، الشرق",
+  "noMatchingResults": "لا توجد نتائج مطابقة.",
+  "locationSourceGps": "GPS (الأدق)",
+  "locationSourceGpsSub": "قد يستغرق بضع ثوان",
+  "locationSourceNetwork": "الشبكة (الأسرع)",
+  "locationSourceNetworkSub": "Wi-Fi / بيانات الجوال",
+  "locationSourceLastKnown": "آخر موقع معروف",
+  "locationSourceLastKnownSub": "فوري — قد يكون قديماً",
+  "locationSourceManual": "اختيار يدوي",
+  "locationSourceManualSub": "من قائمة المحافظات",
+  "locationSourceOnline": "بحث بالاسم",
+  "locationSourceOnlineSub": "اكتب اسم مدينتك أو حيّك",
+  "planYourTrip": "خطط لرحلتك",
+  "whereToGo": "إلى أين تريد أن تذهب؟",
+  "chooseGovernorateToStart": "اختر المحافظة لتبدأ التخطيط.",
+  "foundInBasket": "وجدنا {count} في سلتك",
+  "@foundInBasket": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "tripIn": "رحلة في {govName}. كيف تريد أن تكون؟",
+  "@tripIn": {
+    "placeholders": {
+      "govName": { "type": "String" }
+    }
+  },
+  "governorate": "المحافظة",
+  "duration": "المدة",
+  "halfDay": "نصف يوم",
+  "halfDaySub": "~4 ساعات",
+  "fullDay": "يوم كامل",
+  "fullDaySub": "~8 ساعات",
+  "weekend": "عطلة نهاية أسبوع",
+  "weekendSub": "~16 ساعة (يومان)",
+  "customDates": "تواريخ مخصصة (3 أيام أو أكثر)",
+  "tripDurationDays": "{days, plural, =1{مدة الرحلة: يوم واحد} =2{مدة الرحلة: يومان} few{مدة الرحلة: {days} أيام} many{مدة الرحلة: {days} يوماً} other{مدة الرحلة: {days} يوم}}",
+  "@tripDurationDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "transportMode": "وسيلة النقل",
+  "transportDriving": "سيارة",
+  "transportWalking": "مشي",
+  "transportBus": "حافلة",
+  "preparingBestOrder": "نقوم بتجهيز أفضل ترتيب لرحلتك...",
+  "notEnoughPlaces": "لم نجد أماكن كافية",
+  "modifyOptions": "تعديل الخيارات",
+  "modifyPlacesManually": "تعديل الأماكن يدوياً",
+  "finalTouches": "اللمسات الأخيرة",
+  "addTripTitle": "أضف عنواناً لرحلتك",
+  "tripTitleField": "عنوان الرحلة",
+  "previous": "السابق",
+  "generateTrip": "توليد الرحلة",
+  "next": "متابعة",
+  "saveTrip": "حفظ الرحلة",
+  "tripSavedSuccess": "تم حفظ الرحلة بنجاح",
+  "loginRequiredForSave": "يجب تسجيل الدخول لحفظ الرحلة",
+  "saveFailed": "تعذر الحفظ",
+  "dayNumber": "اليوم {day}",
+  "@dayNumber": {
+    "placeholders": {
+      "day": { "type": "int" }
+    }
+  },
+  "minutes": "دقيقة",
+  "minutesDual": "دقيقتان",
+  "minutesPlural": "دقائق",
+  "stations": "محطة",
+  "stationsDual": "محطتان",
+  "stationsPlural": "محطات",
+  "hours": "ساعة",
+  "hoursPlural": "ساعات",
+  "places": "مكان",
+  "placesDual": "مكانان",
+  "placesPlural": "أماكن",
+  "newTrip": "رحلة جديدة",
+  "tripTo": "رحلة إلى {govName}",
+  "@tripTo": {
+    "placeholders": {
+      "govName": { "type": "String" }
+    }
+  },
+  "bulkImportTitle": "إدارة المعالم (رفع مجمع)",
+  "bulkImportIntro": "يمكنك إدخال عشرات المعالم دفعة واحدة عبر ملف Excel.\nقم بتحميل القالب، تعبئته، ثم رفعه.",
+  "downloadExcelTemplate": "1. تحميل قالب الإكسل",
+  "pickExcelFile": "2. اختيار ملف الإكسل ومراجعته",
+  "confirmUploadPlaces": "3. تأكيد رفع {count, plural, =1{معلم واحد} =2{معلمين} few{{count} معالم} many{{count} معلماً} other{{count} معلم}} للقاعدة",
+  "@confirmUploadPlaces": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "preparingTemplate": "جاري تحضير القالب...",
+  "templateReady": "تم تجهيز القالب! يمكنك الآن حفظه أو مشاركته.",
+  "templateError": "حدث خطأ أثناء تحضير القالب: {error}",
+  "@templateError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "readingFile": "جاري قراءة الملف والتحقق من البيانات...",
+  "fileSelectionCancelled": "تم إلغاء اختيار الملف.",
+  "noValidDataFound": "لم يتم العثور على بيانات صالحة في الملف.",
+  "fileReadSuccess": "تم قراءة الملف بنجاح. يرجى مراجعة النتائج أدناه.",
+  "uploadingData": "جاري رفع البيانات إلى قاعدة البيانات...",
+  "uploadSuccess": "🎉 تم رفع {count, plural, =1{معلم واحد} =2{معلمين} few{{count} معالم} many{{count} معلماً} other{{count} معلم}} بنجاح!",
+  "@uploadSuccess": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "duplicatesSkipped": "(تم تجاهل {count, plural, =1{معلم مسجل مسبقاً} =2{معلمين مسجلين مسبقاً} few{{count} معالم مسجلة مسبقاً} many{{count} معلماً مسجلاً مسبقاً} other{{count} معلم مسجل مسبقاً}})",
+  "@duplicatesSkipped": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "sortReport": "📊 تقرير الفرز:",
+  "validPlaces": "✅ معالم صالحة للرفع: {count, plural, =0{لا يوجد} =1{معلم واحد} =2{معلمين} few{{count} معالم} many{{count} معلماً} other{{count} معلم}}",
+  "@validPlaces": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "errorLines": "❌ أسطر بها أخطاء (سيتم تجاهلها): {count, plural, =0{لا يوجد} =1{سطر واحد} =2{سطرين} few{{count} أسطر} many{{count} سطراً} other{{count} سطر}}",
+  "@errorLines": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkUploadSuccessMsg": "تمت عملية الرفع المجمع بنجاح",
+  "noDataToUpload": "لا توجد بيانات صالحة للرفع.",
+  "allPlacesAlreadyRegistered": "كل المعالم الموجودة في الملف مسجلة مسبقاً في قاعدة البيانات أو مكررة داخل الملف.",
+  "databaseConnectionError": "حدث خطأ أثناء الاتصال بقاعدة البيانات: {error}",
+  "@databaseConnectionError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fileReadError": "حدث خطأ أثناء قراءة الملف. تأكد من أن الملف بصيغة xlsx صحيحة وغير تالف. ({error})",
+  "@fileReadError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "templateGenerationFailed": "فشل في إنشاء ملف الإكسل",
+  "templateShareText": "قالب إدخال معالم يا بلدي (بورسعيد)",
+  "templateShareSubject": "قالب استيراد المعالم",
+  "noValidFcmTokens": "لا توجد رموز إشعارات صالحة لهذا المستخدم.",
+  "pushSentSuccess": "تم إرسال الإشعار بنجاح.",
+  "pushFailed": "فشل إرسال الإشعار.",
+  "notificationPlaceBlockedTitle": "🚫 تم إيقاف نشاطك مؤقتاً",
+  "notificationPlaceBlockedBody": "تم إيقاف \"{placeName}\". السبب: {reason}",
+  "@notificationPlaceBlockedBody": {
+    "placeholders": {
+      "placeName": { "type": "String" },
+      "reason": { "type": "String" }
+    }
+  },
+  "notificationPlaceUnblockedTitle": "✅ تم تفعيل نشاطك",
+  "notificationPlaceUnblockedBody": "تم فك الحظر عن \"{placeName}\" بنجاح. يمكنك الآن استقبال الطلبات.",
+  "@notificationPlaceUnblockedBody": {
+    "placeholders": {
+      "placeName": { "type": "String" }
+    }
+  },
+  "notificationSupportReplyTitle": "💬 رد جديد من الدعم",
+  "notificationSupportReplyBody": "تم الرد على بلاغك ({code}). يرجى فتح تفاصيل البلاغ للمراجعة.",
+  "@notificationSupportReplyBody": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "notificationMerchantApprovedTitle": "🎉 تم قبول طلبك",
+  "notificationMerchantApprovedBody": "تمت الموافقة على طلبك كتاجر. ابدأ الآن في إدارة نشاطك التجاري!",
+  "notificationMerchantRejectedTitle": "⚠️ طلبك يحتاج تعديل",
+  "notificationMerchantRejectedBody": "السبب: {reason}",
+  "@notificationMerchantRejectedBody": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "notificationNewReviewTitle": "⭐ تقييم جديد على {placeName}",
+  "@notificationNewReviewTitle": {
+    "placeholders": {
+      "placeName": { "type": "String" }
+    }
+  },
+  "notificationNewReviewBody": "حصلت على تقييم {rating} نجوم. \"{comment}\"",
+  "@notificationNewReviewBody": {
+    "placeholders": {
+      "rating": { "type": "String" },
+      "comment": { "type": "String" }
+    }
+  },
+  "planTripAction": "خطط لرحلتك",
+  "myTripsAction": "رحلاتي",
+  "topRatedIn": "الأعلى تقييماً في {governorateName}",
+  "@topRatedIn": {
+    "placeholders": {
+      "governorateName": { "type": "String" }
+    }
+  },
+  "guestBannerTitle": "سجل دخولك لتجربة أفضل!"
 }
