@@ -1,0 +1,16 @@
+{
+  "name": "yabaladi-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "اختبارات قواعد Firestore وStorage بمحاكي Firebase",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore,storage --project demo-yabaladi \"vitest run\"",
+    "test:baseline": "RULES_DIR=baseline firebase emulators:exec --only firestore,storage --project demo-yabaladi \"vitest run\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.14.0",
+    "firebase-tools": "^13.0.0",
+    "vitest": "^2.1.0"
+  }
+}

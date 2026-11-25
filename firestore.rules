@@ -2,6 +2,18 @@ rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════
 // YaBaladi Firestore Security Rules
+// [v7.1 — 2026-11-19] — تقييم واحد لكل مستخدم/مكان بمعرّف حتمي، وحدود حجم للنصوص.
+// [v7.0 — 2026-11-18] — SECURITY HARDENING (الجولة 1 / حزم P0-أ إلى P0-د)
+//   - places: منع إنشاء مكان معتمد مسبقاً، وزيادة viewCount بمقدار 1 لمسجّل فقط،
+//             وحصر كتابة حقول التقييم المشتقة في نطاقات صالحة وبخطوة واحدة.
+//   - users:  قيم ابتدائية ثابتة عند الإنشاء، حماية حقول الثقة والتوثيق والاشتراك،
+//             منع حذف مستند المحظور (لا تهرّب من الحظر)، قاعدة fcm_tokens.
+//   - ADDED: owner_claim_requests / moderation_logs / rating_revisions / system_events.
+//   - audit_logs: إضافة فقط؛ التحديث مقصور على أعلام الأرشفة والحذف الناعم؛ لا حذف نهائي.
+//   - notifications: الإنشاء للمشرف/الأدمن فقط.
+//   - ratings: قيم ابتدائية ثابتة، وتعديل المالك لتقييمه دون المساس بحقول الإشراف.
+//   - حدّ معروف: كتابة المتوسطات من العميل مقيّدة بنطاق وخطوة فقط، والحل الجذري
+//     نقلها إلى الخادم (حزمة P1، تتطلب قراراً بشأن خطة Blaze).
 // [v6.1 — 2026-11-12] — FIX: Added rule for /review_criteria
 //   - ADDED: /review_criteria/{criterionId} — read public; write admin only.
 //   - Fixes PERMISSION_DENIED error when loading review criteria in the app.
@@ -60,14 +72,64 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/places/$(placeId)) && get(/databases/$(database)/documents/places/$(placeId)).data.ownerId == uid(); 
     }
 
+    // تحديث حقول التقييم المشتقة على المكان (يكتبها AggregateService من العميل مؤقتاً).
+    function isValidDerivedPlaceUpdate(oldD, newD) {
+      return newD.diff(oldD).affectedKeys().hasOnly(['averageRating', 'reviewCount', 'adjustedScore', 'sampleQuality', 'isRankable'])
+          && newD.get('averageRating', 0) is number && newD.get('averageRating', 0) >= 0 && newD.get('averageRating', 0) <= 5
+          && newD.get('reviewCount', 0) is int && newD.get('reviewCount', 0) >= 0
+          && newD.get('reviewCount', 0) - oldD.get('reviewCount', 0) <= 1
+          && oldD.get('reviewCount', 0) - newD.get('reviewCount', 0) <= 1
+          && newD.get('adjustedScore', 0) is number && newD.get('adjustedScore', 0) >= 0 && newD.get('adjustedScore', 0) <= 5
+          && newD.get('sampleQuality', 0) is number && newD.get('sampleQuality', 0) >= 0 && newD.get('sampleQuality', 0) <= 1
+          && newD.get('isRankable', false) is bool;
+    }
+
     // ─── المستخدمون (Users) ───
+    // حقول لا يكتبها المستخدم بنفسه أبداً (تُدار بالأدمن/الخادم).
+    function userProtectedKeys() {
+      return ['role', 'uid', 'createdAt', 'email', 'isVerified', 'isBanned', 'banReason', 'bannedAt',
+              'hasConfirmedReports', 'confirmedReportsCount', 'trustScore',
+              'merchantVerified', 'verifiedAt', 'subscriptionTier'];
+    }
+    // حقول دفتر التقييم: تُكتب مرة عند كل تقييم جديد بقيم مقيّدة فقط.
+    function userRatingKeys() { return ['publishedRatingsCount', 'userTrustFactor', 'lastRatedAt']; }
+
+    // إنشاء مستند المستخدم: قيم ابتدائية ثابتة لا يستطيع العميل تضخيمها.
+    function isValidNewUser(d) {
+      return d.role in ['user', 'member']
+          && d.get('uid', request.auth.uid) == request.auth.uid
+          && d.get('isBanned', false) == false
+          && d.get('publishedRatingsCount', 0) == 0
+          && d.get('trustScore', 0) == 0
+          && d.get('hasConfirmedReports', false) == false
+          && d.get('confirmedReportsCount', 0) == 0
+          && d.get('merchantVerified', false) == false
+          && d.get('subscriptionTier', 'free') == 'free'
+          && !('userTrustFactor' in d.keys());
+    }
+
+    // دفتر التقييم: زيادة العداد بمقدار 1 فقط ومعامل الثقة ضمن نطاق منطقي.
+    function isRatingBookkeeping(oldD, newD) {
+      let changed = newD.diff(oldD).affectedKeys();
+      return changed.hasOnly(userRatingKeys())
+          && (!changed.hasAny(['publishedRatingsCount'])
+              || newD.publishedRatingsCount == oldD.get('publishedRatingsCount', 0) + 1)
+          && (!changed.hasAny(['userTrustFactor'])
+              || (newD.userTrustFactor is number && newD.userTrustFactor >= 0 && newD.userTrustFactor <= 2));
+    }
+
     match /users/{userId} {
       allow get: if isSelf(userId) || isAdmin();
       allow list: if isAdmin(); 
       
-      allow create: if isSelf(userId) && request.resource.data.role in ['user', 'member'];
-      allow update: if isAdmin() || (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'createdAt', 'email', 'isVerified', 'isBanned', 'banReason', 'bannedAt', 'hasConfirmedReports', 'trustScore']));
-      allow delete: if isSelf(userId) || isAdmin();
+      allow create: if isSelf(userId) && isValidNewUser(request.resource.data);
+      allow update: if isAdmin()
+                    || (isSelf(userId)
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                              .hasAny(userProtectedKeys().concat(userRatingKeys())))
+                    || (isSelf(userId) && isRatingBookkeeping(resource.data, request.resource.data));
+      // المحظور لا يحذف مستنده (يمنع التهرّب من الحظر بإعادة التسجيل).
+      allow delete: if isAdmin() || (isSelf(userId) && resource.data.get('isBanned', false) == false);
 
       match /favorites/{placeId} { 
         allow read, create, delete: if isSelf(userId); 
@@ -75,6 +137,7 @@ service cloud.firestore {
       }
       match /notification_reads/{notificationId} { allow read, write: if isSelf(userId); }
       match /notification_hides/{notificationId} { allow read, write: if isSelf(userId); }
+      match /fcm_tokens/{token} { allow read, write: if isSelf(userId); }
     }
 
     // ─── المفضلة (Favorites) ───
@@ -89,12 +152,23 @@ service cloud.firestore {
     // ─── الأماكن (Places) ───
     match /places/{placeId} {
       allow get, list: if true;
-      allow create: if isAdmin() || (isSignedIn() && request.resource.data.ownerId == uid());
+      // إنشاء غير الأدمن: مكان غير معتمد وبعدادات صفرية فقط.
+      allow create: if isAdmin() ||
+                    (isSignedIn()
+                      && request.resource.data.ownerId == uid()
+                      && request.resource.data.get('isApproved', false) == false
+                      && request.resource.data.get('averageRating', 0) == 0
+                      && request.resource.data.get('reviewCount', 0) == 0
+                      && request.resource.data.get('viewCount', 0) == 0);
       
       allow update: if isAdmin() || 
-                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount'])) || 
-                    (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['averageRating', 'reviewCount'])) || 
-                    (isMerchantOwner(placeId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'isApproved', 'averageRating', 'reviewCount', 'createdAt', 'viewCount']));
+                    // عدّاد المشاهدات: مسجّل فقط وبزيادة 1 بالضبط.
+                    (isSignedIn()
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount'])
+                      && request.resource.data.viewCount == resource.data.get('viewCount', 0) + 1) || 
+                    // حقول التقييم المشتقة (مؤقتاً من العميل): نطاقات صالحة وخطوة عدد واحدة.
+                    (isSignedIn() && isValidDerivedPlaceUpdate(resource.data, request.resource.data)) || 
+                    (isMerchantOwner(placeId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'isApproved', 'averageRating', 'reviewCount', 'adjustedScore', 'sampleQuality', 'isRankable', 'createdAt', 'viewCount']));
 
       allow delete: if isAdmin();
 
@@ -184,10 +258,34 @@ service cloud.firestore {
       allow list: if resource.data.status == 'PUBLISHED'
                    || (isSignedIn() && resource.data.userId == uid())
                    || isModeratorOrAdmin();
-      allow create: if isSignedIn() && request.resource.data.userId == uid();
+      // إنشاء: لنفسه، حالة منشور، عدّادات صفرية، وتقييم عام بين 1 و5.
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && request.resource.data.status == 'PUBLISHED'
+                    && request.resource.data.get('helpfulCount', 0) == 0
+                    && request.resource.data.get('reportCount', 0) == 0
+                    && isValidRating(request.resource.data.overall)
+                    // تقييم واحد لكل مستخدم لكل مكان: المعرّف حتمي (uid_placeId).
+                    && ratingId == request.resource.data.userId + '_' + request.resource.data.placeId
+                    // حدود الحجم تمنع إغراق القاعدة بنصوص ضخمة.
+                    && request.resource.data.get('body', '').size() <= 2000
+                    && request.resource.data.get('title', '').size() <= 200
+                    // لا تقييم لمكان تملكه (كان المنع في الواجهة فقط).
+                    && get(/databases/$(database)/documents/places/$(request.resource.data.placeId)).data.get('ownerId', '') != uid();
 
       // helpfulCount +1 فقط (markHelpful)
       allow update: if isModeratorOrAdmin()
+                    // ردّ التاجر مالك المكان: حقلا الردّ فقط، دون المساس بالتقييم.
+                    || (isMerchantOwner(resource.data.placeId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['merchantReply', 'merchantRepliedAt']))
+                    // تعديل المالك لتقييمه دون المساس بحقول الإشراف والهوية والعدّادات.
+                    || (isSignedIn()
+                        && resource.data.userId == uid()
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                              .hasAny(['userId', 'placeId', 'status', 'helpfulCount', 'reportCount',
+                                       'createdAt', 'moderatedAt', 'moderatedBy', 'merchantReply', 'merchantRepliedAt'])
+                        && isValidRating(request.resource.data.overall))
                     || (isSignedIn()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
                         && request.resource.data.helpfulCount == resource.data.helpfulCount + 1)
@@ -204,7 +302,17 @@ service cloud.firestore {
     // حذف: الأدمن فقط.
     match /place_aggregates/{placeId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
+      // مؤقتاً من العميل: نطاقات صالحة وخطوة عدد واحدة (الحل الجذري في الخادم - P1).
+      allow create, update: if isAdmin()
+                            || (isSignedIn()
+                                && request.resource.data.get('totalRatings', 0) is int
+                                && request.resource.data.get('totalRatings', 0) >= 0
+                                && request.resource.data.get('averageOverall', 0) is number
+                                && request.resource.data.get('averageOverall', 0) >= 0
+                                && request.resource.data.get('averageOverall', 0) <= 5
+                                && (request.method == 'create'
+                                    || (request.resource.data.get('totalRatings', 0) - resource.data.get('totalRatings', 0) <= 1
+                                        && resource.data.get('totalRatings', 0) - request.resource.data.get('totalRatings', 0) <= 1)));
       allow delete: if isAdmin();
     }
 
@@ -237,9 +345,49 @@ service cloud.firestore {
 
     match /admin_stats/{docId} { allow read: if isModeratorOrAdmin(); allow write: if isAdmin(); }
 
+    // ─── سجل التدقيق: إضافة فقط ───
+    // التحديث مقصور على أعلام الأرشفة والحذف الناعم؛ لا حذف نهائي من أي دور.
     match /audit_logs/{logId} {
       allow read: if isModeratorOrAdmin();
-      allow write: if isModeratorOrAdmin(); 
+      allow create: if isModeratorOrAdmin() && request.resource.data.actorId == uid();
+      allow update: if isModeratorOrAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['isArchived', 'archivedAt', 'isDeleted', 'deletedAt']);
+      allow delete: if false;
+    }
+
+    // ─── سجل الإشراف: غير قابل للتعديل أو الحذف ───
+    match /moderation_logs/{logId} {
+      allow read: if isModeratorOrAdmin();
+      allow create: if isModeratorOrAdmin() && request.resource.data.actorId == uid();
+      allow update, delete: if false;
+    }
+
+    // ─── أحداث النظام: إضافة فقط ───
+    match /system_events/{eventId} {
+      allow read: if isModeratorOrAdmin();
+      allow create: if isModeratorOrAdmin() && request.resource.data.actorId == uid();
+      allow update, delete: if false;
+    }
+
+    // ─── أرشيف تعديلات التقييم: يُنشئه صاحب التقييم، ولا يُعدَّل ───
+    match /rating_revisions/{revisionId} {
+      allow read: if isSignedIn() && (resource.data.userId == uid() || isModeratorOrAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == uid();
+      allow update, delete: if false;
+    }
+
+    // ─── طلبات استلام المكان (Owner Claims) ───
+    match /owner_claim_requests/{claimId} {
+      allow get: if isSignedIn() && (resource.data.userId == uid() || isModeratorOrAdmin());
+      allow list: if isModeratorOrAdmin();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == uid()
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasOnly(['placeId', 'placeName', 'userId', 'userDisplayName',
+                         'userEmail', 'businessPhone', 'evidenceType', 'evidenceReference',
+                         'evidenceImageUrls', 'notes', 'status', 'createdAt']);
+      allow update, delete: if isAdmin();
     }
 
     match /visit_requests/{requestId} {
@@ -251,15 +399,23 @@ service cloud.firestore {
     }
 
     match /trip_plans/{planId} {
-      allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidTripStatus(request.resource.data.status);
+      allow create: if isSignedIn() && request.resource.data.userId == uid() && isValidTripStatus(request.resource.data.status)
+                    && request.resource.data.stops.size() <= 50;
       allow get: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
-      allow list: if isAdmin(); 
-      allow update: if isSignedIn() && (resource.data.userId == uid() || isAdmin()) && isValidTripStatus(request.resource.data.status);
+      // الاستعلام where(userId==uid) في TripRepository يتطلب قاعدة list تشمل المالك (كانت للأدمن فقط فيفشل لدى المستخدم العادي).
+      allow list: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
+      allow update: if isSignedIn() && (resource.data.userId == uid() || isAdmin())
+                    && request.resource.data.userId == resource.data.userId
+                    && isValidTripStatus(request.resource.data.status)
+                    && request.resource.data.stops.size() <= 50;
       allow delete: if isSignedIn() && (resource.data.userId == uid() || isAdmin());
     }
 
     match /support_tickets/{ticketId} {
-      allow create: if ((request.auth != null && request.resource.data.userId == request.auth.uid) || (request.auth == null && request.resource.data.userId == 'anonymous')) && request.resource.data.status == 'open';
+      allow create: if ((request.auth != null && request.resource.data.userId == request.auth.uid) || (request.auth == null && request.resource.data.userId == 'anonymous')) && request.resource.data.status == 'open'
+                    // حدود الحجم تمنع إغراق التذاكر (الإنشاء متاح للزائر عمداً).
+                    && request.resource.data.get('errorMessage', '').size() <= 2000
+                    && request.resource.data.get('stackTrace', '').size() <= 4000;
       allow get: if isAdmin() || (isSignedIn() && resource.data.userId == uid());
       allow list: if isAdmin(); 
       allow update, delete: if isAdmin();
@@ -268,7 +424,8 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow get: if isSignedIn() && (resource.data.userId == uid() || resource.data.userId == 'all');
       allow list: if isAdmin() || (isSignedIn() && (resource.data.userId == uid() || resource.data.userId == 'all')); 
-      allow create: if isSignedIn(); 
+      // الإنشاء للمشرف/الأدمن فقط (يمنع انتحال إشعارات لأي مستخدم أو للجميع).
+      allow create: if isModeratorOrAdmin(); 
       allow update: if isSignedIn() && resource.data.userId == uid() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'title', 'body', 'type', 'createdAt']);
       allow delete: if isSignedIn() && resource.data.userId == uid();
     }

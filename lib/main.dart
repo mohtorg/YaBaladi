@@ -15,6 +15,8 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
@@ -26,7 +28,6 @@ import 'package:yabaladi_rebuild/features/auth/google_auth_service.dart';
 import 'core/location/browsing_location_controller.dart';
 import 'core/router/app_router.dart';
 import 'core/utils/error_reporter.dart';
-import 'core/utils/reset_ratings_util.dart'; // ✅ Phase 8: One-time reset utility
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/categories/controllers/categories_controller.dart';
 import 'features/favorites/controllers/favorites_controller.dart';
@@ -46,7 +47,6 @@ import 'theme/app_theme.dart';
 
 /// ⚠️ TEMPORARY FLAG: Set to `true` ONCE to wipe all ratings and aggregates,
 /// then change back to `false` and hot-restart to prevent accidental data loss.
-const bool _runOneTimeReset = false;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -110,23 +110,25 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // [v-R3] App Check (Play Integrity): يحجب الطلبات الصادرة من غير التطبيق الأصلي.
+    // وضع debug للتطوير فقط؛ أضف رمز debug إلى الكونسول عند الاختبار.
+    // الفشل لا يوقف الإقلاع (الإلزام يُفعَّل من الكونسول بعد أسبوع مراقبة).
+    if (!kIsWeb) {
+      try {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider:
+              kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+        );
+      } catch (e) {
+        debugPrint('AppCheck activate failed: $e');
+      }
+    }
+
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       webExperimentalForceLongPolling: true,
       webExperimentalAutoDetectLongPolling: true,
     );
-
-    // ✅ Phase 8: One-time reset before app starts
-    if (_runOneTimeReset) {
-      try {
-        debugPrint('⚠️ RUNNING ONE-TIME RATINGS RESET...');
-        await ResetRatingsUtil.resetAllRatings();
-        debugPrint(
-            '✅ RATINGS RESET COMPLETED. CHANGE _runOneTimeReset TO false NOW.');
-      } catch (e) {
-        debugPrint('❌ RATINGS RESET FAILED: $e');
-      }
-    }
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 

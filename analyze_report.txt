@@ -1,0 +1,25 @@
+Analyzing ya_baladi_rebuild...                                  
+
+warning - Unused import: '../../services/location_service.dart'. Try removing the import directive - lib\core\location\browsing_location_controller.dart:13:8 - unused_import
+warning - Unused import: '../../../theme/design_tokens.dart'. Try removing the import directive - lib\features\admin\widgets\place_detail_sections.dart:7:8 - unused_import
+warning - Unused import: '../../../theme/design_tokens.dart'. Try removing the import directive - lib\features\auth\screens\login_screen.dart:8:8 - unused_import
+warning - Unused import: 'package:go_router/go_router.dart'. Try removing the import directive - lib\features\trip\screens\trip_detailed_screen.dart:5:8 - unused_import
+warning - The operand can't be 'null', so the condition is always 'false'. Try removing the condition, an enclosing condition, or the whole conditional statement - lib\features\trip\screens\wizard\wizard_container_screen.dart:193:13 - unnecessary_null_comparison
+warning - Unused import: 'dart:math'. Try removing the import directive - lib\models\trip_plan.dart:8:8 - unused_import
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:7:3 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:36:5 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:49:9 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:52:9 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:55:7 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:61:5 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:73:9 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:75:9 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:78:7 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:83:5 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:84:5 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:88:3 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:125:3 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:130:3 - avoid_print
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\osm_seeder.dart:131:3 - avoid_print
+
+21 issues found. (ran in 281.7s)

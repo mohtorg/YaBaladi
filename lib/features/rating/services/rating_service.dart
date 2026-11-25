@@ -282,7 +282,9 @@ class RatingService {
       );
     } else {
       // ─────────── مسار الإنشاء ───────────
-      final ratingRef = await _firestore.collection('ratings').add({
+      // [v-R3] معرّف حتمي: تقييم واحد لكل مستخدم لكل مكان، تفرضه القواعد.
+      final String newRatingId = '${user.uid}_$placeId';
+      await _firestore.collection('ratings').doc(newRatingId).set({
         'placeId': placeId,
         'categoryId': categoryId,
         'userId': user.uid,
@@ -311,7 +313,7 @@ class RatingService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      ratingId = ratingRef.id;
+      ratingId = newRatingId;
       ratingModel = RatingModel(
         id: ratingId,
         placeId: placeId,

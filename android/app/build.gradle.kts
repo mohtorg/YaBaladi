@@ -26,9 +26,26 @@ android {
         versionName = flutter.versionName
     }
 
+    // [v4 — 2026-11-19] توقيع release بمفتاح خاص من android/key.properties (غير مرفوع إلى Git).
+    // دون الملف يعود البناء إلى مفتاح debug للتطوير فقط، ولن تقبله Play.
+    signingConfigs {
+        create("release") {
+            val props = java.util.Properties()
+            val f = rootProject.file("key.properties")
+            if (f.exists()) {
+                f.inputStream().use { props.load(it) }
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            val hasKey = rootProject.file("key.properties").exists()
+            signingConfig = if (hasKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 

@@ -572,7 +572,7 @@ class _AuditLogManagementScreenState extends State<AuditLogManagementScreen>
           );
           if (mounted) {
             messenger.showSnackBar(const SnackBar(
-                content: Text('تم الحذف النهائي'),
+                content: Text('السجل يُحفظ في سلة المهملات: سجل التدقيق لا يُحذف نهائياً'),
                 backgroundColor: Colors.red));
           }
         }

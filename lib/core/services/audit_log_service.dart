@@ -102,12 +102,11 @@ class AuditLogService {
     });
   }
 
-  // ─── 7. الحذف النهائي (Hard Delete - يُستخدم فقط من داخل سلة المهملات) ───
+  // ─── 7. «الحذف النهائي» ───
+  // [v3.1 — 2026-11-19] سجل التدقيق إضافة فقط: القواعد تمنع delete من أي دور.
+  // تبقى الدالة للتوافق وتُبقي السجل في سلة المهملات (حذفاً ناعماً).
   static Future<void> hardDeleteLog(String logId) async {
-    await FirebaseFirestore.instance
-        .collection('audit_logs')
-        .doc(logId)
-        .delete();
+    await softDeleteLog(logId);
   }
 
   // ─── 8. إفراغ السجل بالكامل (نقل كل السجلات النشطة لسلة المهملات) ───

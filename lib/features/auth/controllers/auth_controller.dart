@@ -132,7 +132,6 @@ class AuthController extends ChangeNotifier {
     _authSubscription = _auth.authStateChanges().listen(
       (User? user) async {
         if (user == null) {
-          await Future.delayed(const Duration(milliseconds: 2500));
           if (_isDisposed) {
             return;
           }
@@ -199,7 +198,6 @@ class AuthController extends ChangeNotifier {
         _role = UserRole.values.first;
         _stopMerchantPlaceListener();
       }
-      await Future.delayed(const Duration(milliseconds: 2500));
       if (_user?.uid == uid) {
         _isRoleReady = true;
         _safeNotify();
@@ -207,7 +205,6 @@ class AuthController extends ChangeNotifier {
     }, onError: (Object e) async {
       debugPrint('AuthController role stream error: $e');
       _role = UserRole.values.first;
-      await Future.delayed(const Duration(milliseconds: 2500));
       if (_user?.uid == uid) {
         _isRoleReady = true;
         _safeNotify();

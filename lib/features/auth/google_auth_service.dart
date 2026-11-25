@@ -9,9 +9,18 @@ import 'package:google_sign_in/google_sign_in.dart';
 class GoogleAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // [v-R4] معرّف عميل الويب (من google-services.json، client_type 3): ضروري على أندرويد
+  // للحصول على idToken. تحديده صراحةً يعمل حتى لو لم تُعالَج ملفات google-services.
+  static const String _webClientId =
+      '231838490815-ivkqvuc58t65p2riietbiqcecdhb27se.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId: kIsWeb ? null : _webClientId,
   );
+
+  /// آخر خطأ تسجيل (للتشخيص: 10 = بصمة SHA-1 غير مسجّلة، 12500/12501 = إعداد أو إلغاء).
+  static String? lastError;
 
   // ✅ قفل لمنع التهيئة المتكررة (خاصة على الويب)
   static bool _isInitialized = false;
@@ -59,6 +68,7 @@ class GoogleAuthService {
         return await _auth.signInWithCredential(credential);
       }
     } catch (e) {
+      lastError = e.toString();
       debugPrint('Google Sign-In Error: $e');
       return null;
     }

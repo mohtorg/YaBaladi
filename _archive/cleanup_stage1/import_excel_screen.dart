@@ -27,10 +27,10 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
     });
 
     try {
-      // 1. اختيار ملف CSV
+      // 1. اختيار ملف Excel
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
+        allowedExtensions: ['xlsx', 'xls', 'csv'],
         withData: true,
       );
       if (picked == null || picked.files.first.bytes == null) {
@@ -40,7 +40,8 @@ class _ImportExcelScreenState extends State<ImportExcelScreen> {
 
       // 2. قراءة الملف
       final bytes = picked.files.first.bytes!;
-      final rows = await _service.parseCsv(bytes);
+      final parseResult = await _service.parseExcel(bytes);
+      final rows = parseResult.validPlaces;
 
       if (rows.isEmpty) {
         _showSnack('الملف فارغ أو غير صالح', Colors.red);

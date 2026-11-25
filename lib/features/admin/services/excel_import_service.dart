@@ -185,6 +185,13 @@ class ExcelImportService {
         continue;
       }
 
+      // نطاق مصر التقريبي: يكشف تبديل خط الطول والعرض أو الأخطاء الكبيرة.
+      if (lat < 21.5 || lat > 32.0 || lng < 24.5 || lng > 37.0) {
+        errors.add(
+            '"$name" (السطر ${i + 1}): الإحداثيات خارج نطاق مصر (تحقق من تبديل الطول والعرض).');
+        continue;
+      }
+
       validPlaces.add({
         'name': name,
         'name_en': getCell('name_en'),
@@ -258,6 +265,13 @@ class ExcelImportService {
             ..['averageRating'] = 0.0
             ..['reviewCount'] = 0
             ..['imageUrls'] = <String>[]
+            // الحقول التي يقرؤها التطبيق فعلاً (Place.fromMap والاستعلامات)،
+            // وتُترك الأسماء القديمة للتوافق مع بقية الشاشات.
+            ..['nameAr'] = row['name']
+            ..['nameEn'] = row['name_en'] ?? ''
+            ..['isActive'] = row['is_active'] ?? false
+            ..['googleMapsUrl'] = row['map_url'] ?? ''
+            ..['createdAt'] = FieldValue.serverTimestamp()
             ..['created_at'] = FieldValue.serverTimestamp()
             ..['updatedAt'] = FieldValue.serverTimestamp();
 

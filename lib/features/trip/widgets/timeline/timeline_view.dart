@@ -8,6 +8,7 @@
 //   - KEPT: All v1.1.1 fixes (clamp toInt, primary: false, travel-min efficiency).
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import '../../../../models/trip_plan.dart';
 import 'timeline_station_card.dart';
@@ -80,7 +81,7 @@ class TimelineView extends StatelessWidget {
       // (used by trip_detailed_screen for multi-day trips).
       primary: false,
       // ✅ Smoother scrolling for longer trips.
-      cacheExtent: 500,
+      scrollCacheExtent: const ScrollCacheExtent.pixels(500),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: children,
     );

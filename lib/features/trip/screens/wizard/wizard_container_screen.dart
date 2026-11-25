@@ -621,10 +621,15 @@ class _WizardContainerScreenState extends State<WizardContainerScreen> {
       tips.add('👨‍👩‍👧‍👦 ابدأ صباحاً لتجنب الزحام');
       tips.add('🍔 خصص وقتاً للطعام والراحة');
     }
-    if (_companions == 'couple') tips.add('💕 الأماكن المفتوحة رائعة لرحلتك');
-    if (_transport == 'walking' && stops.length > 4)
+    if (_companions == 'couple') {
+      tips.add('💕 الأماكن المفتوحة رائعة لرحلتك');
+    }
+    if (_transport == 'walking' && stops.length > 4) {
       tips.add('🚶‍♂️ الرحلة مشي، فكر في تقسيمها على يومين');
-    if (stops.length > 6) tips.add('☕ خذ استراحة بين المحطات');
+    }
+    if (stops.length > 6) {
+      tips.add('☕ خذ استراحة بين المحطات');
+    }
 
     if (mounted) {
       setState(() {

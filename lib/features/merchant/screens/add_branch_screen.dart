@@ -182,7 +182,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         'ownerId': auth.uid,
         'isBranch': true,
         'parentId': widget.mainBranch.id,
-        'isApproved': true,
+        'isApproved': false, // [v-R7] الفرع الجديد يُعتمد من الأدمن (القواعد تمنع الاعتماد الذاتي)
         'isActive': true,
         'averageRating': 0.0,
         'reviewCount': 0,

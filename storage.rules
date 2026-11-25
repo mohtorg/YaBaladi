@@ -1,5 +1,16 @@
 rules_version = '2';
 
+// ═══════════════════════════════════════════════════════════════
+// YaBaladi Storage Security Rules
+// [v2.0 — 2026-11-18] — SECURITY HARDENING (حزمة P0-د)
+//   - /places/{placeId}/**: الكتابة لمالك المكان أو الأدمن فقط (كانت لأي مسجّل).
+//     يمنع الكتابة فوق صور أي مكان أو تشويهها.
+//   - الحذف يُفصل عن الرفع (request.resource غير موجود عند الحذف).
+//   - /users/{userId}/**: كما كانت (المالك فقط، حتى 2MB، صورة).
+//   - ملاحظة: التحقق من الملكية يقرأ Firestore (يحتاج دور IAM لخدمة Storage
+//     على Firestore، ويُضبط تلقائياً عند أول نشر لقواعد تستخدم firestore.get).
+// ═══════════════════════════════════════════════════════════════
+
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -15,19 +26,37 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(uid()));
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+          && firestore.exists(/databases/(default)/documents/users/$(uid()))
+          && userDoc().data.role == 'admin';
+    }
+
+    function isPlaceOwner(placeId) {
+      return isSignedIn()
+          && firestore.exists(/databases/(default)/documents/places/$(placeId))
+          && firestore.get(/databases/(default)/documents/places/$(placeId)).data.ownerId == uid();
+    }
+
     match /places/{placeId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn()
-                   && request.resource.size <= 5 * 1024 * 1024
-                   && isImage();
+      allow create, update: if (isAdmin() || isPlaceOwner(placeId))
+                            && request.resource.size <= 5 * 1024 * 1024
+                            && isImage();
+      allow delete: if isAdmin() || isPlaceOwner(placeId);
     }
 
     match /users/{userId}/{allPaths=**} {
       allow read: if true;
-      allow write: if isSignedIn()
-                   && userId == uid()
-                   && request.resource.size <= 2 * 1024 * 1024
-                   && isImage();
+      allow create, update: if isSignedIn()
+                            && userId == uid()
+                            && request.resource.size <= 2 * 1024 * 1024
+                            && isImage();
+      allow delete: if isSignedIn() && userId == uid();
     }
 
     match /{allPaths=**} {
