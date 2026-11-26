@@ -21,6 +21,17 @@ import '../../features/auth/screens/register_screen.dart';
 
 // ─── Admin Routes ───
 import '../../features/admin/screens/admin_dashboard_screen.dart';
+import '../../features/admin/screens/manage_geo_hierarchy_screen.dart';
+import '../../features/admin/screens/manage_review_criteria_screen.dart';
+import '../../features/admin/screens/owner_claim_requests_screen.dart';
+import '../../features/admin/screens/admin_merchants_screen.dart';
+import '../../features/admin/screens/geo_zones_admin_screen.dart';
+import '../../features/admin/screens/admin_statistics_screen.dart';
+import '../../features/admin/screens/admin_offer_requests_screen.dart';
+import '../../features/admin/screens/admin_recompute_screen.dart';
+import '../../features/admin/screens/admin_broadcast_notification_screen.dart';
+import '../../features/admin/screens/admin_reports_screen.dart';
+import '../../features/admin/screens/admin_settings_screen.dart';
 import '../../features/support/controllers/support_tickets_controller.dart';
 import '../../features/support/screens/admin_support_screen.dart';
 // ✅ إضافة استيراد شاشة استيراد الإكسل
@@ -223,6 +234,61 @@ GoRouter createAppRouter(AuthController auth) {
         path: '/admin/bulk-import',
         name: 'adminBulkImport',
         builder: (context, state) => const BulkImportScreen(),
+      ),
+      GoRoute(
+        path: '/admin/geo-hierarchy',
+        name: 'adminGeoHierarchy',
+        builder: (context, state) => const ManageGeoHierarchyScreen(),
+      ),
+      GoRoute(
+        path: '/admin/review-criteria',
+        name: 'adminReviewCriteria',
+        builder: (context, state) => const ManageReviewCriteriaScreen(),
+      ),
+      GoRoute(
+        path: '/admin/owner-claims',
+        name: 'adminOwnerClaims',
+        builder: (context, state) => const OwnerClaimRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/merchants',
+        name: 'adminMerchants',
+        builder: (context, state) => const AdminMerchantsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/geo-zones',
+        name: 'adminGeoZones',
+        builder: (context, state) => const GeoZonesAdminScreen(),
+      ),
+      GoRoute(
+        path: '/admin/statistics',
+        name: 'adminStatistics',
+        builder: (context, state) => const AdminStatisticsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/offer-requests',
+        name: 'adminOfferRequests',
+        builder: (context, state) => const AdminOfferRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/recompute',
+        name: 'adminRecompute',
+        builder: (context, state) => const AdminRecomputeScreen(),
+      ),
+      GoRoute(
+        path: '/admin/broadcast',
+        name: 'adminBroadcast',
+        builder: (context, state) => const AdminBroadcastNotificationScreen(),
+      ),
+      GoRoute(
+        path: '/admin/reports',
+        name: 'adminReports',
+        builder: (context, state) => const AdminReportsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/settings',
+        name: 'adminSettings',
+        builder: (context, state) => const AdminSettingsScreen(),
       ),
 
       // ═══════════════════════════════════════════════════════════

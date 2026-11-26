@@ -102,11 +102,12 @@ class ReviewsRepository {
   // MUTATIONS
   // ═══════════════════════════════════════════════════════════════
 
-  /// ينشئ تقييماً جديداً. يُعيد الـ id الجديد من Firestore.
+  /// ينشئ تقييماً جديداً بمعرف حتمي فريد لمنع تعدد التقييمات. يُعيد الـ id الجديد من Firestore.
   /// يرمي استثناء عند الفشل (permission-denied، network، إلخ).
   Future<String> create(Review review) async {
-    final doc = await _ref.add(review.toMap());
-    return doc.id;
+    final docId = '${review.userId}_${review.placeId}';
+    await _ref.doc(docId).set(review.toMap());
+    return docId;
   }
 
   /// [v1.3] يحدّث تقييماً موجوداً.

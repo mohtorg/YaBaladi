@@ -22,7 +22,29 @@ class PlacesRepository {
   // TRENDING
   // ═══════════════════════════════════════════════════════════════
 
-  Future<List<Place>> getTrending({int limit = 10}) async {
+  Future<List<Place>> getTrending({
+    int limit = 10,
+    bool preferCache = false,
+  }) async {
+    if (preferCache) {
+      try {
+        final cachedSnap = await _db
+            .collection(_collection)
+            .where('isApproved', isEqualTo: true)
+            .where('isActive', isEqualTo: true)
+            .orderBy('averageRating', descending: true)
+            .limit(limit)
+            .get(const GetOptions(source: Source.cache));
+        if (cachedSnap.docs.isNotEmpty) {
+          return cachedSnap.docs
+              .map((doc) => Place.fromMap(doc.id, doc.data()))
+              .toList();
+        }
+      } catch (_) {
+        // خطة احتياطية في حال لم تكن البيانات بالكاش
+      }
+    }
+
     final snap = await _db
         .collection(_collection)
         .where('isApproved', isEqualTo: true)
@@ -75,7 +97,25 @@ class PlacesRepository {
   // ALL PLACES
   // ═══════════════════════════════════════════════════════════════
 
-  Future<List<Place>> getAllPlaces() async {
+  Future<List<Place>> getAllPlaces({bool preferCache = false}) async {
+    if (preferCache) {
+      try {
+        final cachedSnap = await _db
+            .collection(_collection)
+            .where('isApproved', isEqualTo: true)
+            .where('isActive', isEqualTo: true)
+            .limit(100)
+            .get(const GetOptions(source: Source.cache));
+        if (cachedSnap.docs.isNotEmpty) {
+          return cachedSnap.docs
+              .map((doc) => Place.fromMap(doc.id, doc.data()))
+              .toList();
+        }
+      } catch (_) {
+        // خطة احتياطية في حال لم تكن البيانات بالكاش
+      }
+    }
+
     final snap = await _db
         .collection(_collection)
         .where('isApproved', isEqualTo: true)
@@ -89,9 +129,23 @@ class PlacesRepository {
   // GET BY ID
   // ═══════════════════════════════════════════════════════════════
 
-  Future<Place?> getById(String id) async {
+  Future<Place?> getById(String id, {bool preferCache = false}) async {
+    if (preferCache) {
+      try {
+        final cachedDoc = await _db
+            .collection(_collection)
+            .doc(id)
+            .get(const GetOptions(source: Source.cache));
+        if (cachedDoc.exists && cachedDoc.data() != null) {
+          return Place.fromMap(cachedDoc.id, cachedDoc.data()!);
+        }
+      } catch (_) {
+        // خطة احتياطية في حال لم تكن الوثيقة بالكاش
+      }
+    }
+
     final doc = await _db.collection(_collection).doc(id).get();
-    if (!doc.exists) return null;
+    if (!doc.exists || doc.data() == null) return null;
     return Place.fromMap(doc.id, doc.data()!);
   }
 

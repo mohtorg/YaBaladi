@@ -45,6 +45,7 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bodyController = TextEditingController();
   final _pinController = TextEditingController();
+  final _qrController = TextEditingController();
   final _bodyFocus = FocusNode();
 
   int _overall = 0;
@@ -141,6 +142,7 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
   void dispose() {
     _bodyController.dispose();
     _pinController.dispose();
+    _qrController.dispose();
     _bodyFocus.dispose();
     super.dispose();
   }
@@ -182,6 +184,9 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
       userProvidedPin: _pinController.text.trim().isEmpty
           ? null
           : _pinController.text.trim(),
+      userProvidedQr: _qrController.text.trim().isEmpty
+          ? null
+          : _qrController.text.trim(),
     );
 
     if (!mounted) return;
@@ -208,6 +213,8 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
   String _successMessageFor(String? method, {bool isUpdate = false}) {
     final prefix = isUpdate ? 'تم تحديث تقييمك' : 'تم نشر تقييمك';
     switch (method) {
+      case 'QR':
+        return '$prefix — موثّق بمسح رمز QR المكان ✅';
       case 'POLYGON_PIN':
       case 'POLYGON':
         return '$prefix — موثّق داخل حدود المنطقة';
@@ -260,6 +267,7 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
         criteria: _criteria,
         initialScores: _scores,
         initialPin: _pinController.text,
+        initialQr: _qrController.text,
         hasPin: hasPin,
       ),
     );
@@ -267,6 +275,7 @@ class _RatePlaceScreenState extends State<RatePlaceScreen> {
       setState(() {
         _scores = result.scores;
         _pinController.text = result.pin;
+        _qrController.text = result.qrPayload;
       });
     }
   }
@@ -553,20 +562,27 @@ class _StarRow extends StatelessWidget {
 class _DetailsResult {
   final Map<String, int> scores;
   final String pin;
+  final String qrPayload;
 
-  const _DetailsResult({required this.scores, required this.pin});
+  const _DetailsResult({
+    required this.scores,
+    required this.pin,
+    required this.qrPayload,
+  });
 }
 
 class _DetailsSheet extends StatefulWidget {
   final List<ReviewCriterionModel> criteria;
   final Map<String, int> initialScores;
   final String initialPin;
+  final String initialQr;
   final bool hasPin;
 
   const _DetailsSheet({
     required this.criteria,
     required this.initialScores,
     required this.initialPin,
+    required this.initialQr,
     required this.hasPin,
   });
 
@@ -577,17 +593,20 @@ class _DetailsSheet extends StatefulWidget {
 class _DetailsSheetState extends State<_DetailsSheet> {
   late Map<String, int> _scores;
   late final TextEditingController _pinController;
+  late final TextEditingController _qrController;
 
   @override
   void initState() {
     super.initState();
     _scores = Map.from(widget.initialScores);
     _pinController = TextEditingController(text: widget.initialPin);
+    _qrController = TextEditingController(text: widget.initialQr);
   }
 
   @override
   void dispose() {
     _pinController.dispose();
+    _qrController.dispose();
     super.dispose();
   }
 
@@ -632,6 +651,28 @@ class _DetailsSheetState extends State<_DetailsSheet> {
                 (v) => setState(() => _scores[c.fieldKey] = v ?? 0),
               );
             }),
+            const SizedBox(height: YaBaladiDesignTokens.space5),
+            Text(
+              'رمز QR للزيارة (توثيق الزيارة)',
+              style: YaBaladiTypography.headingLabel
+                  .copyWith(color: colorScheme.onSurface),
+            ),
+            const SizedBox(height: YaBaladiDesignTokens.space1),
+            Text(
+              'امسح أو الصق رمز QR الموجود في المكان لتأكيد زيارتك',
+              style: YaBaladiTypography.caption
+                  .copyWith(color: YaBaladiDesignTokens.textSecondary),
+            ),
+            const SizedBox(height: YaBaladiDesignTokens.space2),
+            TextFormField(
+              controller: _qrController,
+              textAlign: TextAlign.center,
+              style: YaBaladiTypography.bodyMedium,
+              decoration: const InputDecoration(
+                hintText: 'YB-QR:v1:...',
+                prefixIcon: Icon(Icons.qr_code_scanner_rounded),
+              ),
+            ),
             if (widget.hasPin) ...[
               const SizedBox(height: YaBaladiDesignTokens.space5),
               Text(
@@ -666,6 +707,7 @@ class _DetailsSheetState extends State<_DetailsSheet> {
                   _DetailsResult(
                     scores: _scores,
                     pin: _pinController.text,
+                    qrPayload: _qrController.text.trim(),
                   ),
                 );
               },

@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class VisitService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// ينشئ وثيقة زيارة موثقة. يجب أن يُستدعى **بعد** التحقق من GPS و/أو PIN.
+  /// ينشئ وثيقة زيارة موثقة. يجب أن يُستدعى **بعد** التحقق من QR أو GPS و/أو PIN.
   Future<String> createVisit({
     required String userId,
     required String placeId,
@@ -17,18 +17,22 @@ class VisitService {
     required double? distanceMeters,
     required bool isMockedLocation,
     required String deviceId,
+    bool qrVerified = false,
   }) async {
-    final isValid = (gpsVerified || pinVerified) && !isMockedLocation;
+    final isValid =
+        (qrVerified || gpsVerified || pinVerified) && !isMockedLocation;
 
     final data = <String, dynamic>{
       'userId': userId,
       'placeId': placeId,
-      'verificationMethod': _deriveMethod(gpsVerified, pinVerified),
+      'verificationMethod':
+          _deriveMethod(gpsVerified, pinVerified, qrVerified),
       'latitude': latitude,
       'longitude': longitude,
       'distanceMeters': distanceMeters,
       'pinVerified': pinVerified,
       'gpsVerified': gpsVerified,
+      'qrVerified': qrVerified,
       'isMockedLocation': isMockedLocation,
       'deviceId': deviceId,
       'verifiedAt': isValid ? FieldValue.serverTimestamp() : null,
@@ -71,7 +75,8 @@ class VisitService {
     return snap.count ?? 0;
   }
 
-  String _deriveMethod(bool gps, bool pin) {
+  String _deriveMethod(bool gps, bool pin, [bool qr = false]) {
+    if (qr) return 'QR';
     if (gps && pin) return 'GPS_PIN';
     if (gps) return 'GPS';
     if (pin) return 'PIN';

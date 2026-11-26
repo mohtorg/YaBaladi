@@ -38,6 +38,7 @@ class RatingController extends ChangeNotifier {
     required Map<String, dynamic> dimensionsMetadata,
     required String body,
     String? userProvidedPin,
+    String? userProvidedQr,
   }) async {
     _isSubmitting = true;
     _error = null;
@@ -57,6 +58,7 @@ class RatingController extends ChangeNotifier {
         dimensionsMetadata: dimensionsMetadata,
         body: body,
         userProvidedPin: userProvidedPin,
+        userProvidedQr: userProvidedQr,
       );
 
       _isSubmitting = false;

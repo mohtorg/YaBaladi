@@ -9,11 +9,13 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/adjusted_score_service.dart';
+import '../../../core/services/qr_verification_service.dart';
 import '../../../core/utils/location_helper.dart';
 import '../../../core/helpers/location_url_helper.dart';
 import '../../auth/controllers/auth_controller.dart';
@@ -345,6 +347,11 @@ class _PlaceDetailsScreenState extends State<PlaceDetailsScreen> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop()),
               actions: [
+                _QrCodeButton(
+                  placeId: widget.placeId,
+                  placeName: nameAr,
+                  governorate: gov,
+                ),
                 const _TripBagIcon(),
                 _FavoriteButton(placeId: widget.placeId),
                 const SizedBox(width: 8),
@@ -1266,6 +1273,119 @@ class _BottomBar extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _QrCodeButton extends StatelessWidget {
+  final String placeId;
+  final String placeName;
+  final String governorate;
+
+  const _QrCodeButton({
+    required this.placeId,
+    required this.placeName,
+    required this.governorate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.qr_code_2_rounded),
+      tooltip: 'رمز توثيق المكان (QR)',
+      onPressed: () => _showQrDialog(context),
+    );
+  }
+
+  void _showQrDialog(BuildContext context) {
+    final payload = QrVerificationService.generatePlaceQrPayload(
+      placeId: placeId,
+      governorate: governorate,
+    );
+    final theme = Theme.of(context);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.qr_code_2_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'رمز توثيق الزيارة',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              placeName,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.qr_code_scanner_rounded, size: 48),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    payload,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'هذا الرمز هو الهوية المعتمدة للمكان؛ يمكن لصاحب المكان عرضه أو طباعته ليقوم الزوار بمسحه وإثبات زيارتهم وحصول تقييماتهم على أعلى موثوقية.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: payload));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('تم نسخ رمز المكان بنجاح'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              Navigator.pop(ctx);
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('نسخ الرمز'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إغلاق'),
+          ),
+        ],
       ),
     );
   }

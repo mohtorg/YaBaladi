@@ -80,9 +80,10 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     final db = FirebaseFirestore.instance;
     final placeRef = db.collection('places').doc(widget.place.id);
     // نحدد مسار التقييم: إما تعديل تقييم موجود، أو إنشاء تقييم جديد
+    final deterministicDocId = '${auth.uid}_${widget.place.id}';
     final reviewRef = isEditing
         ? db.collection('reviews').doc(widget.existingReview!.id)
-        : db.collection('reviews').doc();
+        : db.collection('reviews').doc(deterministicDocId);
 
     try {
       // ✅ استخدام Transaction لضمان التزامن بين حفظ التقييم وتحديث المكان

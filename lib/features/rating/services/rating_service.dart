@@ -12,6 +12,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../core/services/qr_verification_service.dart';
 import '../../../core/services/user_trust_service.dart';
 import '../../../models/moderation_log_model.dart';
 import '../../../models/rating_model.dart';
@@ -64,6 +65,7 @@ class RatingService {
     String? title,
     required String body,
     String? userProvidedPin,
+    String? userProvidedQr,
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -95,7 +97,21 @@ class RatingService {
       );
     }
 
-    // ─── 2. التحقق من PIN ───
+    // ─── 2.a التحقق من رمز QR (أعلى موثوقية حضور) ───
+    bool qrVerified = false;
+    if (userProvidedQr != null && userProvidedQr.trim().isNotEmpty) {
+      qrVerified = QrVerificationService.verifyQrPayload(
+        scannedPayload: userProvidedQr,
+        expectedPlaceId: placeId,
+      );
+      if (!qrVerified) {
+        return RatingSubmitResult.failure(
+          'رمز QR غير صالح أو لا يخص هذا المكان',
+        );
+      }
+    }
+
+    // ─── 2.b التحقق من PIN ───
     bool pinVerified = false;
     if (userProvidedPin != null && userProvidedPin.trim().isNotEmpty) {
       pinVerified = PinService.verify(
@@ -110,9 +126,10 @@ class RatingService {
       }
     }
 
-    if (!locationResult.success && !pinVerified) {
+    if (!locationResult.success && !pinVerified && !qrVerified) {
       return RatingSubmitResult.failure(
-        locationResult.reason ?? 'فشل التحقق من وجودك في المكان',
+        locationResult.reason ??
+            'فشل التحقق من وجودك في المكان — امسح رمز QR الخاص بالمكان أو فعّل الموقع الجغرافي',
       );
     }
 
@@ -165,10 +182,12 @@ class RatingService {
       polygonVerified: locationResult.isPolygonVerified,
       radiusVerified: locationResult.isRadiusVerified,
       pinVerified: pinVerified,
+      qrVerified: qrVerified,
     );
     final trustWeight = userTrustFactor * verificationFactor;
 
     final method = _methodFor(
+      qrVerified: qrVerified,
       polygonVerified: locationResult.isPolygonVerified,
       gpsVerified: locationResult.success,
       pinVerified: pinVerified,
@@ -180,6 +199,7 @@ class RatingService {
       placeId: placeId,
       gpsVerified: locationResult.success,
       pinVerified: pinVerified,
+      qrVerified: qrVerified,
       latitude: locationResult.latitude,
       longitude: locationResult.longitude,
       distanceMeters: locationResult.distanceMeters,
@@ -428,7 +448,9 @@ class RatingService {
     required bool polygonVerified,
     required bool radiusVerified,
     required bool pinVerified,
+    bool qrVerified = false,
   }) {
+    if (qrVerified) return 1.8;
     if (polygonVerified && pinVerified) return 1.7;
     if (polygonVerified) return 1.4;
     if (radiusVerified && pinVerified) return 1.5;
@@ -438,10 +460,12 @@ class RatingService {
   }
 
   String _methodFor({
+    required bool qrVerified,
     required bool polygonVerified,
     required bool gpsVerified,
     required bool pinVerified,
   }) {
+    if (qrVerified) return 'QR';
     if (polygonVerified && pinVerified) return 'POLYGON_PIN';
     if (polygonVerified) return 'POLYGON';
     if (gpsVerified && pinVerified) return 'GPS_PIN';

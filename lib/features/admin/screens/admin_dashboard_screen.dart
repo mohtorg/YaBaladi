@@ -33,17 +33,9 @@ import 'place_statistics_screen.dart';
 import 'review_statistics_screen.dart';
 import 'user_statistics_screen.dart';
 import 'admin_settings_screen.dart';
-import 'admin_statistics_screen.dart';
-import 'geo_zones_admin_screen.dart';
-import 'manage_geo_hierarchy_screen.dart';
 import 'admin_offer_requests_screen.dart';
-import 'admin_broadcast_notification_screen.dart';
 import 'admin_merchants_screen.dart';
 import 'audit_log_management_screen.dart';
-import 'manage_review_criteria_screen.dart';
-import 'admin_reports_screen.dart';
-import 'owner_claim_requests_screen.dart';
-import 'admin_recompute_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -155,12 +147,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             context, 'إدارة المواقع', Icons.map_outlined,
                             Colors.blue, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const ManageGeoHierarchyScreen()),
-                          );
+                          context.push('/admin/geo-hierarchy');
                         }),
                         _buildMoreItem(context, 'التصنيفات', Icons.category,
                             Colors.blue, () {
@@ -175,12 +162,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _buildMoreItem(context, 'إدارة المعايير',
                             Icons.fact_check_outlined, Colors.orange, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const ManageReviewCriteriaScreen()),
-                          );
+                          context.push('/admin/review-criteria');
                         }),
                         _buildReportsMenuItem(context),
                         _buildMoreItem(
@@ -190,22 +172,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           Colors.teal.shade700,
                           () {
                             Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const OwnerClaimRequestsScreen()),
-                            );
+                            context.push('/admin/owner-claims');
                           },
                         ),
                         _buildMoreItem(context, 'إدارة التجار',
                             Icons.people_alt, Colors.brown, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const AdminMerchantsScreen()),
-                          );
+                          context.push('/admin/merchants');
                         }),
                         _buildMoreItem(context, 'المستخدمون', Icons.people,
                             Colors.green, () {
@@ -215,11 +188,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _buildMoreItem(context, 'الحدود الجغرافية', Icons.public,
                             Colors.indigo, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const GeoZonesAdminScreen()),
-                          );
+                          context.push('/admin/geo-zones');
                         }),
                         _buildMoreItem(context, 'السجل', Icons.history,
                             Colors.blueGrey, () {
@@ -229,21 +198,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _buildMoreItem(context, 'الإحصائيات', Icons.analytics,
                             Colors.teal, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const AdminStatisticsScreen()),
-                          );
+                          context.push('/admin/statistics');
                         }),
                         _buildMoreItem(context, 'طلبات العروض',
                             Icons.local_offer, Colors.deepOrange, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const AdminOfferRequestsScreen()),
-                          );
+                          context.push('/admin/offer-requests');
                         }),
                         _buildMoreItem(
                           context,
@@ -252,22 +212,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           Colors.cyan.shade700,
                           () {
                             Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const AdminRecomputeScreen()),
-                            );
+                            context.push('/admin/recompute');
                           },
                         ),
                         _buildMoreItem(context, 'إشعار عام', Icons.campaign,
                             Colors.red, () {
                           Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const AdminBroadcastNotificationScreen()),
-                          );
+                          context.push('/admin/broadcast');
                         }),
                       ],
                     ),
@@ -298,10 +249,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Colors.red.shade700,
           () {
             Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminReportsScreen()),
-            );
+            context.push('/admin/reports');
           },
           badgeCount: count,
         );
